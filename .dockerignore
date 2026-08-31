@@ -1,0 +1,12 @@
+# Áp dụng cho build context của Dockerfile.backend (context = thư mục gốc repo).
+**/bin/
+**/obj/
+.vs/
+.vscode/
+4.Test/
+docs/
+assets/
+fontend/
+*.md
+.git/
+.gitignore

@@ -1,0 +1,102 @@
+﻿# Quy trình lu?ng làm vi?c (Workflow) - Development & Operations
+
+M?c ?ích: Mô t? quy trình làm vi?c chu?n cho phát tri?n, ki?m th?, review, tri?n khai và v?n hành h? th?ng `SolutionDepot`.
+
+1. Vai trò
+- Team Lead: quy?t ??nh k? thu?t, duy?t PR, phê duy?t release.
+- Backend Developer: th?c hi?n feature, vi?t test, t?o PR.
+- Frontend Developer: tri?n khai UI, tích h?p API.
+- Tester/QA: t?o test cases, ch?y E2E, báo l?i.
+- DevOps: qu?n lý CI/CD, deploy, giám sát.
+- On-call/Operator: x? lý s? c? v?n hành, theo runbook.
+
+2. Issue lifecycle
+- T?o Issue (template): tiêu ??, mô t?, acceptance criteria, priority, estimate (story points ho?c gi?).
+- Triage: Team Lead/PO phân lo?i, gán nhãn (`bug`, `feature`, `hotfix`, `ops`), ch? ??nh ng??i ph? trách.
+- Planning: ??a vào sprint/backlog, breakdown task khi c?n.
+
+3. Branch & Commit conventions
+- Branch: `feature/<ISSUE-ID>-short-desc`, `bugfix/<ISSUE-ID>-short-desc`, `hotfix/<desc>`.
+- Commit message: `<type>(<scope>): <short summary>` (type: feat, fix, chore, docs, test).
+- Push frequently, gi? branch nh?, 1 feature = 1 PR.
+
+4. Development flow
+- Pull latest `main`/`develop`, rebase/merge tr??c khi làm PR.
+- Vi?t code theo ki?n trúc: Controller m?ng -> Application Service -> Data.
+- Vi?t unit tests cho logic business; vi?t integration tests cho DB/EF n?u c?n.
+- Lint & format code local (EditorConfig, analyzers, ESLint/Prettier for frontend).
+
+5. Pull Request (PR)
+- PR template: mô t?, issue liên quan, change summary, migration required (Y/N), test instructions, checklist.
+- Copilot có th? sinh code/mô t? nh?ng PR ph?i ???c review và ch?nh b?i con ng??i.
+- Yêu c?u review: t?i thi?u 1 reviewer (Team Lead cho thay ??i l?n).
+- PR checklists: build green, unit tests pass, integration tests pass, security scan ok, migration script included n?u có schema change.
+
+6. CI Pipeline (PR)
+- Các b??c: restore -> build -> run linters -> run unit tests -> run integration tests (optional) -> run static/security scanners -> publish test reports.
+- Không merge n?u CI failed.
+
+7. Merging & Release
+- Squash-merge ho?c merge commit theo quy ??c team.
+- Release process: t?o release branch / tag `vYYYY.MM.DD` ho?c semantic versioning.
+- Ch?y migration trong controlled step: backup DB -> run migrations -> verify.
+- Deploy to `staging` first -> smoke tests -> approve -> deploy `production`.
+
+8. Hotfix & Emergency release
+- Branch `hotfix/<desc>` t? `main`, implement, run CI, small window deploy.
+- Notify stakeholders, create post-mortem.
+
+9. Deployment environments
+- `dev` (developer local / feature env)
+- `staging` (pre-prod test, mirror prod config)
+- `prod` (live)
+- Configs & secrets per environment, stored in secret manager.
+
+10. Database migration rules
+- Migrations must be reviewed in PR.
+- Use additive changes when possible; breaking changes require migration plan and downtime window.
+- Keep rollback plan and backup snapshot before applying in prod.
+
+11. Monitoring & Alerting
+- Logs: centralized Serilog sink (ELK/Seq/Datadog).
+- Health checks endpoint `/health` and metrics exporter for Prometheus.
+- Alerts: DB down, high error rate, failed jobs, payment webhook failures.
+- On alert: follow runbook -> assign on-call -> escalate to Team Lead.
+
+12. Incident management
+- Triage: Severity P1/P2/P3; P1 = production outage.
+- Communication: use Slack/MS Teams channel + incident doc.
+- Post-mortem: timeline, root cause, mitigation, action items.
+
+13. Scheduled jobs & EDI
+- `Depot.ApiIntegration` runs scheduled polling, EDI sends/receives messages.
+- Jobs must be idempotent and have retry/backoff and dead-letter for poison messages.
+
+14. Payments & Webhooks
+- Webhook endpoint must validate signatures and idempotency keys.
+- On payment failure, create ticket and notify Billing team.
+
+15. Security & Compliance
+- No secrets in code. Use Key Vault / pipeline secret store.
+- Run static code analysis and dependency vulnerability scan.
+- Periodic access review for production credentials.
+
+16. Operational runbooks (short)
+- Recover service: check logs -> restart service -> run smoke tests.
+- DB restore: follow backup & restore guide (stored in `0. Solution Items/runbooks`).
+- File storage issue: check `Storage-File` logs and disk space; failover to alternative provider if configured.
+
+17. Onboarding checklist for new developer
+- Clone repo, open solution.
+- Setup local DB and env vars from `.env.sample`.
+- Run `dotnet ef database update` and seed data.
+- Start `Depot.BackendApi` and run unit tests.
+- Read architecture docs in `0. Solution Items` and join team channels.
+
+18. Documentation & templates
+- Keep `PR_TEMPLATE.md`, `ISSUE_TEMPLATE.md`, `CONTRIBUTING.md` in `0. Solution Items`.
+- Publish OpenAPI spec artifact in CI for frontend integration.
+
+---
+
+File này là b?n tóm t?t quy trình lu?ng làm vi?c. N?u b?n mu?n tôi t?o các file m?u (PR_TEMPLATE.md, ISSUE_TEMPLATE.md, runbook chi ti?t), ch?n m?c mu?n sinh tr??c.

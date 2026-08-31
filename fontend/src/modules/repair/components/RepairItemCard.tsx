@@ -1,0 +1,352 @@
+import React, { useState } from 'react';
+import {
+  Play,
+  Camera,
+  CheckCircle2,
+  Clock,
+  Wrench,
+  Image as ImageIcon,
+  Layers,
+  FileCheck,
+  Package,
+  AlertCircle,
+  ChevronDown,
+  ChevronUp,
+  Eye
+} from 'lucide-react';
+import { WorkOrderRepairItem, RepairPhoto } from '../types/repair';
+
+interface RepairItemCardProps {
+  item: WorkOrderRepairItem;
+  workOrderNo: string;
+  containerNo: string;
+  onStartRepairItem: (itemId: string) => void;
+  onOpenCapturePhotos: (item: WorkOrderRepairItem) => void;
+  onOpenCompleteModal: (item: WorkOrderRepairItem) => void;
+  onOpenCompareModal: (item: WorkOrderRepairItem) => void;
+}
+
+export const RepairItemCard: React.FC<RepairItemCardProps> = ({
+  item,
+  workOrderNo,
+  containerNo,
+  onStartRepairItem,
+  onOpenCapturePhotos,
+  onOpenCompleteModal,
+  onOpenCompareModal
+}) => {
+  const [isExpanded, setIsExpanded] = useState(true);
+  const [selectedPhotoPreview, setSelectedPhotoPreview] = useState<string | null>(null);
+
+  const beforePhotos = item.photos.filter((p) => p.type === 'BEFORE');
+  const afterPhotos = item.photos.filter((p) => p.type === 'AFTER');
+
+  const statusConfig = {
+    PENDING: {
+      label: 'Chưa sửa (Waiting)',
+      bgColor: 'bg-slate-800 text-slate-300 border-slate-700',
+      indicator: 'bg-slate-500'
+    },
+    IN_PROGRESS: {
+      label: 'Đang sửa (In Progress)',
+      bgColor: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+      indicator: 'bg-amber-400 animate-pulse'
+    },
+    COMPLETED: {
+      label: 'Đã hoàn thành (Completed)',
+      bgColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+      indicator: 'bg-emerald-400'
+    }
+  };
+
+  const currentStatus = statusConfig[item.status] || statusConfig.PENDING;
+
+  return (
+    <div className={`bg-slate-900 border rounded-3xl overflow-hidden transition-all duration-200 ${
+      item.status === 'COMPLETED'
+        ? 'border-emerald-500/40 shadow-md shadow-emerald-950/20'
+        : item.status === 'IN_PROGRESS'
+        ? 'border-amber-500/50 shadow-md shadow-amber-950/20'
+        : 'border-slate-800'
+    }`}>
+      {/* Top Bar of Item Card */}
+      <div className="p-4 sm:p-5 bg-slate-950/90 border-b border-slate-800/80 flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <div className={`w-9 h-9 rounded-2xl flex items-center justify-center font-mono font-black text-sm border ${
+            item.status === 'COMPLETED'
+              ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+              : item.status === 'IN_PROGRESS'
+              ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+              : 'bg-slate-800 text-slate-300 border-slate-700'
+          }`}>
+            {item.itemNo < 10 ? `0${item.itemNo}` : item.itemNo}
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h4 className="text-sm font-bold text-white">
+                {item.repairNameVi}
+              </h4>
+              <span className="font-mono text-xs font-bold px-2 py-0.5 bg-blue-950 text-blue-300 border border-blue-800 rounded">
+                Mã: {item.repairCode}
+              </span>
+            </div>
+            <div className="text-xs text-slate-400 mt-0.5 flex items-center gap-2 font-mono">
+              <span>Vị trí: <strong className="text-slate-200">{item.locationVi} ({item.locationCode})</strong></span>
+              <span>&bull;</span>
+              <span>Hư hỏng: <strong className="text-amber-400">{item.damageCode} - {item.damageNameVi}</strong></span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Status Badge */}
+          <span className={`px-3 py-1 rounded-full text-xs font-bold border flex items-center gap-1.5 ${currentStatus.bgColor}`}>
+            <span className={`w-2 h-2 rounded-full ${currentStatus.indicator}`} />
+            <span>{currentStatus.label}</span>
+          </span>
+
+          <button
+            type="button"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition cursor-pointer"
+          >
+            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+        </div>
+      </div>
+
+      {/* Expandable Body */}
+      {isExpanded && (
+        <div className="p-4 sm:p-6 space-y-5">
+          {/* Technical Specs and Description */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+            <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800">
+              <span className="text-slate-500 block">Nội Dung Thi Công:</span>
+              <span className="font-medium text-slate-200">{item.description}</span>
+            </div>
+            <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800">
+              <span className="text-slate-500 block">Quy Cách Khối Lượng:</span>
+              <span className="font-bold text-amber-300 font-mono">{item.quantity} {item.unit} &bull; Chuẩn IICL</span>
+            </div>
+            <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800">
+              <span className="text-slate-500 block">Tiến Độ & Thợ Phụ Trách:</span>
+              <span className="font-bold text-slate-200">
+                {item.technician || 'Tổ thợ cơ khí EMR'}
+                {item.actualHours ? ` (${item.actualHours}h)` : ''}
+              </span>
+            </div>
+          </div>
+
+          {/* Photo Section: Before & After Photo Preview Cards */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                <ImageIcon className="w-3.5 h-3.5 text-blue-400" />
+                <span>Bằng Chứng Hình Ảnh Đối Chứng (Before &bull; After)</span>
+              </span>
+
+              {afterPhotos.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => onOpenCompareModal(item)}
+                  className="text-xs font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1 cursor-pointer transition"
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>So sánh Trước / Sau</span>
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Box 1: BEFORE PHOTO */}
+              <div className="p-3 bg-slate-950 rounded-2xl border border-amber-900/40 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-amber-400 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                    <span>ẢNH TRƯỚC SỬA (BEFORE)</span>
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-mono">Giám định e-EIR</span>
+                </div>
+
+                {beforePhotos.length > 0 ? (
+                  <div
+                    onClick={() => setSelectedPhotoPreview(beforePhotos[0].url)}
+                    className="relative rounded-xl overflow-hidden aspect-video bg-black cursor-pointer group border border-slate-800"
+                  >
+                    <img
+                      src={beforePhotos[0].url}
+                      alt="Ảnh trước sửa"
+                      className="w-full h-full object-cover group-hover:scale-105 transition"
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-xs font-bold gap-1">
+                      <Eye className="w-4 h-4" />
+                      <span>Xem ảnh lớn</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-28 rounded-xl bg-slate-900 border border-dashed border-slate-800 flex items-center justify-center text-slate-500 text-xs">
+                    Chưa có ảnh trước sửa
+                  </div>
+                )}
+              </div>
+
+              {/* Box 2: AFTER PHOTO */}
+              <div className="p-3 bg-slate-950 rounded-2xl border border-emerald-900/40 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-emerald-400 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    <span>ẢNH SAU SỬA (AFTER) ({afterPhotos.length})</span>
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-mono">
+                    {afterPhotos.length > 0 ? 'Đã nghiệm thu ảnh' : 'Bắt buộc chụp'}
+                  </span>
+                </div>
+
+                {afterPhotos.length > 0 ? (
+                  <div
+                    onClick={() => setSelectedPhotoPreview(afterPhotos[0].url)}
+                    className="relative rounded-xl overflow-hidden aspect-video bg-black cursor-pointer group border border-emerald-800/60"
+                  >
+                    <img
+                      src={afterPhotos[0].url}
+                      alt="Ảnh sau sửa"
+                      className="w-full h-full object-cover group-hover:scale-105 transition"
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-xs font-bold gap-1">
+                      <Eye className="w-4 h-4" />
+                      <span>Xem ảnh lớn ({afterPhotos.length} ảnh)</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => onOpenCapturePhotos(item)}
+                    className="h-28 rounded-xl bg-emerald-950/20 hover:bg-emerald-950/40 border-2 border-dashed border-emerald-600/40 hover:border-emerald-500 flex flex-col items-center justify-center p-3 text-center cursor-pointer transition group"
+                  >
+                    <Camera className="w-6 h-6 text-emerald-400 group-hover:scale-110 transition mb-1" />
+                    <span className="text-xs font-bold text-emerald-300">+ Bấm chụp ảnh sau sửa</span>
+                    <span className="text-[10px] text-slate-400">Dùng camera hoặc chọn file</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* If completed, show material usage & technical notes summary */}
+          {item.status === 'COMPLETED' && (
+            <div className="p-4 bg-slate-950 rounded-2xl border border-emerald-900/40 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-emerald-300 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <span>Kết Quả Thi Công Đã Ghi Nhận:</span>
+                </span>
+                <span className="text-slate-400 font-mono">
+                  Hoàn thành lúc: {item.completedAt || '2026-08-15 11:30'}
+                </span>
+              </div>
+
+              <p className="text-slate-300 leading-relaxed bg-slate-900 p-2.5 rounded-xl border border-slate-800">
+                {item.executionNotes || 'Đã hàn kín, mài phẳng mối nối, sơn chống rỉ chuẩn kỹ thuật IICL.'}
+              </p>
+
+              {item.materialsUsed.length > 0 && (
+                <div className="pt-1 flex items-center gap-2 flex-wrap">
+                  <span className="text-slate-500 font-bold flex items-center gap-1">
+                    <Package className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Vật tư xuất dùng:</span>
+                  </span>
+                  {item.materialsUsed.map((mat, i) => (
+                    <span
+                      key={i}
+                      className="px-2 py-0.5 bg-slate-900 border border-slate-700 text-amber-300 rounded font-mono text-[11px]"
+                    >
+                      {mat.materialName} ({mat.quantity} {mat.unit})
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Action Buttons for Worker (Touch-Friendly) */}
+          <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              {/* Compare Photos button */}
+              {afterPhotos.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => onOpenCompareModal(item)}
+                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700 flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <Layers className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Đối Chiếu Ảnh</span>
+                </button>
+              )}
+
+              {/* Capture / Add More After Photos */}
+              <button
+                type="button"
+                onClick={() => onOpenCapturePhotos(item)}
+                className={`px-3.5 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition cursor-pointer ${
+                  afterPhotos.length > 0
+                    ? 'bg-slate-800 hover:bg-slate-700 text-emerald-300 border-emerald-800'
+                    : 'bg-emerald-950/60 hover:bg-emerald-900 text-emerald-300 border-emerald-600/60 shadow'
+                }`}
+              >
+                <Camera className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{afterPhotos.length > 0 ? `Thêm Ảnh Sau Sửa (${afterPhotos.length})` : 'Chụp Ảnh Sau Sửa'}</span>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {item.status === 'PENDING' && (
+                <button
+                  type="button"
+                  onClick={() => onStartRepairItem(item.id)}
+                  className="px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-black rounded-xl shadow-md shadow-amber-950 flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <Play className="w-4 h-4 fill-white" />
+                  <span>BẮT ĐẦU SỬA HẠNG MỤC NÀY</span>
+                </button>
+              )}
+
+              {item.status === 'IN_PROGRESS' && (
+                <button
+                  type="button"
+                  onClick={() => onOpenCompleteModal(item)}
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl shadow-md shadow-emerald-950 flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>GHI NHẬN KẾT QUẢ & HOÀN THÀNH</span>
+                </button>
+              )}
+
+              {item.status === 'COMPLETED' && (
+                <button
+                  type="button"
+                  onClick={() => onOpenCompleteModal(item)}
+                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl border border-slate-700 flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <FileCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Cập Nhật Kết Quả</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox Modal */}
+      {selectedPhotoPreview && (
+        <div
+          className="fixed inset-0 z-60 bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setSelectedPhotoPreview(null)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl">
+            <img src={selectedPhotoPreview} alt="Zoom preview" className="w-full h-full object-contain" />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

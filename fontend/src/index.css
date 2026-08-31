@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+/* Ensure root containers support 100% dynamic viewport and smooth touch scrolling */
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  -webkit-overflow-scrolling: touch;
+  touch-action: manipulation;
+}
+
+/* Enable hardware-accelerated momentum touch scrolling across all scrolling divs */
+.overflow-y-auto,
+.overflow-x-auto,
+.overflow-auto,
+main {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* Custom subtle scrollbars for touch & desktop */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.4);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(71, 85, 105, 0.6);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.9);
+}
+
+/* Mobile tap highlight reset */
+* {
+  -webkit-tap-highlight-color: transparent;
+}

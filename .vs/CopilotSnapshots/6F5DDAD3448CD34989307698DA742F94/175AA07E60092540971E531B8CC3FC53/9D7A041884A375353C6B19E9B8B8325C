@@ -1,0 +1,49 @@
+﻿using System;
+using Microsoft.EntityFrameworkCore;
+using Depot.Data.EF;
+using Depot.Data.Entities;
+
+// Simple seeder: apply migrations and insert sample master data if absent.
+
+var builder = new ConfigurationBuilder();
+// read environment variable or use localdb default
+var envConn = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection");
+var connectionString = envConn ?? "Server=(localdb)\\mssqllocaldb;Database=SolutionDepot.Dev;Trusted_Connection=True;";
+
+var optionsBuilder = new DbContextOptionsBuilder<DepotDbContext>();
+optionsBuilder.UseSqlServer(connectionString);
+
+using var db = new DepotDbContext(optionsBuilder.Options);
+
+Console.WriteLine("Applying migrations (if any)...");
+try
+{
+    db.Database.Migrate();
+    Console.WriteLine("Migrations applied.");
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"Migration failed: {ex.Message}");
+}
+
+if (!db.GateIns.Any())
+{
+    Console.WriteLine("Seeding sample GateIn data...");
+    db.GateIns.Add(new GateIn
+    {
+        ContainerNo = "ABCD1234567",
+        SealNo = "SEAL001",
+        TruckPlate = "51C-12345",
+        DriverName = "Nguyen Van A",
+        Status = "Received",
+        CreatedAt = DateTime.UtcNow
+    });
+    db.SaveChanges();
+    Console.WriteLine("Seed complete.");
+}
+else
+{
+    Console.WriteLine("Seed data already present, skipping.");
+}
+
+Console.WriteLine("Done.");

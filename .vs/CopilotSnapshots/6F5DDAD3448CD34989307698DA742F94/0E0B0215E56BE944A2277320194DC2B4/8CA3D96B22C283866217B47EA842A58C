@@ -1,0 +1,232 @@
+﻿# TÀI LIỆU ĐẶC TẢ NGHIỆP VỤ & HỆ THỐNG QUẢN LÝ DEPOT CONTAINER & SỬA CHỮA EMR
+**Dự Án:** Giải Pháp Số Hóa Vận Hành Depot Container & Quy Trình Sửa Chữa EMR Toàn Diện  
+**Tiêu Chuẩn Áp Dụng:** IICL-6 (Institute of International Container Lessors), ISO 6346, EDIFACT (CODECO, WESTIM, DESTIM)  
+**Phiên Bản Hệ Thống:** Enterprise Edition v3.5  
+**Cập Nhật:** 2026
+
+---
+
+## MỤC LỤC
+1. [Giới Thiệu Tổng Quan & Phạm Vi Nghiệp Vụ](#1-giới-thiệu-tổng-quan--phạm-vi-nghiệp-vụ)
+2. [Sơ Đồ Quy Trình Vận Hành Chuẩn 10 Bước (End-to-End Workflow)](#2-sơ-đồ-quy-trình-vận-hành-chuẩn-10-bước-end-to-end-workflow)
+3. [Chi Tiết Từng Phân Hệ Chức Năng](#3-chi-tiết-từng-phân-hệ-chức-năng)
+   - 3.1. [Cổng Tiếp Nhận & Xuất Vỏ (Gate-In & Gate-Out)](#31-cổng-tiếp-nhận--xuất-vỏ-gate-in--gate-out)
+   - 3.2. [Giám Định e-EIR & Phân Hạng Vỏ IICL-6 (Inspection & Survey)](#32-giám-định-e-eir--phân-hạng-vỏ-iicl-6-inspection--survey)
+   - 3.3. [Tổ Vệ Sinh Vỏ Container (Cleaning Bay)](#33-tổ-vệ-sinh-vỏ-container-cleaning-bay)
+   - 3.4. [Báo Giá Sửa Chữa & Phê Duyệt Estimate (MNR Estimation)](#34-báo-giá-sửa-chữa--phê-duyệt-estimate-mnr-estimation)
+   - 3.5. [Thi Công Sửa Chữa (Work Orders) & Nghiệm Thu KCS (QC)](#35-thi-công-sửa-chữa-work-orders--nghiệm-thu-kcs-qc)
+   - 3.6. [Quản Lý Vật Tư Kho EMR (Nhập - Xuất - Tồn)](#36-quản-lý-vật-tư-kho-emr-nhập---xuất---tồn)
+   - 3.7. [Quản Lý Sơ Đồ Bãi 2D & Điều Phối Xe Nâng (Yard & Forklift)](#37-quản-lý-sơ-đồ-bãi-2d--điều-phối-xe-nâng-yard--forklift)
+   - 3.8. [Khai Thác Cước, Biểu Phí & Thanh Toán VietQR (Billing & Tariffs)](#38-khai-thác-cước-biểu-phí--thanh-toán-vietqr-billing--tariffs)
+   - 3.9. [Cổng Thông Tin Zalo OA Gateway & Chatbot 2 Chiều](#39-cổng-thông-tin-zalo-oa-gateway--chatbot-2-chiều)
+   - 3.10. [Quản Lý Khách Hàng (Trucking, Forwarder & Hãng Tàu)](#310-quản-lý-khách-hàng-trucking-forwarder--hãng-tàu)
+4. [Mô Hình Phân Quyền Phân Vai Người Dùng (RBAC - 10 Vai Trò)](#4-mô-hình-phân-quyền-phân-vai-người-dùng-rbac---10-vai-trò)
+5. [Cơ Sở Dữ Liệu & Danh Mục Dùng Chung (Master Data)](#5-cơ-sở-dữ-liệu--danh-mục-dùng-chung-master-data)
+6. [Hướng Dẫn Vận Hành Từng Nghiệp Vụ Cụ Thể](#6-hướng-dẫn-vận-hành-từng-nghiệp-vụ-cụ-thể)
+
+---
+
+## 1. GIỚI THIỆU TỔNG QUAN & PHẠM VI NGHIỆP VỤ
+
+Hệ thống được thiết kế chuyên biệt phục vụ các Depot cảng cạn, ICD và trung tâm khai thác vỏ container rỗng chuyên nghiệp, đáp ứng các tiêu chuẩn khắt khe của Hãng tàu quốc tế (Maersk Line) và quy chuẩn kỹ thuật quốc tế IICL-6.
+
+### Mục Tiêu Trọng Tâm:
+1. **Số hóa 100% quy trình giấy tờ:** Thay thế phiếu EIR giấy, báo giá giấy bằng e-EIR điện tử, Estimate trực tuyến và mã QR tương tác nhanh.
+2. **Tự động hóa chuỗi kiểm soát container:** Từ lúc xe đầu kéo vào cổng hạ vỏ $\rightarrow$ Giám định hư hỏng $\rightarrow$ Vệ sinh $\rightarrow$ Báo giá $\rightarrow$ Phê duyệt $\rightarrow$ Xuất vật tư $\rightarrow$ Sửa chữa $\rightarrow$ Nghiệm thu QC $\rightarrow$ Cấp vỏ Gate-Out.
+3. **Quản trị kho vật tư tinh gọn (Nhập - Xuất - Tồn):** Đảm bảo không âm kho, tự động cập nhật số lượng tồn tức thì ngay khi tạo phiếu nhập hoặc phiếu xuất vật tư.
+4. **Tích hợp kênh Zalo OA Gateway:** Gửi thông báo tự động và cho phép hãng tàu/thợ/tài xế tương tác 2 chiều (duyệt báo giá, yêu cầu vật tư, lấy mã QR cổng xuất).
+
+---
+
+## 2. SƠ ĐỒ QUY TRÌNH VẬN HÀNH CHUẨN 10 BƯỚC (END-TO-END WORKFLOW)
+
+```
+[BƯỚC 1: CỔNG VÀO (GATE-IN)]
+  └── Tiếp nhận xe kéo hạ vỏ rỗng, kiểm tra mã ISO 6346, chụp ảnh, tạo phiếu Gate-In e-EIR.
+        │
+[BƯỚC 2: GIÁM ĐỊNH TÌNH TRẠNG VỎ (SURVEY)]
+  └── Giám định viên kiểm tra 6 mặt theo chuẩn IICL-6, ghi nhận mã hư hỏng, phân hạng Grade (A/B/C/D).
+        │
+[BƯỚC 3: TỔ VỆ SINH VỎ CONTAINER (CLEANING BAY)]
+  └── Vệ sinh quét khô, rửa áp lực cao hoặc xử lý hóa chất mùi/dầu, cập nhật trạng thái đã sạch.
+        │
+[BƯỚC 4: LẬP BÁO GIÁ SỬA CHỮA (ESTIMATE CALCULATION)]
+  └── Hệ thống tự động tính giá nhân công, vật tư theo biểu phí Tariff của Hãng tàu.
+        │
+[BƯỚC 5: PHÊ DUYỆT BÁO GIÁ (APPROVAL)]
+  └── Hãng tàu duyệt báo giá qua Portal trực tuyến, EDI DESTIM hoặc bấm duyệt nhanh qua Zalo OA.
+        │
+[BƯỚC 6: LẬP LỆNH SỬA CHỮA & XUẤT VẬT TƯ (WORK ORDER & ISSUE)]
+  └── Tạo lệnh WO phân công tổ thợ EMR; Thủ kho lập Phiếu Xuất Kho (PXK) trừ tồn tự động.
+        │
+[BƯỚC 7: THI CÔNG SỬA CHỮA (EMR REPAIR)]
+  └── Thợ gò hàn, thay vách tôn, nắn xà, thay roong cửa; cập nhật tiến độ thi công.
+        │
+[BƯỚC 8: NGHIỆM THU KỸ THUẬT (QC INSPECTION)]
+  └── Kỹ sư QC kiểm tra chất lượng theo chuẩn IICL; Đạt (Passed) chuyển trạng thái Sẵn Sàng (Available).
+        │
+[BƯỚC 9: ĐIỀU PHỐI VỊ TRÍ BÃI 2D & XE NÂNG (YARD & FORKLIFT)]
+  └── Cập nhật tọa độ Block-Bay-Row-Tier; Lệnh xe nâng đảo chuyển cont hợp lý.
+        │
+[BƯỚC 10: CỔNG XUẤT CẤP VỎ (GATE-OUT)]
+  └── Tài xế xuất trình Booking & Mã QR; Hệ thống kiểm tra Grade vỏ phù hợp và hoàn tất Gate-Out.
+```
+
+---
+
+## 3. CHI TIẾT TỪNG PHÂN HỆ CHỨC NĂNG
+
+### 3.1. Cổng Tiếp Nhận & Xuất Vỏ (Gate-In & Gate-Out)
+- **Gate-In (Hạ vỏ rỗng):**
+  - Nhập số container (tự động kiểm tra thuật toán Check Digit ISO 6346: 4 chữ cái + 7 chữ số).
+  - Chọn Hãng tàu (Maersk Line, MSC, CMA-CGM,...), Loại kích thước (20DC, 40DC, 40HC, 45HC, 20RF, 40RF,...), Trọng lượng Tare Weight, Max Payload.
+  - Ghi nhận thông tin tài xế, biển số xe kéo, số rơ-moóc, công ty vận tải Trucking.
+  - Tự động in/phát hành **Phiếu e-EIR điện tử** kèm mã QR tra cứu.
+- **Gate-Out (Cấp vỏ xuất bãi):**
+  - Tra cứu số Booking của hãng tàu.
+  - Hệ thống tự động gợi ý vị trí vỏ container đạt chuẩn phân hạng yêu cầu (Grade A cho hàng thực phẩm/điện tử; Grade B cho hàng khô đóng bao; Grade C cho hàng thông thường).
+  - Phát hành mã **QR Gate-Out** gửi đến tài xế qua Zalo OA.
+
+### 3.2. Giám Định e-EIR & Phân Hạng Vỏ IICL-6 (Inspection & Survey)
+- **Sơ đồ cấu kiện 6 mặt:** Mặt cửa sau (Door), Vách trái (Left Side), Vách phải (Right Side), Mặt trước (Front), Nóc (Roof), Sàn & Gầm (Floor & Understructure).
+- **Bộ mã tiêu chuẩn quốc tế:**
+  - Vị trí cấu kiện (Location): Xà dọc nóc (TR), Xà dọc đáy (BR), Cột góc (CP), Tôn vách (SP), Tole nóc (RP), Tấm sàn gỗ (FP).
+  - Mã hư hỏng (Damage Codes): Rách thủng (H), Móp méo biến dạng (D), Rỉ sét thủng (C), Cong vênh (B), Bung mối hàn (BW), Dơ bẩn dầu mỡ (OL).
+  - Mã sửa chữa (Repair Codes): Cắt hàn ghép (I), Hàn đắp (W), Nắn thẳng (S), Thay mới toàn bộ (R), Vệ sinh hóa chất (CL).
+- **Phân định trách nhiệm thanh toán (Responsibility):**
+  - `CARRIER`: Hãng tàu chịu chi phí (hư hỏng tự nhiên do khai thác).
+  - `USER / TRUCKER`: Khách hàng/Tài xế/Forwarder chịu chi phí (hư hỏng do vận chuyển, tai nạn, đâm va).
+  - `DEPOT`: Chi phí nội bộ bãi.
+- **Phân hạng chất lượng vỏ (Grade Classification):**
+  - **Grade A:** Vỏ sạch tuyệt đối, không mùi, không rỉ sét, sàn đẹp $\rightarrow$ Dành cho hàng gạo, may mặc, thực phẩm, linh kiện điện tử.
+  - **Grade B:** Vỏ bình thường, đã qua sử dụng, kín nước kín sáng $\rightarrow$ Dành cho hàng công nghiệp, máy móc, nông sản khô.
+  - **Grade C:** Vỏ cũ, có trầy xước hàn vá $\rightarrow$ Dành cho phế liệu, quặng, gạch men.
+  - **Grade D:** Vỏ hư hỏng nặng, cần sửa chữa lớn trước khi cấp đóng hàng.
+
+### 3.3. Tổ Vệ Sinh Vỏ Container (Cleaning Bay)
+- **4 Phương pháp làm sạch:**
+  1. Quét dọn & Thổi khí khô (Dry Sweep & Blow).
+  2. Rửa nước áp lực cao (High Pressure Water Wash).
+  3. Tẩy rửa hóa chất khử mùi, tẩy dầu mỡ công nghiệp (Chemical Wash).
+  4. Khử trùng & Diệt khuẩn khoang hàng (Fumigation / Disinfection).
+- Ghi nhận trạng thái hoàn thành vệ sinh trước khi chuyển sang bước Báo giá hoặc Sẵn sàng cấp rỗng.
+
+### 3.4. Báo Giá Sửa Chữa & Phê Duyệt Estimate (MNR Estimation)
+- Tự động tra cứu đơn giá nhân công ($/Hour hoặc VNĐ/Công) và đơn giá vật tư chuẩn theo hợp đồng của từng Hãng tàu.
+- Tổng hợp thành bảng báo giá chi tiết từng dòng hư hỏng (Line-by-line damage breakdown).
+- Hỗ trợ gửi duyệt báo giá đa kênh:
+  - Gửi tệp điện tử chuẩn **EDI DESTIM / WESTIM** đến hệ thống Hãng tàu.
+  - Gửi thông báo kèm nút **"Phê Duyệt / Từ Chối"** ngay trên ứng dụng Zalo OA của đại diện Hãng tàu.
+
+### 3.5. Thi Công Sửa Chữa (Work Orders) & Nghiệm Thu KCS (QC)
+- Lập lệnh sửa chữa (WO) giao cho Tổ thợ EMR sau khi Hãng tàu duyệt báo giá.
+- Thợ trưởng kiểm tra tiến độ, báo xin cấp vật tư, báo hoàn thành thi công.
+- **Kỹ sư QC nghiệm thu 2 giai đoạn:**
+  - Kiểm tra kích thước, chất lượng mối hàn, độ kín nước kín sáng (Light Test / Water Test).
+  - Đạt chuẩn $\rightarrow$ Bấm **QC PASSED** $\rightarrow$ Hệ thống tự động chuyển trạng thái container thành **AVAILABLE (SẴN SÀNG CẤP VỎ)**.
+  - Không đạt $\rightarrow$ Bấm **QC REWORK** yêu cầu sửa chữa lại.
+
+---
+
+### 3.6. Quản Lý Vật Tư Kho EMR (Nhập - Xuất - Tồn)
+
+Phân hệ được thiết kế theo đúng yêu cầu tối giản, trực quan và chính xác:
+
+#### A. Công Thức Tính Tồn Kho Chuẩn:
+$$\text{TỒN KHO HIỆN TẠI} = \text{TỒN ĐẦU KỲ} + \text{TỔNG NHẬP (PNK)} - \text{TỔNG XUẤT (PXK)}$$
+
+#### B. Quy Trình Nghiệp Vụ Vật Tư:
+1. **Nhập Kho Vật Tư (Phiếu Nhập PNK):**
+   - Chọn mã vật tư (Tôn vách Corten, Ván sàn Cont, Roong cao su, Khóa Cam, Sơn Epoxy,...).
+   - Nhập số lượng, đơn giá mua từ Nhà cung cấp.
+   - **Hệ thống tự động cộng dồn số lượng tồn kho và cập nhật đơn giá bình quân gia quyền.**
+2. **Xuất Kho Vật Tư (Phiếu Xuất PXK):**
+   - Chọn vật tư cần xuất thi công sửa chữa container (theo lệnh WO hoặc xuất bảo trì bãi).
+   - Nhập số lượng xuất.
+   - **Hệ thống kiểm tra tồn khả dụng (ngăn chặn xuất âm kho) và tự động trừ tồn kho tức thì.**
+3. **Báo Cáo Nhập - Xuất - Tồn & Sổ Thẻ Kho:**
+   - Xem bảng cân đối: Mã VT | Tên quy cách | ĐVT | Tồn Đầu | Tổng Nhập | Tổng Xuất | **Tồn Hiện Tại** | Đơn Giá TB | Thành Tiền Tồn | Trạng Thái Đủ Hàng/Sắp Hết.
+   - Sao kê chi tiết từng giao dịch lịch sử biến động kho theo thời gian thực.
+
+---
+
+### 3.7. Quản Lý Sơ Đồ Bãi 2D & Điều Phối Xe Nâng (Yard & Forklift)
+- **Tọa độ bãi chuẩn 4 chiều:**
+  - `Block` (Khu bãi: A, B, C, D,...).
+  - `Bay` (Dãy đặt container 20ft/40ft: 01, 03, 05,...).
+  - `Row` (Hàng ngang: 01, 02, 03,...).
+  - `Tier` (Tầng xếp chồng: Tầng 1 đến Tầng 5).
+- **Màn hình máy tính bảng xe nâng (Forklift Tablet):**
+  - Hiển thị danh sách công việc nâng hạ cần thực hiện.
+  - Xác nhận đã gắp vỏ và cập nhật vị trí mới trên sơ đồ bãi 2D bằng 1 chạm.
+
+### 3.8. Khai Thác Cước, Biểu Phí & Thanh Toán VietQR (Billing & Tariffs)
+- Cấu hình biểu cước nâng hạ vỏ rỗng, lưu bãi quá hạn (Free time), phí vệ sinh, phí sửa chữa.
+- Tự động sinh mã **VietQR động chuẩn Napas247** kèm mã giao dịch để tài xế hoặc chủ hàng quét chuyển khoản nhanh tại quầy cổng.
+
+### 3.9. Cổng Thông Tin Zalo OA Gateway & Chatbot 2 Chiều
+- Tích hợp cổng Zalo Official Account Gateway phục vụ truyền thông tin tức thời:
+  - Gửi e-EIR khi xe vào bãi.
+  - Gửi Estimate cho đại diện Hãng tàu duyệt trực tuyến trên smartphone.
+  - Gửi lệnh cấp vật tư cho Thủ kho EMR.
+  - Gửi mã QR Cổng Xuất cho tài xế xe kéo.
+- Simulator mô phỏng tương tác 2 chiều với 4 nhóm đối tượng: Hãng tàu, Thợ trưởng, Giám định viên và Tài xế.
+
+### 3.10. Quản Lý Khách Hàng (Trucking, Forwarder & Hãng Tàu)
+- Quản lý danh bạ công ty vận tải, Forwarder, chủ hàng và Hãng tàu độc quyền.
+- Thiết lập hạn mức công nợ, phân loại nhóm khách hàng VIP / Standard.
+
+---
+
+## 4. MÔ HÌNH PHÂN QUYỀN PHÂN VAI NGƯỜI DÙNG (RBAC - 10 VAI TRÒ)
+
+| Mã Vai Trò | Tên Vai Trò | Phạm Vi Trách Nhiệm & Quyền Hạn |
+|:---|:---|:---|
+| `DEPOT_MANAGER` | Giám Đốc Depot | Toàn quyền quản trị hệ thống, duyệt báo cáo tổng thể, cấu hình bảng giá cước. |
+| `EMR_LEAD` | Trưởng Phòng EMR | Quản lý đội thợ, duyệt lệnh sửa chữa WO, điều phối vật tư, kiểm soát chất lượng. |
+| `SURVEYOR` | Giám Định Viên | Khảo sát vỏ e-EIR, vẽ vị trí hư hỏng, xác định mã IICL-6 và phân hạng Grade. |
+| `STOREKEEPER` | Thủ Kho Vật Tư | Lập phiếu Nhập kho (PNK), Phiếu Xuất kho (PXK), kiểm soát tồn kho Nhập-Xuất-Tồn. |
+| `QC_INSPECTOR` | Kỹ Sư KCS (QC) | Nghiệm thu container sau sửa chữa, cấp chứng chỉ QC Passed / Rework. |
+| `YARD_PLANNER` | Điều Phối Bãi | Lập kế hoạch xếp bãi 2D, tối ưu hóa vị trí hạ cont, giảm thiểu đảo chuyển. |
+| `FORKLIFT_DRIVER`| Lái Xe Nâng Bãi | Nhận lệnh nâng hạ trên Tablet, xác nhận hoàn thành vị trí Block-Bay-Row-Tier. |
+| `GATE_OPERATOR` | Nhân Viên Cổng | Tiếp nhận xe vào (Gate-In), kiểm tra thông tin xuất vỏ (Gate-Out), in phiếu e-EIR. |
+| `CASHIER` | Thu Ngân / Kế Toán | Thu phí nâng hạ, phí vệ sinh, xuất hóa đơn điện tử, kiểm tra thanh toán VietQR. |
+| `SHIPPING_LINE` | Đại Diện Hãng Tàu | Xem danh sách vỏ của hãng, trực tiếp duyệt/từ chối báo giá sửa chữa Estimate. |
+
+---
+
+## 5. CƠ SỞ DỮ LIỆU & DANH MỤC DÙNG CHUNG (MASTER DATA)
+
+1. **Danh Mục Hãng Tàu:** Maersk Line (MSK), MSC, CMA-CGM, ONE, Evergreen, Yang Ming.
+2. **Danh Mục Kích Thước ISO Container:** 20DC, 40DC, 40HC, 45HC, 20RF, 40RF, 20OT, 40OT, 20FR, 40FR.
+3. **Danh Mục Phân Hạng Vỏ:** Grade A (Food Grade), Grade B (Cargo Worthy), Grade C (Industrial), Grade D (Damaged).
+4. **Danh Mục Vị Trí Cấu Kiện IICL:** Cột góc trước/sau, Xà nóc, Xà đáy, Tôn vách L/R/F, Cửa nóc, Tấm sàn gỗ Corten/Plywood.
+5. **Danh Mục Mã Hư Hỏng IICL:** D (Dent), H (Hole), C (Corrosion), B (Bowed), BW (Broken Weld), OL (Oil Stained).
+6. **Danh Mục Phương Án Sửa Chữa:** I (Insert), W (Welding), S (Straighten), R (Replace), CL (Chemical Cleaning).
+7. **Danh Mục Vật Tư Kho EMR:** Tôn vách 1.6mm/2.0mm Corten, Ván sàn cont 28mm, Roong cao su EPDM, Khóa cam tay quay, Sơn lót kẽm Epoxy.
+
+---
+
+## 6. HƯỚNG DẪN VẬN HÀNH TỪNG NGHIỆP VỤ CỤ THỂ
+
+### 6.1. Hướng Dẫn Nhập Vật Tư Vào Kho:
+1. Truy cập menu **"Vật Tư (Nhập - Xuất - Tồn)"**.
+2. Nhấn nút **`+ Nhập Vật Tư`** (màu xanh lá cây ở góc trên).
+3. Chọn **Nhà Cung Cấp** $\rightarrow$ Chọn **Mã Vật Tư** cần nhập $\rightarrow$ Điền **Số Lượng** và **Đơn Giá**.
+4. Nhấn **"Xác Nhận Nhập Kho"**. Hệ thống sẽ tự động sinh phiếu `PNK-2026-xxxx` và tăng số lượng tồn ngay lập tức.
+
+### 6.2. Hướng Dẫn Xuất Vật Tư Cho Sửa Chữa:
+1. Truy cập menu **"Vật Tư (Nhập - Xuất - Tồn)"**.
+2. Nhấn nút **`- Xuất Vật Tư`** (màu vàng cam ở góc trên).
+3. Chọn **Mã Vật Tư** cần xuất $\rightarrow$ Điền **Số Lượng Xuất** $\rightarrow$ Điền **Người Nhận** hoặc **Số Container/Lệnh WO**.
+4. Nhấn **"Xác Nhận Xuất Kho"**. Hệ thống kiểm tra số lượng tồn, sinh phiếu `PXK-2026-xxxx` và trừ tồn kho tức thì.
+
+### 6.3. Hướng Dẫn Giám Định & Duyệt Báo Giá:
+1. Vào màn hình **"Giám Định e-EIR"**, chọn container cần giám định.
+2. Chọn mặt cấu kiện bị hư $\rightarrow$ Chọn vị trí $\rightarrow$ Mã hư hỏng $\rightarrow$ Phương án sửa chữa.
+3. Chuyển sang màn hình **"Báo Giá Sửa Chữa (Estimate)"** $\rightarrow$ Nhấn **"Tính Báo Giá Tự Động"** $\rightarrow$ Nhấn **"Gửi Hãng Tàu Duyệt"**.
+4. Hãng tàu nhận thông báo trên Portal hoặc Zalo OA và bấm **"Duyệt Báo Giá"**.
+5. Sau khi duyệt, chuyển lệnh cho thợ thi công $\rightarrow$ QC nghiệm thu $\rightarrow$ Container sẵn sàng cấp vỏ.
+
+---
+*Tài liệu được thiết lập theo quy chuẩn kỹ thuật hệ thống Depot Solution 2026.*

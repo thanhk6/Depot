@@ -1,0 +1,40 @@
+# Dockerfile cho Depot.BackendApi (.NET 8 Web API)
+# Build từ thư mục gốc repo (context = "."), vì Depot.BackendApi tham chiếu tới
+# Depot.Application / Depot.Data / Depot.ViewModels nằm ở các thư mục khác trong SolutionDepot.
+
+# ===== Stage 1: Build & Publish =====
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+# Copy trước các file .csproj để tận dụng cache layer của Docker: chỉ khi đổi dependency
+# (thêm/bớt package) thì bước "dotnet restore" mới phải chạy lại từ đầu.
+COPY ["SolutionDepot/3. Hosts/Depot.BackendApi/Depot.BackendApi.csproj", "SolutionDepot/3. Hosts/Depot.BackendApi/"]
+COPY ["SolutionDepot/2. Domain/Depot.Application/Depot.Application.csproj", "SolutionDepot/2. Domain/Depot.Application/"]
+COPY ["SolutionDepot/2. Domain/Depot.Data/Depot.Data.csproj", "SolutionDepot/2. Domain/Depot.Data/"]
+COPY ["SolutionDepot/1. Infrastructure/Depot.ViewModels/Depot.ViewModels.csproj", "SolutionDepot/1. Infrastructure/Depot.ViewModels/"]
+RUN dotnet restore "SolutionDepot/3. Hosts/Depot.BackendApi/Depot.BackendApi.csproj"
+
+# Copy toàn bộ source code còn lại (Controllers, Entities, Migrations...) rồi publish Release.
+COPY SolutionDepot/ SolutionDepot/
+RUN dotnet publish "SolutionDepot/3. Hosts/Depot.BackendApi/Depot.BackendApi.csproj" \
+    -c Release -o /app/publish --no-restore
+
+# ===== Stage 2: Runtime =====
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+WORKDIR /app
+
+# curl chỉ dùng để Docker healthcheck tự kiểm tra /api/health, không ảnh hưởng ứng dụng.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_ENVIRONMENT=Production
+EXPOSE 8080
+
+COPY --from=build /app/publish .
+
+HEALTHCHECK --interval=10s --timeout=5s --retries=10 --start-period=20s \
+    CMD curl -f http://localhost:8080/api/health || exit 1
+
+ENTRYPOINT ["dotnet", "Depot.BackendApi.dll"]

@@ -1,0 +1,75 @@
+# Tiến độ đồng bộ Backend (SolutionDepot) theo Menu Frontend
+
+📐 Quy tắc chung bắt buộc đọc trước: [00-quy-tac-backend.md](00-quy-tac-backend.md)
+📐 Quy tắc tạo bảng (entity + EF Core): [00b-quy-tac-tao-bang.md](00b-quy-tac-tao-bang.md)
+
+Quy trình: đi theo đúng thứ tự **menu thật đang chạy trên UI** (`fontend/src/components/layout/Sidebar.tsx`,
+không phải `constants/menus.ts` — file đó là cấu hình cũ không được `App.tsx` dùng), từ trên xuống dưới,
+với mỗi màn hình: kiểm tra endpoint frontend đang gọi → đối chiếu controller/service/entity backend
+tương ứng → sửa/bổ sung nếu thiếu hoặc sai → build lại để xác nhận không lỗi → ghi lại vào file `.md` riêng.
+
+Ký hiệu trạng thái: ✅ Xong · ⚠️ Xong một phần / có ghi chú · ❌ Chưa làm · 🔜 Chưa tới lượt
+
+| # | Nhóm | Màn hình (tab id) | File chi tiết | Trạng thái |
+|---|---|---|---|---|
+| 0 | — | Hạ tầng nền (DI, JSON, DB) | [00-infrastructure.md](00-infrastructure.md) | ✅ |
+| 1 | TỔNG QUAN | `dashboard` — Dashboard ERP | [01-dashboard.md](01-dashboard.md) | ✅ |
+| 2 | TỔNG QUAN | `workflow` — Sơ Đồ Vòng Đời Nghiệp Vụ | [02-workflow.md](02-workflow.md) | ✅ |
+| 3 | KHAI THÁC & GATE-IN | `gate` — 1. Tiếp Nhận Cổng (Gate-In) | 03-gate-in.md | 🔜 |
+| 4 | KHAI THÁC & GATE-IN | `survey` — 2. Giám Định (Survey e-EIR) | [04-survey.md](04-survey.md) | ⚠️ |
+| 5 | KHAI THÁC & GATE-IN | `cleaning` — 3. Tổ Vệ Sinh (Cleaning Bay) | 05-cleaning.md | 🔜 |
+| 6 | KHAI THÁC & GATE-IN | `operation` — 4. Khai Thác Gate-In (Tariff) | 06-operation.md | 🔜 |
+| 7 | KHAI THÁC & GATE-IN | `payment` — 5. Thanh Toán VietQR | 07-payment.md | 🔜 |
+| 8 | QUẢN LÝ CONTAINER & BÃI | `container` — Danh Sách Container | [08-container-list.md](02-container-list.md) | ✅ |
+| 9 | QUẢN LÝ CONTAINER & BÃI | `yard_map` — Sơ Đồ Bãi 2D (Konva) | 09-yard-map.md | 🔜 |
+| 10 | QUẢN LÝ CONTAINER & BÃI | `yard_blocks` — Quản Lý Vị Trí Block | 10-yard-blocks.md | 🔜 |
+| 11 | QUẢN LÝ CONTAINER & BÃI | `forklift` — Lệnh Điều Xe Nâng | 11-forklift.md | 🔜 |
+| 12 | BÁO GIÁ & SỬA CHỮA | `estimate` — Lập Báo Giá Estimate | 12-estimate.md | 🔜 |
+| 13 | BÁO GIÁ & SỬA CHỮA | `approval` — Phê Duyệt Hãng Tàu | 13-approval.md | 🔜 |
+| 14 | BÁO GIÁ & SỬA CHỮA | `repair` — Lệnh Sửa Chữa (WO) | 14-repair.md | 🔜 |
+| 15 | BÁO GIÁ & SỬA CHỮA | `qc` — 9. QC Nghiệm Thu (AV Grade) | 15-qc.md | 🔜 |
+| 16 | BÁO GIÁ & SỬA CHỮA | `shipping_api` — 10. Truyền API Hãng Tàu | 16-shipping-api.md | 🔜 |
+| 17 | CỔNG XUẤT & GATE-OUT | `gate_out` — 11. Tổng Quan Cổng Xuất | 17-gate-out.md | 🔜 |
+| 18 | CỔNG XUẤT & GATE-OUT | `gate_out_ready` — 1. Vỏ Chờ Cấp | 18-gate-out-ready.md | 🔜 |
+| 19 | CỔNG XUẤT & GATE-OUT | `gate_out_lane` — 2. Tiếp Nhận Làn Cổng Xuất | 19-gate-out-lane.md | 🔜 |
+| 20 | CỔNG XUẤT & GATE-OUT | `gate_out_history` — 3. Nhật Ký Xuất & Phiếu e-EIR | 20-gate-out-history.md | 🔜 |
+| 21 | CÔNG NỢ & BILLING | `billing` — Công Nợ Hãng Tàu (AR) | 21-billing.md | 🔜 |
+| 22 | KHO VẬT TƯ | `warehouse` — Kho Vật Tư Sửa Chữa EMR | 22-warehouse.md | 🔜 |
+| 23 | MASTER DATA | `master_data` — Tất Cả Danh Mục | 23-master-data.md | 🔜 |
+| 24 | MASTER DATA | `departments` — DM Phòng Ban Depot | 24-departments.md | 🔜 |
+| 25 | MASTER DATA | `tariff_services` — Cước Nâng Hạ & Lưu Bãi | 25-tariff-services.md | 🔜 |
+| 26 | MASTER DATA | `cleaning_tariffs` — Biểu Phí Vệ Sinh Container | 26-cleaning-tariffs.md | 🔜 |
+| 27 | MASTER DATA | `container_types` — DM Loại Container (ISO) | 27-container-types.md | 🔜 |
+| 28 | MASTER DATA | `damage_locations` — DM Vị Trí Cấu Kiện | 28-damage-locations.md | 🔜 |
+| 29 | MASTER DATA | `damage_codes` — DM Mã Hư Hỏng IICL | 29-damage-codes.md | 🔜 |
+| 30 | MASTER DATA | `repair_codes` — DM Phương Án Sửa Chữa | 30-repair-codes.md | 🔜 |
+| 31 | MASTER DATA | `grades` — DM Phân Hạng Vỏ | 31-grades.md | 🔜 |
+| 32 | MASTER DATA | `standards` — DM Tiêu Chuẩn Giám Định | 32-standards.md | 🔜 |
+| 33 | KHÁCH HÀNG & ĐỐI TÁC | `customer_list` — Khách Hàng (Trucking & FWD) | 33-customer-list.md | 🔜 |
+| 34 | KHÁCH HÀNG & ĐỐI TÁC | `customer_classifications` — DM Phân Loại Khách Hàng | 34-customer-classifications.md | 🔜 |
+| 35 | KHÁCH HÀNG & ĐỐI TÁC | `shipping_lines` — Hãng Tàu | 35-shipping-lines.md | 🔜 |
+| 36 | ZALO GATEWAY | `zalo_overview` — Tổng Quan Zalo OA | 36-zalo-overview.md | 🔜 |
+| 37 | ZALO GATEWAY | `zalo_simulator` — Zalo Simulator & Chat | 37-zalo-simulator.md | 🔜 |
+| 38 | ZALO GATEWAY | `zalo_templates` — Mẫu Tin ZNS & OA | 38-zalo-templates.md | 🔜 |
+| 39 | ZALO GATEWAY | `zalo_settings` — Cấu Hình Zalo OA & Token | 39-zalo-settings.md | 🔜 |
+| 40 | ZALO GATEWAY | `zalo_logs` — Nhật Ký Webhook & API | 40-zalo-logs.md | 🔜 |
+| 41 | THÔNG BÁO | `notifications` — Dashboard Thông Báo | 41-notifications.md | 🔜 |
+| 42 | THÔNG BÁO | `notifications_send` — Gửi Thông Báo Mới | 42-notifications-send.md | 🔜 |
+| 43 | THÔNG BÁO | `notifications_employees` — Thông Báo Nhân Viên | 43-notifications-employees.md | 🔜 |
+| 44 | THÔNG BÁO | `notifications_customers` — Thông Báo Khách Hàng | 44-notifications-customers.md | 🔜 |
+| 45 | THÔNG BÁO | `notifications_templates` — Thư Viện Mẫu Tin | 45-notifications-templates.md | 🔜 |
+| 46 | THÔNG BÁO | `notifications_history` — Lịch Sử Gửi Toàn Hệ Thống | 46-notifications-history.md | 🔜 |
+| 47 | THÔNG BÁO | `notifications_queue` — Hàng Đợi Gửi (Queue) | 47-notifications-queue.md | 🔜 |
+| 48 | BÁO CÁO & HIỆU SUẤT | `report_staff_realtime` — Công Việc Từng Người (Real-time) | 48-report-staff-realtime.md | 🔜 |
+| 49 | BÁO CÁO & HIỆU SUẤT | `report` — Tổng Quan & Thông Lượng Bãi | 49-report.md | 🔜 |
+| 50 | BÁO CÁO & HIỆU SUẤT | `report_emr` — Năng Suất Sửa Chữa EMR | 50-report-emr.md | 🔜 |
+| 51 | BÁO CÁO & HIỆU SUẤT | `report_dwell_time` — Thời Gian Lưu Bãi (Dwell Time) | 51-report-dwell-time.md | 🔜 |
+| 52 | BÁO CÁO & HIỆU SUẤT | `report_revenue` — Doanh Thu & Biểu Cước | 52-report-revenue.md | 🔜 |
+| 53 | HỆ THỐNG & PHÂN QUYỀN | `system` — Phân Quyền RBAC & Users | 53-system.md | 🔜 |
+
+Ghi chú:
+- Cột "File chi tiết" của mục 8 trỏ về file cũ `02-container-list.md` (đã viết trước khi phát hiện thứ
+  tự menu thật) — không đổi tên file, chỉ số thứ tự trong bảng này đổi từ 2 → 8 cho khớp vị trí thật.
+- Nhiều tab (`yard_blocks`, `gate_out_ready/lane/history`, toàn bộ nhóm Zalo, nhóm Thông báo con,
+  nhóm Báo cáo con...) nhiều khả năng dùng chung 1 vài endpoint backend — khi rà sẽ gộp nhận xét vào
+  cùng 1 file nếu đúng là trùng lặp, không tạo file rỗng cho mỗi tab.

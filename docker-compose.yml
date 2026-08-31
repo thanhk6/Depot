@@ -1,0 +1,61 @@
+# Dựng toàn bộ hệ thống SolutionDepot: PostgreSQL + Backend .NET 8 + Frontend React.
+# Chạy: docker compose up --build -d
+# Truy cập: Frontend http://localhost:3000  |  Backend Swagger http://localhost:50210/swagger
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: solutiondepot-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: SolutionDepotDb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 12345678
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      # Map ra 5433 (không phải 5432) vì máy dev thường đã có PostgreSQL cài local chiếm sẵn cổng
+      # 5432 — đây là volume/DB RIÊNG của Docker, không liên quan tới Postgres cài trực tiếp trên máy.
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d SolutionDepotDb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: solutiondepot-backend
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      # Ghi đè ConnectionStrings:PostgreSqlConnection trong appsettings.json bằng biến môi trường
+      # chuẩn của ASP.NET Core (dấu "__" thay cho dấu ":") — trỏ tới service "postgres" trong mạng
+      # nội bộ docker-compose thay vì "localhost" như khi chạy dev trên máy thật.
+      ConnectionStrings__PostgreSqlConnection: "Host=postgres;Port=5432;Database=SolutionDepotDb;Username=postgres;Password=12345678;"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "50210:8080"
+
+  frontend:
+    build:
+      context: ./fontend
+      dockerfile: Dockerfile
+    container_name: solutiondepot-frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      # server.ts (Express) forward mọi request /api/* sang đúng URL này.
+      DEPOT_BACKEND_URL: "http://backend:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres_data:

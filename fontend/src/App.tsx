@@ -1,0 +1,584 @@
+import React, { useEffect, useState } from 'react';
+import { Sidebar } from './components/layout/Sidebar';
+import { ContainerRecord } from './services/mockDataStore';
+import { containerApi, estimateApi } from './api';
+import { AuthProvider } from './app/providers/AuthProvider';
+import { ChevronRight, Menu } from 'lucide-react';
+import { LoginScreen } from './components/LoginScreen';
+import { UserAccountMenu } from './components/UserAccountMenu';
+import { UserAccountProfile } from './data/roleMenuConfig';
+import { DepotProvider } from './context/DepotContext';
+
+// Modules
+import { DashboardPage } from './modules/dashboard/pages/DashboardPage';
+import { GateInPage } from './modules/gate/pages/GateInPage';
+import { SurveyModulePage } from './modules/survey/pages/SurveyModulePage';
+import { CleaningModulePage } from './modules/cleaning/pages/CleaningModulePage';
+import { OperationPage } from './modules/operation/pages/OperationPage';
+import { PaymentPage } from './modules/payment/pages/PaymentPage';
+import { ContainerListPage } from './modules/container/pages/ContainerListPage';
+import { YardMapPage } from './modules/yard/pages/YardMapPage';
+import { YardBlocksPage } from './modules/yard/pages/YardBlocksPage';
+import { ForkliftPage } from './modules/forklift/pages/ForkliftPage';
+import { EstimatePage } from './modules/estimate/pages/EstimatePage';
+import { ApprovalPage } from './modules/approval/pages/ApprovalPage';
+import { RepairPage } from './modules/repair/pages/RepairPage';
+import { QCPage } from './modules/qc/pages/QCPage';
+import { ShippingApiPage } from './modules/shipping_api/pages/ShippingApiPage';
+import { GateOutPage } from './modules/gate_out/pages/GateOutPage';
+import { WarehousePage } from './modules/warehouse/pages/WarehousePage';
+import { BillingPage } from './modules/billing/pages/BillingPage';
+import { ReportPage } from './modules/report/pages/ReportPage';
+import { MasterDataPage } from './modules/masterdata/pages/MasterDataPage';
+import { SystemPage } from './modules/system/pages/SystemPage';
+import { CustomerPage } from './modules/customer/pages/CustomerPage';
+import { NotificationModule } from './modules/notifications/NotificationModule';
+// `ZaloModule`/`ZaloHeader` (màn "ZALO GATEWAY & CHAT" riêng) đã bị xoá — gộp chung vào
+// `NotificationModule` (hub "THÔNG BÁO & ZALO GATEWAY") theo yêu cầu người dùng, xem case
+// 'zalo_overview'..'zalo_logs' bên dưới đều trỏ vào NotificationModule.
+import { BusinessWorkflowModal } from './modules/system/components/BusinessWorkflowModal';
+
+interface AppContentProps {
+  onLogout: () => void;
+}
+
+function AppContent({ onLogout }: AppContentProps) {
+  // Theo yêu cầu người dùng: đăng nhập xong phải vào thẳng Dashboard ERP. `AppContent` mount lại từ đầu
+  // mỗi lần đăng nhập (App.tsx chuyển hẳn nhánh JSX từ LoginScreen sang AppContent), nên chỉ cần đổi
+  // giá trị khởi tạo state — trước đây để nhầm 'notifications' (không phải Dashboard).
+  const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [containers, setContainers] = useState<ContainerRecord[]>([]);
+  const [isWorkflowModalOpen, setIsWorkflowModalOpen] = useState<boolean>(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    // SQL Server is the only source of operational container data.
+    containerApi.getAll()
+      .then((response: any) => {
+        if (response?.statusCode !== 200 || !Array.isArray(response.data)) return;
+        setContainers(response.data.map((job: any): ContainerRecord => ({
+          id: String(job.id),
+          containerNo: job.containerNo,
+          isoCode: job.isoSize,
+          size: job.isoSize,
+          type: job.isoSize?.includes('RF') || job.isoSize?.includes('RH') ? 'Reefer' : 'Dry High Cube',
+          shippingLine: job.shippingLineCode,
+          // 'B' = cấp CL (cần vệ sinh, xem DepotJobService.SubmitSurveyAsync) — thiếu nhánh này khiến mọi
+          // container CL bị hiện nhầm thành DM (Cần Sửa Chữa) sau F5, biến mất khỏi hàng đợi Tổ Vệ Sinh
+          // (CleaningModulePage lọc `condition === 'CL'`) vì luôn rơi vào nhánh else.
+          // `Survey.ConditionRating` chỉ ghi 1 LẦN lúc giám định và không bao giờ bị Cleaning/Repair/QC
+          // đụng tới sau đó — nên trước đây container đã vệ sinh/sửa chữa xong (job.Status đã lên
+          // READY_FOR_OUT/GATE_OUT) vẫn hiện `condition: 'CL'`/`'DM'` mãi mãi, khiến KPI "Container CL/DM"
+          // trên Dashboard đếm nhầm cả những container đã xong việc từ lâu, và dễ gây hiểu lầm "giám định
+          // đã chuyển qua vệ sinh nhưng sao Cleaning bay không thấy" khi thực ra job đó đã được xử lý xong.
+          // job.Status đạt READY_FOR_OUT/GATE_OUT là trạng thái chốt duy nhất cho cả 2 nhánh Cleaning
+          // (CleaningService.HandoverAsync) và Repair→QC (SubmitQcAsync khi Passed) nên dùng nó ưu tiên hơn.
+          condition: job.status === 'READY_FOR_OUT' || job.status === 'GATE_OUT'
+            ? 'AV'
+            : job.survey?.conditionRating === 'A' ? 'AV' : job.survey?.conditionRating === 'B' ? 'CL' : job.survey ? 'DM' : 'AV',
+          status: job.status,
+          gateInDate: job.gateInDate,
+          gateOutDate: job.gateOutDate,
+          yardLocation: job.blockCode ? {
+            block: job.blockCode,
+            bay: String(job.bay),
+            row: String(job.row),
+            tier: String(job.tier)
+          } : undefined,
+          timeline: (job.auditLogs || []).map((log: any) => ({
+            status: log.action,
+            time: log.timestamp,
+            actor: log.user,
+            note: log.details
+          }))
+        })));
+      })
+      .catch((error) => console.warn('Không thể tải container từ Backend SQL:', error));
+  }, []);
+
+  // Tab Breadcrumb Map
+  const tabTitles: Record<string, string> = {
+    dashboard: 'Dashboard ERP Tổng Quan',
+    workflow: 'Sơ Đồ Vòng Đời Nghiệp Vụ',
+    gate: '1. Tiếp Nhận Cổng (Gate-In)',
+    survey: '2. Giám Định e-EIR (IICL-6)',
+    cleaning: 'Danh Sách Cần Vệ Sinh Container',
+    cleaning_history: 'Lịch Sử Đã Vệ Sinh Container',
+    operation: '4. Khai Thác Gate-In & Biểu Cước Tariff',
+    payment: '5. Thanh Toán Dịch Vụ VietQR',
+    container: 'Danh Sách Quản Lý Container',
+    yard_map: 'Sơ Đồ Bãi 2D (Konva)',
+    yard_blocks: 'Quản Lý Vị Trí Block',
+    forklift: 'Lệnh Điều Độ Xe Nâng',
+    estimate: 'Lập Báo Giá MNR (Estimate)',
+    approval: 'Phê Duyệt Báo Giá Hãng Tàu',
+    repair: '8. Lệnh Sửa Chữa Work Order',
+    qc: '9. QC Nghiệm Thu Chất Lượng AV',
+    shipping_api: '10. Cổng Truyền Dữ Liệu API Hãng Tàu (API Gateway)',
+    gate_out: '11. Tổng Quan & Điều Độ Cổng Xuất (Gate-Out Dashboard)',
+    gate_out_ready: '1. Vỏ Sẵn Sàng Cấp (Ready In Yard)',
+    gate_out_lane: '2. Tiếp Nhận Làn Cổng Xuất',
+    gate_out_history: '3. Nhật Ký Xuất & Phiếu e-EIR',
+    warehouse: 'Kho Vật Tư Sửa Chữa EMR',
+    billing: 'Công Nợ & Billing Hãng Tàu',
+    master_data: 'Danh Mục Master Data',
+    departments: 'Danh Mục Phòng Ban & Cơ Cấu Tổ Chức',
+    tariff_lolo: 'Cước Nâng Hạ (LoLo)',
+    tariff_storage: 'Cước Lưu Bãi (Storage)',
+    tariff_calculator: 'Máy Tính Cước Nâng Hạ & Lưu Bãi',
+    cleaning_tariffs: 'Biểu Phí Vệ Sinh Container',
+    container_types: 'DM Loại Container (ISO 6346)',
+    damage_locations: 'DM Vị Trí Cấu Kiện (Locations)',
+    damage_codes: 'DM Mã Hư Hỏng IICL',
+    repair_codes: 'DM Phương Án Sửa Chữa',
+    grades: 'DM Phân Hạng Vỏ (Quality Grades)',
+    standards: 'DM Tiêu Chuẩn Giám Định',
+    customer_list: 'Khách Hàng (Trucking & Forwarder)',
+    customer_classifications: 'Danh Mục Phân Loại Khách Hàng',
+    shipping_lines: 'Hãng Tàu Khai Thác (Maersk Line)',
+    zalo_overview: 'Tổng Quan Zalo OA Gateway',
+    zalo_simulator: 'Zalo Simulator & Chat Khách Hàng',
+    zalo_templates: 'Mẫu Tin Zalo ZNS & OA',
+    zalo_settings: 'Cấu Hình Zalo OA & API Token',
+    zalo_logs: 'Nhật Ký Giao Dịch Zalo & Webhook',
+    notifications: 'Dashboard Thông Báo Toàn Hệ Thống',
+    notifications_send: 'Gửi Thông Báo Mới',
+    notifications_employees: 'Thông Báo Nhân Viên',
+    notifications_customers: 'Thông Báo Khách Hàng',
+    notifications_templates: 'Mẫu Thông Báo',
+    notifications_history: 'Lịch Sử Gửi Thông Báo',
+    notifications_queue: 'Hàng Đợi Gửi Thông Báo',
+    report_staff_realtime: '⚡ Báo Cáo Công Việc Từng Người (Real-Time)',
+    report: 'Báo Cáo Tổng Quan & Thông Lượng Bãi',
+    report_emr: 'Báo Cáo Năng Suất Sửa Chữa EMR',
+    report_dwell_time: 'Báo Cáo Thời Gian Lưu Bãi (Dwell Time)',
+    report_revenue: 'Báo Cáo Doanh Thu & Cước Nâng Hạ',
+    system: 'Phân Quyền & Hệ Thống RBAC'
+  };
+
+  const handleSelectTab = (tabId: string) => {
+    if (tabId === 'workflow') {
+      setIsWorkflowModalOpen(true);
+    } else {
+      setActiveTab(tabId);
+    }
+  };
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'dashboard':
+        return (
+          <DashboardPage
+            containers={containers}
+            onNavigateTab={setActiveTab}
+          />
+        );
+      case 'gate':
+        return (
+          <GateInPage
+            containers={containers}
+            onAddGateIn={(newCont) => {
+              const newRecord: ContainerRecord = {
+                id: `CONT-${Date.now()}`,
+                containerNo: newCont.containerNo,
+                isoCode: newCont.isoCode,
+                size: newCont.size,
+                type: newCont.type,
+                shippingLine: newCont.shippingLine,
+                condition: 'AV',
+                status: 'GATE_IN',
+                licensePlate: newCont.licensePlate,
+                driverName: newCont.driverName,
+                driverPhone: newCont.driverPhone,
+                gateInDate: new Date().toISOString().replace('T', ' ').substring(0, 16),
+                timeline: [
+                  {
+                    status: 'GATE_IN',
+                    time: new Date().toISOString().replace('T', ' ').substring(0, 16),
+                    actor: 'Gate Clerk',
+                    note: 'Tiếp nhận xe vào cổng'
+                  }
+                ]
+              };
+              setContainers((prev) => [newRecord, ...prev]);
+            }}
+            onNavigateTab={setActiveTab}
+          />
+        );
+      case 'survey':
+        return <SurveyModulePage onNavigateTab={setActiveTab} />;
+      case 'cleaning':
+        return (
+          <CleaningModulePage
+            initialTab="PENDING"
+            containers={containers}
+            onNavigateTab={setActiveTab}
+          />
+        );
+      case 'cleaning_history':
+        return (
+          <CleaningModulePage
+            initialTab="COMPLETED"
+            containers={containers}
+            onNavigateTab={setActiveTab}
+          />
+        );
+      case 'operation':
+        return (
+          <OperationPage
+            containers={containers}
+            onNavigateTab={setActiveTab}
+          />
+        );
+      case 'payment':
+        return (
+          <PaymentPage
+            containers={containers}
+            onConfirmPayment={(containerId) => {
+              setContainers((prev) =>
+                prev.map((c) =>
+                  c.id === containerId
+                    ? {
+                        ...c,
+                        status: 'PAYMENT_SUCCESS',
+                        tariffDetails: c.tariffDetails
+                          ? { ...c.tariffDetails, paymentStatus: 'PAID' }
+                          : undefined
+                      }
+                    : c
+                )
+              );
+            }}
+            onNavigateTab={setActiveTab}
+          />
+        );
+      case 'container':
+        return (
+          <ContainerListPage
+            containers={containers}
+            onUpdateStatus={async (id, st, cond) => {
+              const response: any = await containerApi.updateStatus(id, st, cond);
+              if (response?.statusCode !== 200) return;
+              setContainers((prev) => prev.map((c) => c.id === id
+                ? { ...c, status: st, condition: cond || c.condition }
+                : c));
+            }}
+            onNavigateTab={setActiveTab}
+          />
+        );
+      case 'yard_map':
+        return (
+          <YardMapPage
+            containers={containers}
+            onSelectContainer={(_c) => {
+              setActiveTab('container');
+            }}
+          />
+        );
+      case 'yard_blocks':
+        return (
+          <YardBlocksPage
+            containers={containers}
+            onNavigateTab={(tab) => setActiveTab(tab)}
+          />
+        );
+      case 'forklift':
+        return (
+          <ForkliftPage
+            containers={containers}
+            onConfirmMove={(id, b, bay, r, t) => {
+              setContainers((prev) =>
+                prev.map((c) =>
+                  c.id === id
+                    ? {
+                        ...c,
+                        status: 'IN_YARD',
+                        yardLocation: { block: b, bay, row: r, tier: t }
+                      }
+                    : c
+                )
+              );
+            }}
+            onNavigateTab={setActiveTab}
+          />
+        );
+      case 'estimate':
+        return (
+          <EstimatePage
+            containers={containers}
+            onNavigateTab={setActiveTab}
+          />
+        );
+      case 'approval':
+        return (
+          <ApprovalPage
+            containers={containers}
+            onApproveEstimate={async (id, authData) => {
+              const response: any = await estimateApi.approveEstimate(
+                id,
+                authData?.notes || 'Đại diện Hãng tàu phê duyệt'
+              );
+              if (response?.statusCode !== 200) return;
+              setContainers((prev) =>
+                prev.map((c) => (c.id === id ? { ...c, status: 'APPROVED' } : c))
+              );
+            }}
+            onRejectEstimate={async (id, reason, rejectCode) => {
+              const response: any = await estimateApi.rejectEstimate(
+                id,
+                reason,
+                rejectCode || 'Hãng tàu'
+              );
+              if (response?.statusCode !== 200) return;
+              setContainers((prev) =>
+                prev.map((c) => (c.id === id ? { ...c, status: 'WAITING_ESTIMATE' } : c))
+              );
+            }}
+            onNavigateTab={setActiveTab}
+          />
+        );
+      case 'repair':
+        return (
+          <RepairPage
+            containers={containers}
+            onCompleteRepair={(id) => {
+              setContainers((prev) =>
+                prev.map((c) => (c.id === id ? { ...c, status: 'WAITING_QC' } : c))
+              );
+            }}
+            onNavigateTab={setActiveTab}
+          />
+        );
+      case 'qc':
+        return (
+          <QCPage
+            containers={containers}
+            onQCResult={(id, res) => {
+              setContainers((prev) =>
+                prev.map((c) =>
+                  c.id === id
+                    ? {
+                        ...c,
+                        status: res === 'PASS' ? 'READY_FOR_USE' : 'REPAIRING',
+                        condition: res === 'PASS' ? 'AV' : 'DM'
+                      }
+                    : c
+                )
+              );
+            }}
+            onNavigateTab={setActiveTab}
+          />
+        );
+      case 'shipping_api':
+        return (
+          <ShippingApiPage
+            containers={containers}
+            onNavigateTab={setActiveTab}
+          />
+        );
+      case 'gate_out':
+      case 'gate_out_ready':
+      case 'gate_out_lane':
+      case 'gate_out_history': {
+        const subTabMap: Record<string, 'OVERVIEW' | 'READY_LIST' | 'GATE_LANE' | 'HISTORY'> = {
+          gate_out: 'OVERVIEW',
+          gate_out_ready: 'READY_LIST',
+          gate_out_lane: 'GATE_LANE',
+          gate_out_history: 'HISTORY'
+        };
+        return (
+          <GateOutPage
+            containers={containers}
+            initialSubTab={subTabMap[activeTab] || 'OVERVIEW'}
+            onNavigateTab={setActiveTab}
+            onUpdateContainerStatus={(idOrNo, status) => {
+              const nowStr = new Date().toISOString().replace('T', ' ').slice(0, 19);
+              setContainers((prev) =>
+                prev.map((c) => {
+                  const isMatch =
+                    c.id === idOrNo ||
+                    c.containerNo === idOrNo ||
+                    `CONT-${c.containerNo}` === idOrNo ||
+                    `GO-PROP-${c.id}` === idOrNo;
+                  if (isMatch) {
+                    return {
+                      ...c,
+                      status: status || 'GATE_OUT',
+                      condition: 'AV',
+                      gateOutDate: nowStr,
+                      yardLocation: undefined // Trừ và giải phóng vị trí bãi
+                    };
+                  }
+                  return c;
+                })
+              );
+            }}
+          />
+        );
+      }
+      case 'warehouse':
+        return <WarehousePage />;
+      case 'billing':
+        return <BillingPage />;
+      case 'zalo_overview':
+        return <NotificationModule initialSubTab="zalo_overview" onNavigateTab={setActiveTab} />;
+      case 'zalo_simulator':
+        return <NotificationModule initialSubTab="zalo_simulator" onNavigateTab={setActiveTab} />;
+      case 'zalo_templates':
+        return <NotificationModule initialSubTab="zalo_templates" onNavigateTab={setActiveTab} />;
+      case 'zalo_settings':
+        return <NotificationModule initialSubTab="zalo_settings" onNavigateTab={setActiveTab} />;
+      case 'zalo_logs':
+        return <NotificationModule initialSubTab="zalo_logs" onNavigateTab={setActiveTab} />;
+      case 'notifications':
+        return <NotificationModule initialSubTab="dashboard" onNavigateTab={setActiveTab} />;
+      case 'notifications_send':
+        return <NotificationModule initialSubTab="send" onNavigateTab={setActiveTab} />;
+      case 'notifications_employees':
+        return <NotificationModule initialSubTab="employees" onNavigateTab={setActiveTab} />;
+      case 'notifications_customers':
+        return <NotificationModule initialSubTab="customers" onNavigateTab={setActiveTab} />;
+      case 'notifications_templates':
+        return <NotificationModule initialSubTab="templates" onNavigateTab={setActiveTab} />;
+      case 'notifications_history':
+        return <NotificationModule initialSubTab="history" onNavigateTab={setActiveTab} />;
+      case 'notifications_queue':
+        return <NotificationModule initialSubTab="queue" onNavigateTab={setActiveTab} />;
+      case 'report_staff_realtime':
+        return <ReportPage containers={containers} initialTab="staff_realtime" onNavigateTab={setActiveTab} />;
+      case 'report':
+        return <ReportPage containers={containers} initialTab="overview" onNavigateTab={setActiveTab} />;
+      case 'report_emr':
+        return <ReportPage containers={containers} initialTab="emr_damage" onNavigateTab={setActiveTab} />;
+      case 'report_dwell_time':
+        return <ReportPage containers={containers} initialTab="dwell_time" onNavigateTab={setActiveTab} />;
+      case 'report_revenue':
+        return <ReportPage containers={containers} initialTab="revenue" onNavigateTab={setActiveTab} />;
+      case 'customer_list':
+        return <CustomerPage />;
+      case 'customer_classifications':
+        return <MasterDataPage initialTab="customer_classifications" />;
+      case 'departments':
+        return <MasterDataPage initialTab="departments" />;
+      case 'master_data':
+      case 'tariff_lolo':
+      case 'tariff_storage':
+      case 'tariff_calculator':
+      case 'cleaning_tariffs':
+      case 'container_types':
+      case 'damage_locations':
+      case 'damage_codes':
+      case 'repair_codes':
+      case 'grades':
+      case 'standards':
+      case 'shipping_lines':
+        return <MasterDataPage initialTab={activeTab === 'master_data' ? 'container_types' : activeTab} />;
+      case 'system':
+        return <SystemPage />;
+      default:
+        return <MasterDataPage initialTab="customer_classifications" />;
+    }
+  };
+
+  return (
+
+    <div className="flex h-[100dvh] w-full bg-[#F4F7FA] text-[#1F2937] font-sans overflow-hidden">
+      {/* Sidebar */}
+      <Sidebar
+        activeTab={activeTab}
+        onSelectTab={handleSelectTab}
+        isMobileOpen={isMobileMenuOpen}
+        onCloseMobile={() => setIsMobileMenuOpen(false)}
+      />
+
+      {/* Main Content Area */}
+
+      <div className="flex-1 flex flex-col min-w-0 h-[100dvh] overflow-hidden bg-[#F4F7FA]">
+        {/* Top Header Breadcrumb Bar */}
+        <header className="h-14 px-3 sm:px-6 border-b border-[#E2E8F0] bg-[#FFFFFF] flex items-center justify-between shrink-0 z-30">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <button
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="lg:hidden p-2 rounded-xl bg-[#FFFFFF] text-[#1F2937] hover:bg-[#F4F7FA] border border-[#E2E8F0] transition cursor-pointer shrink-0 shadow-sm"
+              aria-label="Mở menu điều hướng"
+            >
+              <Menu className="w-4 h-4" />
+            </button>
+            <div className="flex items-center gap-1.5 sm:gap-2 text-xs text-[#64748B] min-w-0">
+              <span className="hidden sm:inline hover:text-[#1F2937] cursor-pointer font-medium text-[#64748B]">Depot System</span>
+              <ChevronRight className="hidden sm:inline w-3.5 h-3.5 text-[#E2E8F0] shrink-0" />
+              <span className="text-[#1677FF] font-bold tracking-wide truncate max-w-[180px] sm:max-w-none">
+                {tabTitles[activeTab] || 'Vận Hành Depot'}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <div className="hidden sm:flex px-2.5 sm:px-3 py-1 rounded-full bg-[#16A34A]/10 border border-[#16A34A]/20 text-[#16A34A] text-[10px] sm:text-[11px] font-mono font-bold items-center gap-1.5">
+              <span className="w-1.5 sm:w-2 h-1.5 sm:h-2 rounded-full bg-[#16A34A] animate-pulse"></span>
+              Live Server
+            </div>
+            <UserAccountMenu onLogout={onLogout} />
+          </div>
+        </header>
+
+        {/* Dynamic Main Body with smooth touch scrolling and bottom safe padding */}
+
+        <main className="flex-1 overflow-y-auto overscroll-y-contain p-3 sm:p-4 md:p-6 pb-16 sm:pb-8 bg-[#F4F7FA] touch-pan-y">
+          {renderContent()}
+        </main>
+      </div>
+
+      {/* Business Workflow Modal */}
+      <BusinessWorkflowModal
+        isOpen={isWorkflowModalOpen}
+        onClose={() => setIsWorkflowModalOpen(false)}
+        onNavigateTab={(tab) => {
+          setIsWorkflowModalOpen(false);
+          setActiveTab(tab);
+        }}
+      />
+    </div>
+  );
+}
+
+export default function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
+    return !!localStorage.getItem('depot_logged_user_id');
+  });
+
+  useEffect(() => {
+    const syncLoginState = () => {
+      setIsLoggedIn(!!localStorage.getItem('depot_logged_user_id'));
+    };
+
+    window.addEventListener('storage', syncLoginState);
+    return () => window.removeEventListener('storage', syncLoginState);
+  }, []);
+
+  const handleLoginSuccess = (_user: UserAccountProfile) => {
+    setIsLoggedIn(true);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('depot_logged_user_id');
+    localStorage.removeItem('depot_logged_user_profile');
+    setIsLoggedIn(false);
+  };
+
+  if (!isLoggedIn) {
+    return (
+      <DepotProvider>
+        <LoginScreen onLoginSuccess={handleLoginSuccess} />
+      </DepotProvider>
+    );
+  }
+
+  return (
+    <AuthProvider>
+      <DepotProvider>
+        <AppContent onLogout={handleLogout} />
+      </DepotProvider>
+    </AuthProvider>
+  );
+}

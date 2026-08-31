@@ -1,0 +1,2834 @@
+﻿# DEPOT CONTAINER MANAGEMENT SYSTEM
+# GitHub Copilot Development Instructions
+
+---
+
+# 1. PROJECT IDENTITY
+
+Project Name:
+
+Depot Container Management System
+
+Purpose:
+
+Production-grade Container Depot Management System for managing the complete lifecycle of containers inside a Depot.
+
+The system must be designed as a real-world enterprise application.
+
+This is NOT:
+
+- A demo project
+- A prototype
+- A simple CRUD application
+- A fake/mock production system
+- A collection of disconnected modules
+
+The system must be maintainable, testable, secure, scalable, and ready for real deployment.
+
+---
+
+# 2. TECHNOLOGY STACK
+
+Backend:
+
+- C#
+- .NET 8
+- ASP.NET Core Web API
+- Entity Framework Core
+- SQL Server
+- JWT Authentication
+- RESTful API
+
+Frontend:
+
+- React
+- TypeScript
+
+Architecture:
+
+- Clean Architecture
+- Domain-Driven Design principles
+
+Database:
+
+- Microsoft SQL Server
+
+Primary Keys:
+
+- INT IDENTITY or BIGINT IDENTITY
+
+Do NOT use GUID as primary key unless explicitly required by a real business or technical requirement.
+
+---
+
+# 3. DEVELOPMENT TEAM MODEL
+
+The development team consists of four roles.
+
+1. TEAM LEAD
+2. BACKEND DEVELOPER
+3. FRONTEND DEVELOPER
+4. TESTER
+
+The human developer is the TEAM LEAD.
+
+GitHub Copilot acts as a development assistant for these roles.
+
+Copilot must not behave as an uncontrolled autonomous developer.
+
+Copilot must follow the existing architecture, requirements, coding conventions, and scope defined by the Team Lead.
+
+---
+
+# 4. TEAM LEAD RESPONSIBILITIES
+
+The Team Lead is responsible for:
+
+- Business analysis
+- Architecture decisions
+- Database architecture
+- Domain architecture
+- Task decomposition
+- Development order
+- Code review
+- Security review
+- Business rule approval
+- Integration decisions
+
+Copilot must NOT override Team Lead decisions.
+
+If an architectural decision already exists in the repository, follow it.
+
+Do not introduce a different architecture without explicit approval.
+
+---
+
+# 5. DEVELOPMENT PRINCIPLE
+
+Always develop using this order:
+
+Business Requirement
+        ↓
+Business Rules
+        ↓
+Domain Model
+        ↓
+Database Model
+        ↓
+Application Service
+        ↓
+REST API
+        ↓
+Frontend
+        ↓
+Testing
+        ↓
+Code Review
+
+Do NOT start by generating controllers and CRUD endpoints before understanding the business domain.
+
+---
+
+# 6. CORE ARCHITECTURE
+
+Solution:
+
+Depot.sln
+
+Projects:
+
+Depot.Domain
+Depot.Application
+Depot.Infrastructure
+Depot.Api
+Depot.Frontend
+
+Tests:
+
+Depot.Domain.Tests
+Depot.Application.Tests
+Depot.Api.Tests
+
+Recommended dependency:
+
+Depot.Api
+    ↓
+Depot.Application
+    ↓
+Depot.Domain
+
+Depot.Infrastructure
+    ↓
+Depot.Application
+    ↓
+Depot.Domain
+
+Depot.Domain must NOT depend on:
+
+- ASP.NET Core
+- Entity Framework Core
+- SQL Server
+- Infrastructure
+- HTTP
+- JWT
+- Controllers
+- External APIs
+
+---
+
+# 7. ARCHITECTURE RULES
+
+Use Clean Architecture with DDD principles.
+
+Do NOT use:
+
+- CQRS
+- MediatR
+- Generic Repository
+- Unit Of Work
+
+Do NOT introduce these patterns unless the Team Lead explicitly changes the architecture.
+
+Use:
+
+- Domain entities
+- Application services
+- EF Core DbContext
+- Entity configurations
+- Validators
+- DTOs
+- REST controllers
+- Infrastructure services
+
+Keep abstractions simple.
+
+Do not create abstractions only for the sake of abstraction.
+
+---
+
+# 8. DOMAIN LAYER
+
+Depot.Domain contains business concepts.
+
+Recommended structure:
+
+Depot.Domain
+│
+├── Entities
+├── Enums
+├── ValueObjects
+├── Exceptions
+└── Services
+
+Domain entities must represent real business concepts.
+
+Examples:
+
+- Customer
+- CustomerUser
+- Container
+- Survey
+- SurveyItem
+- Damage
+- CleaningJob
+- Payment
+- Forklift
+- ForkliftJob
+- Yard
+- YardBlock
+- YardBay
+- YardRow
+- YardTier
+- YardLocation
+- Estimate
+- EstimateItem
+- EstimateApiTransaction
+- WorkOrder
+- RepairItem
+- InventoryItem
+- StockTransaction
+- QCInspection
+- Invoice
+- GateEvent
+- EIR
+- IntegrationTransaction
+- AuditLog
+
+Do not create entities without a business reason.
+
+---
+
+# 9. APPLICATION LAYER
+
+Depot.Application contains application use cases.
+
+Recommended structure:
+
+Depot.Application
+│
+├── Authentication
+├── Customers
+├── CustomerUsers
+├── Containers
+├── Gate
+├── Survey
+├── Cleaning
+├── Payment
+├── Forklift
+├── Yard
+├── Estimate
+├── Approval
+├── Repair
+├── Inventory
+├── QC
+├── Billing
+├── GateOut
+├── EIR
+├── Integration
+└── Reporting
+
+Each module can contain:
+
+Interfaces
+Services
+DTOs
+Validators
+Mappings
+Models
+
+Do not create unnecessary folders if they contain nothing.
+
+---
+
+# 10. INFRASTRUCTURE LAYER
+
+Depot.Infrastructure contains technical implementations.
+
+Recommended structure:
+
+Depot.Infrastructure
+│
+├── Persistence
+│   ├── DepotDbContext.cs
+│   ├── Configurations
+│   └── Migrations
+│
+├── Authentication
+├── Authorization
+├── FileStorage
+├── Integrations
+│   ├── Maersk
+│   ├── Payment
+│   └── EDI
+│
+└── Logging
+
+Infrastructure handles:
+
+- EF Core
+- SQL Server
+- DbContext
+- Entity configurations
+- Migrations
+- External API clients
+- File storage
+- Authentication infrastructure
+- Integration infrastructure
+
+---
+
+# 11. API LAYER
+
+Depot.Api is responsible only for HTTP concerns.
+
+Controllers must be thin.
+
+Controllers should:
+
+- Receive request
+- Validate model state
+- Call application service
+- Return HTTP response
+
+Controllers must NOT contain business logic.
+
+Bad:
+
+Controller
+    ↓
+Business calculations
+    ↓
+Database manipulation
+    ↓
+Status changes
+
+Good:
+
+Controller
+    ↓
+Application Service
+    ↓
+Domain Rules
+    ↓
+DbContext
+    ↓
+Database
+
+---
+
+# 12. REST API STANDARD
+
+Use RESTful API.
+
+Examples:
+
+GET    /api/containers
+GET    /api/containers/{id}
+POST   /api/containers
+PUT    /api/containers/{id}
+DELETE /api/containers/{id}
+
+For business actions use explicit endpoints.
+
+Examples:
+
+POST /api/forklift-jobs/{id}/claim
+POST /api/forklift-jobs/{id}/start
+POST /api/forklift-jobs/{id}/complete
+
+POST /api/estimates/{id}/submit
+POST /api/estimates/{id}/resend
+
+POST /api/work-orders/{id}/start
+POST /api/work-orders/{id}/complete
+
+POST /api/qc-inspections/{id}/pass
+POST /api/qc-inspections/{id}/fail
+
+Do not convert every business operation into a generic PUT endpoint.
+
+---
+
+# 13. DATABASE RULES
+
+Database:
+
+SQL Server
+
+Primary key:
+
+INT IDENTITY
+or
+BIGINT IDENTITY
+
+Example:
+
+CustomerId BIGINT
+ContainerId BIGINT
+UserId BIGINT
+ForkliftId BIGINT
+
+Foreign keys must reference database IDs.
+
+Do not use:
+
+CustomerGuid
+ContainerGuid
+ForkliftGuid
+
+unless explicitly required.
+
+---
+
+# 14. DATABASE DESIGN PRINCIPLES
+
+Database must preserve:
+
+- Referential integrity
+- Foreign keys
+- Unique constraints
+- Required fields
+- Appropriate indexes
+- Status consistency
+- Auditability
+
+Do not create duplicate data unless there is a valid reason.
+
+Do not store structured information only as JSON if it needs regular querying.
+
+For example:
+
+DO NOT use:
+
+YardLocation = "A-03-02-01"
+
+as the only location representation.
+
+Use structured relationships:
+
+Yard
+    ↓
+Block
+    ↓
+Bay
+    ↓
+Row
+    ↓
+Tier
+    ↓
+Location
+
+A formatted code such as:
+
+A-03-02-01
+
+can still be generated for display.
+
+---
+
+# 15. EF CORE RULES
+
+Use Entity Framework Core.
+
+Use separate entity configurations.
+
+Example:
+
+Depot.Infrastructure
+└── Persistence
+    └── Configurations
+        ├── CustomerConfiguration.cs
+        ├── ContainerConfiguration.cs
+        ├── ForkliftJobConfiguration.cs
+        └── YardLocationConfiguration.cs
+
+Do not put all entity configuration inside DbContext.
+
+Use migrations for database changes.
+
+Migration names must describe the change.
+
+Examples:
+
+AddCustomerUsers
+AddForkliftDispatch
+AddYardLocations
+AddEstimateApiTransactions
+
+---
+
+# 16. DATABASE QUERY RULES
+
+For read-only queries use:
+
+AsNoTracking()
+
+Do not load an entire large table and filter in memory.
+
+Bad:
+
+var data = await _db.Containers.ToListAsync();
+
+Then:
+
+data.Where(...)
+
+Good:
+
+_db.Containers
+    .AsNoTracking()
+    .Where(...)
+    .ToListAsync();
+
+Apply filtering, sorting, pagination at database level.
+
+---
+
+# 17. PAGINATION
+
+List APIs must support pagination where appropriate.
+
+Example:
+
+GET /api/containers?page=1&pageSize=20
+
+Support:
+
+- page
+- pageSize
+- search
+- filtering
+- sorting
+
+Do not return millions of records to the frontend.
+
+---
+
+# 18. CUSTOMER MODEL
+
+Customer can be:
+
+- Company
+- Business
+- Individual
+
+A Customer can have multiple user accounts.
+
+Example:
+
+Customer
+│
+├── Customer Admin
+├── Driver 01
+├── Driver 02
+├── Driver 03
+└── Customer Staff
+
+Customer Admin manages users belonging to the same Customer.
+
+---
+
+# 19. CUSTOMER USER MODEL
+
+CustomerUser should contain information such as:
+
+- Id
+- CustomerId
+- Username
+- PasswordHash
+- FullName
+- Phone
+- Email
+- Role
+- Status
+- CreatedAt
+- UpdatedAt
+
+Possible roles:
+
+- CustomerAdmin
+- Driver
+- CustomerStaff
+
+Do not mix Customer users with Depot employees.
+
+---
+
+# 20. CUSTOMER DATA ISOLATION
+
+Customer users must only access their own Customer data.
+
+Example:
+
+Customer A:
+
+CustomerId = 100
+
+must NEVER access:
+
+CustomerId = 200
+
+Backend must enforce this.
+
+Never rely only on frontend filtering.
+
+Wrong:
+
+Frontend hides Customer B.
+
+Correct:
+
+Backend rejects Customer B data access.
+
+Every relevant query must apply Customer ownership rules.
+
+---
+
+# 21. DEPOT EMPLOYEE USERS
+
+Depot employees are separate from Customer users.
+
+Possible roles:
+
+- DepotAdmin
+- Manager
+- Surveyor
+- GateOperator
+- CleaningOperator
+- ForkliftOperator
+- EstimateOperator
+- RepairOperator
+- InventoryOperator
+- QCOperator
+- BillingOperator
+
+Roles must be permission-driven.
+
+Do not hard-code authorization inside controllers.
+
+---
+
+# 22. AUTHENTICATION
+
+Use JWT authentication.
+
+JWT should contain only required claims.
+
+Examples:
+
+- UserId
+- CustomerId
+- Role
+- Permission claims if required
+
+Never store:
+
+- Password
+- Password hash
+- API secrets
+- Bank credentials
+
+inside JWT.
+
+Passwords must never be stored in plain text.
+
+---
+
+# 23. AUTHORIZATION
+
+Authentication answers:
+
+"Who is the user?"
+
+Authorization answers:
+
+"What can the user do?"
+
+Use authorization for:
+
+- Customer isolation
+- Role permissions
+- Module access
+- Business operations
+
+Example:
+
+A Driver can:
+
+- Login
+- Online Gate-In
+- View own Gate-In
+- View payment status
+
+A Driver cannot:
+
+- Create Estimate
+- Approve Estimate
+- Modify Repair
+- Access another Customer
+- Manage users
+
+---
+
+# 24. CONTAINER MODULE
+
+Container is the central business entity.
+
+Container should contain appropriate information such as:
+
+- ContainerNo
+- ContainerType
+- Size
+- ShippingLineId
+- OwnerId
+- Status
+- Grade
+- CurrentYardLocationId
+- CreatedAt
+- UpdatedAt
+
+Container must have a lifecycle.
+
+Example:
+
+GATE_IN
+    ↓
+SURVEY
+    ↓
+AV / CL / DM
+    ↓
+CLEANING / REPAIR
+    ↓
+QC
+    ↓
+AV
+    ↓
+YARD
+    ↓
+BOOKING
+    ↓
+GATE_OUT
+    ↓
+OUT
+
+Do not treat Container as simple CRUD only.
+
+---
+
+# 25. SURVEY MODULE
+
+Survey must support:
+
+- Container identification
+- Container type
+- Size
+- Shipping Line
+- Owner
+- Condition
+- Damage location
+- Damage Code
+- Repair Code
+- Cleaning condition
+- Reefer information
+- Images
+- Notes
+- Surveyor
+- Survey time
+
+Survey must preserve historical records.
+
+Do not overwrite previous inspection history.
+
+---
+
+# 26. SURVEY RESULT
+
+Possible container grading:
+
+AV - Available
+CL - Cleaning Required
+DM - Damaged / Pending Repair
+
+Additional Grade may include:
+
+- Grade A
+- Food Grade
+- Scrap Grade
+- Other configured grades
+
+These must be configurable where appropriate.
+
+Do not hard-code all carrier-specific business rules into controllers.
+
+---
+
+# 27. SURVEY IMAGES
+
+Survey images must be linked to:
+
+- Container
+- Survey
+- Survey item
+- Image type
+- User
+- Timestamp
+
+Do not overwrite existing images.
+
+Images must remain auditable.
+
+---
+
+# 28. CLEANING MODULE
+
+When Survey identifies CL:
+
+CL
+    ↓
+Cleaning Queue
+    ↓
+Cleaning Job
+    ↓
+Cleaning Execution
+    ↓
+Cleaning History
+    ↓
+QC
+    ↓
+AV if passed
+
+Cleaning operator must see assigned work through a work queue.
+
+Cleaning history must be preserved.
+
+---
+
+# 29. PAYMENT MODULE
+
+Payment workflow:
+
+Service Order
+    ↓
+Payment
+    ↓
+VietQR
+    ↓
+Customer/Driver
+    ↓
+Bank
+    ↓
+Webhook
+    ↓
+Reconciliation
+    ↓
+PAID
+
+Never trust frontend payment confirmation.
+
+Payment status must be confirmed by backend integration/webhook.
+
+Payment must validate:
+
+- Transaction ID
+- Amount
+- Payment reference
+- Payment content
+- Related service order
+- Payment status
+
+---
+
+# 30. PAYMENT IDEMPOTENCY
+
+Webhook processing must be idempotent.
+
+The same bank transaction must not create multiple payments.
+
+Example:
+
+TransactionId = ABC123
+
+If webhook ABC123 is received twice:
+
+First request:
+
+Process payment.
+
+Second request:
+
+Detect existing transaction.
+
+Do not create duplicate payment.
+
+---
+
+# 31. FORKLIFT DISPATCH
+
+Forklift uses SELF-CLAIM workflow.
+
+Do NOT implement:
+
+Manager
+    ↓
+Assign Job
+    ↓
+Forklift
+
+Correct:
+
+WAITING
+    ↓
+Forklift Operator sees queue
+    ↓
+Operator selects job
+    ↓
+CLAIM
+    ↓
+CLAIMED
+    ↓
+IN_PROGRESS
+    ↓
+COMPLETED
+
+---
+
+# 32. FORKLIFT JOB
+
+ForkliftJob should contain:
+
+- ForkliftJobId
+- ContainerId
+- ForkliftId
+- OperatorId
+- FromLocationId
+- PlannedLocationId
+- ActualLocationId
+- Status
+- Priority
+- CreatedAt
+- ClaimedAt
+- StartedAt
+- CompletedAt
+- FailureReason
+- Notes
+
+---
+
+# 33. FORKLIFT STATUS
+
+Main states:
+
+WAITING
+    ↓
+CLAIMED
+    ↓
+IN_PROGRESS
+    ↓
+COMPLETED
+
+Possible:
+
+WAITING → CANCELLED
+
+CLAIMED → CANCELLED
+
+IN_PROGRESS → FAILED
+
+Invalid status transitions must be rejected.
+
+---
+
+# 34. FORKLIFT CLAIM CONCURRENCY
+
+This is a critical business requirement.
+
+Two operators must NEVER be able to claim the same ForkliftJob.
+
+Example:
+
+Operator A clicks CLAIM.
+
+Operator B clicks CLAIM at the same time.
+
+Only one operator succeeds.
+
+The backend and database must guarantee this.
+
+Do NOT rely on frontend locking.
+
+The operation must be atomic.
+
+Conceptually:
+
+UPDATE ForkliftJobs
+SET
+    Status = CLAIMED,
+    OperatorId = CurrentOperator,
+    ForkliftId = CurrentForklift,
+    ClaimedAt = CurrentTime
+WHERE
+    Id = JobId
+    AND Status = WAITING
+
+If no row is updated:
+
+Return conflict.
+
+Message:
+
+"Container đã được nhân viên khác nhận."
+
+---
+
+# 35. FORKLIFT LOCATION
+
+Always distinguish:
+
+FromLocation
+PlannedLocation
+ActualLocation
+
+Example:
+
+From:
+
+GATE / INSPECTION AREA
+
+Planned:
+
+A-03-02-01
+
+Actual:
+
+A-03-02-02
+
+Do not automatically assume:
+
+Actual = Planned.
+
+When the operator confirms completion, the system must capture ActualLocation.
+
+---
+
+# 36. YARD MANAGEMENT
+
+Yard structure:
+
+Yard
+    ↓
+Block
+    ↓
+Bay
+    ↓
+Row
+    ↓
+Tier
+
+Example:
+
+A-03-02-01
+
+means:
+
+Block A
+Bay 03
+Row 02
+Tier 01
+
+The system must know:
+
+- Which container is in which location
+- Which locations are occupied
+- Which locations are empty
+- Container status
+- Container zone
+- Current location
+
+---
+
+# 37. YARD OCCUPANCY
+
+A location cannot contain two containers unless the business explicitly supports stacking according to the configured tier model.
+
+Before placing a container:
+
+Check:
+
+- Location exists
+- Location is active
+- Location is available
+- Location is compatible
+- Location is not occupied
+- Container type restrictions if applicable
+
+If location is occupied:
+
+Reject completion.
+
+---
+
+# 38. ACTUAL YARD LOCATION
+
+After forklift completion:
+
+Update:
+
+Container.CurrentYardLocationId
+
+and the related location state.
+
+Also record:
+
+- From Location
+- Planned Location
+- Actual Location
+- Operator
+- Forklift
+- Start Time
+- Completion Time
+
+This history must never be lost.
+
+---
+
+# 39. ESTIMATE MODULE
+
+Estimate is used for repair/cleaning costs where required.
+
+Estimate contains:
+
+- EstimateNo
+- ContainerId
+- ShippingLineId
+- Status
+- CreatedBy
+- CreatedAt
+- TotalAmount
+- VAT
+- GrandTotal
+
+EstimateItem contains:
+
+- DamageCode
+- RepairCode
+- Description
+- Quantity
+- UnitPrice
+- Amount
+
+Calculation:
+
+Amount = Quantity × UnitPrice
+
+GrandTotal = Subtotal + VAT
+
+---
+
+# 40. ESTIMATE STATUS
+
+Possible statuses:
+
+DRAFT
+READY
+SENDING
+SUBMITTED
+APPROVED
+REJECTED
+ERROR
+
+Do not allow invalid status transitions.
+
+---
+
+# 41. MAERSK INTEGRATION
+
+Maersk integration must NOT be fake.
+
+Do not create fake production responses.
+
+Do not hard-code:
+
+- API URL
+- API Key
+- Token
+- Password
+- Fake reference number
+
+Use configuration and secure secret storage.
+
+Architecture:
+
+EstimateService
+    ↓
+IMaerskIntegrationService
+    ↓
+MaerskIntegrationService
+    ↓
+Maersk API
+    ↓
+Response
+    ↓
+EstimateApiTransaction
+
+---
+
+# 42. MAERSK API TRANSACTION
+
+Every API request must be auditable.
+
+Store:
+
+- EstimateId
+- RequestId
+- TransactionId
+- Endpoint
+- HTTP Status
+- Request Payload
+- Response Payload
+- Error Code
+- Error Message
+- SentAt
+- CompletedAt
+
+Do not overwrite previous API attempts.
+
+If retry occurs:
+
+Create a new transaction record.
+
+---
+
+# 43. REPAIR MODULE
+
+When Estimate is approved:
+
+APPROVED
+    ↓
+WorkOrder
+    ↓
+WAITING
+    ↓
+Repair
+    ↓
+QC_PENDING
+
+WorkOrder must reference:
+
+- Estimate
+- Container
+- Shipping Line
+- Repair items
+
+---
+
+# 44. REPAIR ITEM
+
+RepairItem contains:
+
+- WorkOrderId
+- DamageCode
+- RepairCode
+- Location
+- Description
+- Quantity
+- Status
+- Result
+- Notes
+
+Repair operator cannot change:
+
+- Approved price
+- Approved Repair Code
+- Approved Estimate amount
+
+---
+
+# 45. REPAIR STATUS
+
+WAITING
+IN_PROGRESS
+COMPLETED
+QC_PENDING
+QC_PASSED
+QC_FAILED
+CANCELLED
+
+Invalid transitions must be rejected.
+
+---
+
+# 46. REPAIR PHOTOS
+
+Photos must support:
+
+BEFORE
+AFTER
+
+Each image should contain:
+
+- ImageId
+- ContainerId
+- WorkOrderId
+- RepairItemId
+- ImageType
+- FilePath
+- UploadedBy
+- UploadedAt
+
+Never overwrite old images.
+
+---
+
+# 47. REPAIR ADDITIONAL DAMAGE
+
+If the repair operator discovers damage not included in the approved Estimate:
+
+Do NOT allow the operator to increase the Estimate.
+
+Do NOT allow the operator to modify the approved Repair Code.
+
+Use:
+
+REPORT ADDITIONAL DAMAGE
+
+Workflow:
+
+Repair
+    ↓
+Additional Damage Request
+    ↓
+Estimate Team
+    ↓
+Additional Estimate
+    ↓
+Approval
+    ↓
+Repair
+
+---
+
+# 48. INVENTORY
+
+Repair materials must be linked to WorkOrder.
+
+Flow:
+
+WorkOrder
+    ↓
+Material Request
+    ↓
+Warehouse
+    ↓
+Issue Material
+    ↓
+Stock Transaction
+    ↓
+Decrease Stock
+
+Never allow stock to become negative unless explicitly configured.
+
+---
+
+# 49. QC
+
+QC must be independent from Repair.
+
+Flow:
+
+REPAIR
+    ↓
+QC_PENDING
+    ↓
+QC INSPECTION
+    ├── PASSED
+    │
+    └── FAILED
+
+If PASSED:
+
+Container becomes eligible for AV.
+
+If FAILED:
+
+Container returns to:
+
+Repair
+or
+Cleaning
+
+Do not automatically mark QC as passed.
+
+---
+
+# 50. GATE-OUT
+
+Gate-Out must validate:
+
+- Booking
+- Release
+- Customer
+- Container
+- Shipping Line
+- Container status
+- Yard location
+- Driver
+- Truck
+
+Then:
+
+Forklift
+    ↓
+Gate
+    ↓
+EIR
+    ↓
+OUT
+
+---
+
+# 51. EIR
+
+EIR must preserve:
+
+- EIR number
+- Container
+- Gate event
+- Condition
+- Survey information
+- Images
+- Created time
+- Created user
+
+EIR is a business document and must remain auditable.
+
+---
+
+# 52. INTEGRATION
+
+External integrations include:
+
+- Maersk API
+- Bank/VietQR webhook
+- EDI
+- Other Shipping Line APIs
+
+External integrations must be isolated behind interfaces.
+
+Example:
+
+IMaerskIntegrationService
+
+IPaymentGatewayService
+
+IEdiIntegrationService
+
+Do not put external HTTP calls inside controllers.
+
+---
+
+# 53. INTEGRATION RETRY
+
+Retries must create history.
+
+Do not overwrite previous failed requests.
+
+Every attempt must have its own transaction record.
+
+Do not blindly retry operations that may not be idempotent.
+
+Use idempotency where required.
+
+---
+
+# 54. AUDIT LOG
+
+Important business operations must create audit history.
+
+Examples:
+
+- Login
+- Customer creation
+- User creation
+- Container creation
+- Survey
+- Cleaning
+- Payment
+- Forklift claim
+- Forklift completion
+- Estimate submission
+- Estimate approval
+- API integration
+- Repair
+- QC
+- Gate-out
+
+Audit information may include:
+
+- User
+- Action
+- Entity
+- EntityId
+- OldValue
+- NewValue
+- Timestamp
+- IP address where appropriate
+
+Never log secrets.
+
+---
+
+# 55. ERROR HANDLING
+
+Use global exception handling.
+
+Possible application exceptions:
+
+- NotFoundException
+- ValidationException
+- BusinessException
+- ForbiddenException
+- ConflictException
+
+Example:
+
+Forklift claim conflict:
+
+HTTP 409 Conflict
+
+Message:
+
+"Container đã được nhân viên khác nhận."
+
+Do not expose internal stack traces to clients in production.
+
+---
+
+# 56. API RESPONSE
+
+Use a consistent API response format.
+
+Success:
+
+{
+    "success": true,
+    "data": {},
+    "message": null
+}
+
+Error:
+
+{
+    "success": false,
+    "data": null,
+    "message": "Container đã được nhân viên khác nhận."
+}
+
+Validation:
+
+{
+    "success": false,
+    "message": "Validation failed",
+    "errors": {
+        "containerNo": [
+            "Container No is required."
+        ]
+    }
+}
+
+---
+
+# 57. VALIDATION
+
+Backend validation is mandatory.
+
+Frontend validation is only for user experience.
+
+Backend must validate:
+
+- Required fields
+- Data format
+- Business rules
+- Ownership
+- Status
+- Permissions
+- Duplicate data
+- State transitions
+
+Never trust client input.
+
+---
+
+# 58. STATUS TRANSITIONS
+
+Every workflow must define valid status transitions.
+
+Example:
+
+Forklift:
+
+WAITING
+    ↓
+CLAIMED
+    ↓
+IN_PROGRESS
+    ↓
+COMPLETED
+
+Do not allow:
+
+COMPLETED → WAITING
+
+unless explicitly supported by a business operation.
+
+---
+
+# 59. TRANSACTION RULES
+
+Use database transactions when multiple database changes must succeed together.
+
+Example:
+
+Forklift completion may require:
+
+1. Update ForkliftJob
+2. Update Container location
+3. Update Yard location occupancy
+4. Create movement history
+
+These operations must be consistent.
+
+If one critical operation fails:
+
+Rollback the transaction.
+
+Do not create partial business state.
+
+---
+
+# 60. CONCURRENCY
+
+Concurrency must be considered for:
+
+- Forklift Claim
+- Yard Location Assignment
+- Payment Webhook
+- Inventory Issue
+- Booking Container Selection
+- Gate-Out
+
+Do not assume users operate sequentially.
+
+---
+
+# 61. INVENTORY CONCURRENCY
+
+Two users must not be able to issue more stock than available.
+
+Example:
+
+Stock = 10
+
+Operator A requests 8.
+
+Operator B requests 8.
+
+The system must prevent total issued quantity from becoming 16.
+
+Use database-safe concurrency/transaction logic.
+
+---
+
+# 62. CODING STYLE
+
+Use clear C# naming.
+
+Classes:
+
+PascalCase
+
+Methods:
+
+PascalCase
+
+Variables:
+
+camelCase
+
+Private fields:
+
+_camelCase
+
+Async methods:
+
+Use Async suffix.
+
+Example:
+
+GetContainerAsync
+
+CreateEstimateAsync
+
+ClaimForkliftJobAsync
+
+---
+
+# 63. ASYNC
+
+Use async/await for database and HTTP operations.
+
+Avoid blocking calls such as:
+
+.Result
+
+.Wait()
+
+unless technically unavoidable.
+
+Use:
+
+CancellationToken
+
+for long-running or external operations where appropriate.
+
+---
+
+# 64. NULLABILITY
+
+Enable nullable reference types.
+
+Avoid unnecessary null suppression:
+
+!
+
+Do not hide potential null bugs.
+
+Handle nullable values intentionally.
+
+---
+
+# 65. DTO RULE
+
+Do not expose EF Core entities directly from APIs.
+
+Use DTOs.
+
+Example:
+
+ContainerEntity
+    ↓
+ContainerDto
+    ↓
+API response
+
+Request DTO:
+
+CreateContainerRequest
+
+UpdateContainerRequest
+
+Response DTO:
+
+ContainerDto
+
+---
+
+# 66. MAPPING
+
+Mapping can be explicit or use an established mapping mechanism already used in the project.
+
+Do not introduce AutoMapper just because it is popular if the existing architecture does not use it.
+
+Follow the project's existing convention.
+
+---
+
+# 67. SERVICE SIZE
+
+Avoid giant services.
+
+Do NOT create:
+
+DepotService
+
+containing every business operation.
+
+Prefer:
+
+ContainerService
+SurveyService
+CleaningService
+PaymentService
+ForkliftService
+YardService
+EstimateService
+RepairService
+QCService
+BillingService
+GateOutService
+
+---
+
+# 68. NO DUPLICATE LOGIC
+
+Before creating new code:
+
+Search existing code.
+
+Reuse existing:
+
+- Services
+- Validators
+- Helpers
+- Extensions
+- DTOs
+- Domain rules
+
+Do not create duplicate implementations.
+
+---
+
+# 69. NO UNRELATED CHANGES
+
+When working on one module:
+
+Do not modify unrelated modules.
+
+Example:
+
+Task:
+
+Add Forklift Claim
+
+Do not modify:
+
+Estimate
+Repair
+Billing
+
+unless required by an actual dependency.
+
+---
+
+# 70. TASK DEVELOPMENT PROCESS
+
+Every task must follow:
+
+1. Understand requirement
+2. Inspect existing project
+3. Identify dependencies
+4. Identify affected files
+5. Design solution
+6. Implement
+7. Build
+8. Run tests
+9. Review
+10. Report result
+
+Do not blindly generate code.
+
+---
+
+# 71. TASK FORMAT
+
+When Team Lead gives a task, first identify:
+
+TASK ID
+
+OBJECTIVE
+
+BUSINESS RULES
+
+AFFECTED MODULES
+
+DATABASE CHANGES
+
+DOMAIN CHANGES
+
+APPLICATION CHANGES
+
+API CHANGES
+
+FRONTEND CHANGES
+
+TEST CASES
+
+ACCEPTANCE CRITERIA
+
+Do not implement outside the defined scope.
+
+---
+
+# 72. DEVELOPMENT PHASES
+
+Development should normally follow:
+
+PHASE 1
+Authentication
+
+PHASE 2
+Customer
+
+PHASE 3
+Customer Users
+
+PHASE 4
+Container
+
+PHASE 5
+Gate
+
+PHASE 6
+Survey
+
+PHASE 7
+Cleaning
+
+PHASE 8
+Payment
+
+PHASE 9
+Yard
+
+PHASE 10
+Forklift
+
+PHASE 11
+Estimate
+
+PHASE 12
+Approval
+
+PHASE 13
+Repair
+
+PHASE 14
+Inventory
+
+PHASE 15
+QC
+
+PHASE 16
+Billing
+
+PHASE 17
+Gate-Out
+
+PHASE 18
+EIR
+
+PHASE 19
+Integration
+
+PHASE 20
+Reporting
+
+---
+
+# 73. BACKEND-FIRST DEVELOPMENT
+
+The backend should normally be implemented before frontend business screens.
+
+For each module:
+
+Domain
+    ↓
+Database
+    ↓
+Application Service
+    ↓
+API
+    ↓
+Tests
+    ↓
+Frontend
+
+Frontend must consume real APIs.
+
+Do not build frontend against fake production APIs.
+
+---
+
+# 74. TESTING TEAM
+
+Tester must verify:
+
+Happy Path
+
+Negative Path
+
+Boundary Cases
+
+Authorization
+
+Security
+
+Concurrency
+
+Database integrity
+
+State transitions
+
+API validation
+
+Integration failure
+
+---
+
+# 75. FORKLIFT TEST CASES
+
+Minimum tests:
+
+- Create Forklift Job
+- List Waiting Jobs
+- Claim Waiting Job
+- Claim already claimed Job
+- Concurrent Claim
+- Start claimed Job
+- Start unclaimed Job
+- Complete in-progress Job
+- Complete without actual location
+- Complete with occupied location
+- Update Yard after completion
+- Cancel waiting job
+- Cancel claimed job
+- Fail in-progress job
+
+---
+
+# 76. CUSTOMER TEST CASES
+
+Minimum tests:
+
+- Create Customer
+- Create Customer Admin
+- Customer Admin creates Driver
+- Driver login
+- Disabled Driver cannot login
+- Customer A cannot access Customer B
+- Customer Admin cannot modify another Customer
+- Driver cannot manage users
+- Driver cannot access Estimate
+- Driver cannot access Repair
+- Driver can perform permitted Online Gate-In operations
+
+---
+
+# 77. PAYMENT TEST CASES
+
+Minimum tests:
+
+- Create payment
+- Generate QR
+- Receive webhook
+- Correct amount
+- Incorrect amount
+- Invalid transaction
+- Duplicate webhook
+- Already paid payment
+- Payment failure
+- Payment timeout
+
+---
+
+# 78. ESTIMATE TEST CASES
+
+Minimum tests:
+
+- Create Draft Estimate
+- Add Estimate Item
+- Calculate subtotal
+- Calculate VAT
+- Calculate total
+- Submit Estimate
+- Send Maersk API
+- Successful response
+- API error
+- Retry
+- Preserve API history
+- Cannot modify approved Estimate
+
+---
+
+# 79. REPAIR TEST CASES
+
+Minimum tests:
+
+- Create Work Order
+- Start Work Order
+- Complete Repair Item
+- Require after-repair image
+- Complete Work Order
+- Prevent incomplete Work Order completion
+- Report additional damage
+- QC Pending
+- QC Passed
+- QC Failed
+
+---
+
+# 80. DEFINITION OF DONE
+
+A task is NOT complete until all applicable conditions are satisfied.
+
+[ ] Business rules implemented
+
+[ ] Domain implemented
+
+[ ] Database updated
+
+[ ] Migration created
+
+[ ] Application service implemented
+
+[ ] Validation implemented
+
+[ ] Authorization implemented
+
+[ ] API implemented
+
+[ ] Error handling implemented
+
+[ ] Logging implemented where appropriate
+
+[ ] Tests implemented
+
+[ ] Build succeeds
+
+[ ] Tests pass
+
+[ ] No fake production implementation
+
+[ ] No TODO for core business logic
+
+[ ] No NotImplementedException for required functionality
+
+[ ] No unrelated changes
+
+[ ] Code reviewed
+
+---
+
+# 81. PROHIBITED IMPLEMENTATIONS
+
+Never create production code containing:
+
+TODO
+
+NotImplementedException
+
+Fake API response
+
+Fake Maersk response
+
+Fake payment success
+
+Hard-coded password
+
+Hard-coded JWT secret
+
+Hard-coded API key
+
+Hard-coded bank credentials
+
+Hard-coded Customer data
+
+Hard-coded Container data
+
+Hard-coded production URL
+
+Fake database implementation
+
+Generic Repository
+
+Unit Of Work
+
+MediatR
+
+CQRS
+
+unless explicitly approved by Team Lead.
+
+---
+
+# 82. MOCKING
+
+Mocking is allowed only for:
+
+- Unit tests
+- Integration tests
+- Automated tests
+
+Do not use mocks as production implementations.
+
+---
+
+# 83. EXTERNAL API RULE
+
+If external API specifications are unknown:
+
+DO NOT INVENT THE API.
+
+Instead:
+
+1. Create integration interface.
+2. Create configuration model.
+3. Create request/response models only when specification is known.
+4. Implement real HTTP integration when official specification is available.
+5. Store request/response history.
+6. Support retry where appropriate.
+
+---
+
+# 84. SECURITY RULES
+
+Never expose:
+
+- Passwords
+- Password hashes
+- JWT secrets
+- API keys
+- Bank credentials
+- Access tokens
+- Refresh tokens in logs
+
+Always validate:
+
+- Authentication
+- Authorization
+- Customer ownership
+- Resource ownership
+- Input data
+
+---
+
+# 85. FILE UPLOAD RULES
+
+Images and documents must not be stored as unrestricted database blobs unless explicitly required.
+
+Use file storage.
+
+Database stores metadata:
+
+- File ID
+- Entity
+- Entity ID
+- File type
+- Path
+- Original filename
+- Size
+- UploadedBy
+- UploadedAt
+
+Validate:
+
+- File size
+- Extension
+- MIME type
+- Access permission
+
+---
+
+# 86. AUDIT REQUIREMENT
+
+Business history must not be destroyed.
+
+Examples:
+
+Survey history
+Cleaning history
+Forklift movement history
+Payment history
+Estimate API history
+Repair history
+QC history
+Gate history
+
+Do not simply overwrite the current state without recording important historical events.
+
+---
+
+# 87. CURRENT STATE VS HISTORY
+
+Separate:
+
+CURRENT STATE
+
+from:
+
+HISTORY
+
+Example:
+
+Container.CurrentYardLocationId
+
+represents current state.
+
+ForkliftJob / ContainerMovementHistory
+
+represents history.
+
+Both are required.
+
+---
+
+# 88. BUSINESS EVENT HISTORY
+
+For important state changes record:
+
+- Entity
+- Previous status
+- New status
+- User
+- Time
+- Reason if applicable
+
+Example:
+
+WAITING
+→
+CLAIMED
+
+record:
+
+Operator
+Forklift
+Timestamp
+
+---
+
+# 89. FRONTEND RULES
+
+React frontend must consume Backend API.
+
+Do not duplicate backend business rules.
+
+Frontend should handle:
+
+- Form validation
+- UI state
+- Loading
+- Errors
+- Pagination
+- Search
+- Filtering
+- Permissions display
+- Responsive layout
+
+Backend handles:
+
+- Business rules
+- Security
+- Data validation
+- Authorization
+- State transitions
+- Database consistency
+
+---
+
+# 90. FRONTEND RESPONSIVE REQUIREMENT
+
+Depot workers may use:
+
+- Desktop
+- Tablet
+- Mobile
+
+Operational screens such as:
+
+- Forklift
+- Cleaning
+- Repair
+- QC
+
+should be optimized for touch devices.
+
+---
+
+# 91. FORKLIFT UI PRINCIPLE
+
+Forklift screen must be simple and fast.
+
+Primary screen:
+
+WAITING JOBS
+
+Show:
+
+- Container No
+- From Location
+- Planned Location
+- Priority
+- Waiting Time
+- Status
+
+Main action:
+
+[ NHẬN LỆNH ]
+
+After claim:
+
+[ BẮT ĐẦU ]
+
+After movement:
+
+[ XÁC NHẬN ĐÃ HẠ ]
+
+Then require:
+
+Actual Block
+Actual Bay
+Actual Row
+Actual Tier
+
+Then:
+
+[ HOÀN THÀNH ]
+
+---
+
+# 92. ONLINE GATE-IN CUSTOMER FLOW
+
+Customer:
+
+Company / Business / Individual
+
+Customer Admin:
+
+    ↓
+
+Create Driver Account
+
+    ↓
+
+Driver Login
+
+    ↓
+
+Online Gate-In
+
+    ↓
+
+Enter container/truck information
+
+    ↓
+
+Submit Gate-In
+
+    ↓
+
+Depot processes request
+
+This must be isolated from Depot employee authentication.
+
+---
+
+# 93. COMPLETE BUSINESS MODULES
+
+The system contains:
+
+1. Authentication
+2. Customer
+3. Customer Users
+4. Container
+5. Gate-In
+6. Survey
+7. Cleaning
+8. Payment
+9. Forklift Dispatch
+10. Yard Management
+11. Estimate
+12. Approval
+13. Repair
+14. Inventory
+15. QC
+16. Billing
+17. Gate-Out
+18. EIR
+19. Integration
+20. Reporting
+21. Audit
+
+---
+
+# 94. GLOBAL BUSINESS FLOW
+
+GATE-IN
+    ↓
+SURVEY
+    ↓
+AV / CL / DM
+    │
+    ├── AV
+    │
+    ├── CL
+    │     ↓
+    │   CLEANING
+    │     ↓
+    │    QC
+    │
+    └── DM
+          ↓
+       ESTIMATE
+          ↓
+       APPROVAL
+          ↓
+        REPAIR
+          ↓
+          QC
+          ↓
+          AV
+
+AV
+    ↓
+PAYMENT / SERVICE
+    ↓
+FORKLIFT
+    ↓
+YARD
+    ↓
+BOOKING / RELEASE
+    ↓
+FORKLIFT
+    ↓
+GATE-OUT
+    ↓
+EIR
+    ↓
+EDI / API
+    ↓
+OUT
+
+---
+
+# 95. AI BEHAVIOR
+
+Copilot must behave like a professional software development team.
+
+Before coding:
+
+Understand.
+
+Before creating:
+
+Search existing code.
+
+Before modifying:
+
+Check dependencies.
+
+Before database changes:
+
+Check existing schema.
+
+Before API changes:
+
+Check existing conventions.
+
+Before frontend changes:
+
+Check API contract.
+
+Before declaring complete:
+
+Build and test.
+
+---
+
+# 96. DO NOT GENERATE THE ENTIRE SYSTEM AT ONCE
+
+Never generate hundreds of entities/controllers/services in one uncontrolled operation.
+
+Implement module by module.
+
+Recommended:
+
+Authentication
+    ↓
+Customer
+    ↓
+Customer Users
+    ↓
+Container
+    ↓
+Gate
+    ↓
+Survey
+    ↓
+Cleaning
+    ↓
+Payment
+    ↓
+Yard
+    ↓
+Forklift
+    ↓
+Estimate
+    ↓
+Repair
+    ↓
+Inventory
+    ↓
+QC
+    ↓
+Gate-Out
+    ↓
+Integration
+    ↓
+Reporting
+
+---
+
+# 97. WHEN REQUIREMENTS ARE AMBIGUOUS
+
+Do not invent important business rules.
+
+If the requirement is unclear:
+
+- Identify the ambiguity.
+- Explain the impact.
+- Ask for Team Lead decision.
+
+Examples:
+
+- Tariff calculation
+- Carrier-specific approval rules
+- Maersk API specification
+- Yard placement algorithm
+- FIFO rules
+- Reefer rules
+- Billing rules
+
+Do not silently invent production behavior.
+
+---
+
+# 98. CODE REVIEW CHECKLIST
+
+Before completing a task, check:
+
+Architecture
+- Does dependency direction remain correct?
+- Is business logic in the correct layer?
+
+Database
+- Are FK relationships correct?
+- Are indexes appropriate?
+- Are concurrency rules handled?
+
+Security
+- Is authorization enforced?
+- Is Customer isolation enforced?
+- Are secrets protected?
+
+Business
+- Are status transitions valid?
+- Are business rules enforced server-side?
+
+API
+- Is REST endpoint naming consistent?
+- Is validation implemented?
+- Are errors handled consistently?
+
+Performance
+- Is pagination implemented?
+- Is AsNoTracking used where appropriate?
+- Are unnecessary queries avoided?
+
+Testing
+- Are happy path tests present?
+- Are negative tests present?
+- Are concurrency/security tests present?
+
+---
+
+# 99. FINAL RULE
+
+The most important rule:
+
+DO NOT WRITE CODE JUST BECAUSE CODE WAS REQUESTED.
+
+First understand:
+
+1. Business requirement
+2. Existing architecture
+3. Existing database
+4. Existing code
+5. Dependencies
+6. Security requirements
+7. Test requirements
+
+Then implement the smallest correct change.
+
+The goal is not to generate the most code.
+
+The goal is to build a maintainable production system.
+
+---
+
+# 100. TEAM LEAD COMMANDS
+
+The following commands may be used by the Team Lead:
+
+/plan
+
+Analyze the requirement and divide it into development tasks.
+
+/backend
+
+Work only on Backend.
+
+/frontend
+
+Work only on Frontend.
+
+/database
+
+Analyze or implement database changes.
+
+/api
+
+Design or implement API.
+
+/test
+
+Create or update tests.
+
+/review
+
+Review current implementation.
+
+/security
+
+Review authentication, authorization, and data isolation.
+
+/refactor
+
+Refactor code without changing business behavior.
+
+/debug
+
+Analyze and fix the specified problem.
+
+/migration
+
+Create or update EF Core migration.
+
+/integration
+
+Work on external API integration.
+
+/status
+
+Report current implementation status.
+
+/next
+
+Suggest the next development task based on project dependencies.
+
+---
+
+# 101. RESPONSE FORMAT FOR TEAM LEAD
+
+When asked to implement a feature, first provide:
+
+## TASK
+
+Task name.
+
+## OBJECTIVE
+
+What the feature must accomplish.
+
+## BUSINESS RULES
+
+Important business rules.
+
+## AFFECTED MODULES
+
+Modules affected by the task.
+
+## DATABASE CHANGES
+
+Entities, fields, relationships, indexes, migrations.
+
+## BACKEND CHANGES
+
+Domain, Application, Infrastructure, API.
+
+## FRONTEND CHANGES
+
+Only if requested.
+
+## TEST CASES
+
+Required tests.
+
+## ACCEPTANCE CRITERIA
+
+Conditions for completion.
+
+Then implement the task.
+
+---
+
+# END OF COPILOT INSTRUCTIONS

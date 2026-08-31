@@ -1,0 +1,6 @@
+{
+  "name": "Solution Depot - Automated Container & EMR Workflow",
+  "description": "Hệ thống Quản Lý Depot Container & EMR Workflow toàn diện: Gate-in, Survey, Payment, Yard 2D, Forklift, Estimate, Approval, Repair, QC, Warehouse & Billing",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

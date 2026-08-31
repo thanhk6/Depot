@@ -1,0 +1,20 @@
+﻿using Microsoft.EntityFrameworkCore;
+using Depot.Data.Entities;
+
+namespace Depot.Data.EF
+{
+    public class DepotDbContext : DbContext
+    {
+        public DepotDbContext(DbContextOptions<DepotDbContext> options) : base(options)
+        {
+        }
+
+        public DbSet<GateIn> GateIns { get; set; } = null!;
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+            modelBuilder.ApplyConfigurationsFromAssembly(typeof(DepotDbContext).Assembly);
+        }
+    }
+}
