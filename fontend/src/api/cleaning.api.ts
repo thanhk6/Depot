@@ -46,6 +46,8 @@ export interface CleaningRecordDto {
   completedAt?: string | null;
   handoverToOperationDate?: string | null;
   handoverActor?: string | null;
+  /** Thời điểm tiếp nhận vào vệ sinh (tạo lệnh). */
+  createdAt?: string | null;
   items: CleaningWorkItemDto[];
 }
 

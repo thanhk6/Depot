@@ -1,0 +1,579 @@
+{
+	"info": {
+		"_postman_id": "32e80d97-3efa-4f0e-8e6a-bbf22e36d6a6",
+		"name": "AEMS API Integration",
+		"description": "**Initial steps before running scripts**\n\n1. Set the `Client ID`, `Client Secret`, `Consumer-Key` and `maintenanceShopCode` in postman collection variables.\n    \n2. Run `get-authentication-token` which will use the configured variable to get and set the authentication token in variables, avaiable for two hours.\n    \n\nAfter this feel free to update the body content of any script in this collection and play around in AEMS APIs.\n\nNote: Please read the OAS to get wiser on the required body content and return types!",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "33422012"
+	},
+	"item": [
+		{
+			"name": "get-authentication-token",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"var jsonData = pm.response.json();\r",
+							"\r",
+							"pm.collectionVariables.set(\"access_token\", jsonData.access_token);"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Consumer-Key",
+						"value": "{{consumer_key}}",
+						"type": "text"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/x-www-form-urlencoded",
+						"type": "text"
+					},
+					{
+						"key": "Cache-Control",
+						"value": "no-cache",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "urlencoded",
+					"urlencoded": [
+						{
+							"key": "grant_type",
+							"value": "client_credentials",
+							"type": "text"
+						},
+						{
+							"key": "client_id",
+							"value": "{{consumer_key}}",
+							"type": "text"
+						},
+						{
+							"key": "client_secret",
+							"value": "{{client_secret}}",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "https://api-stage.maersk.com/customer-identity/oauth/v2/access_token",
+					"protocol": "https",
+					"host": [
+						"api-stage",
+						"maersk",
+						"com"
+					],
+					"path": [
+						"customer-identity",
+						"oauth",
+						"v2",
+						"access_token"
+					]
+				},
+				"description": "Gets the _access_token_ from Maersk Oauth2 Authentication API.\n\nSets the _access_token_ as a local collection variable, which will be used in all the other API calls.\n\nTokeb wll be valid for 2 hours."
+			},
+			"response": []
+		},
+		{
+			"name": "get-user-details",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{access_token}}",
+						"type": "text"
+					},
+					{
+						"key": "Consumer-Key",
+						"value": "{{consumer_key}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "https://api-stage.maersk.com/aems/identity/api/identity/user-details",
+					"protocol": "https",
+					"host": [
+						"api-stage",
+						"maersk",
+						"com"
+					],
+					"path": [
+						"aems",
+						"identity",
+						"api",
+						"identity",
+						"user-details"
+					]
+				},
+				"description": "Prerequsite: run **get-authentication-token**"
+			},
+			"response": []
+		},
+		{
+			"name": "upload-attachment",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "accept",
+						"value": "*/*"
+					},
+					{
+						"key": "Authorization",
+						"value": "Bearer {{access_token}}",
+						"type": "text"
+					},
+					{
+						"key": "Consumer-Key",
+						"value": "{{consumer_key}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "file",
+							"contentType": "image/jpeg",
+							"type": "file",
+							"src": "/Users/oliver/Desktop/CleanShot 2024-09-16 at 15.29.16@2x.png"
+						}
+					]
+				},
+				"url": {
+					"raw": "https://api-stage.maersk.com/aems/blob-manager/api/manage/{{maintenanceShopCode}}/upload",
+					"protocol": "https",
+					"host": [
+						"api-stage",
+						"maersk",
+						"com"
+					],
+					"path": [
+						"aems",
+						"blob-manager",
+						"api",
+						"manage",
+						"{{maintenanceShopCode}}",
+						"upload"
+					]
+				},
+				"description": "Prerequsite: run **get-authentication-token**"
+			},
+			"response": []
+		},
+		{
+			"name": "create-order",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{access_token}}",
+						"type": "text"
+					},
+					{
+						"key": "Consumer-Key",
+						"value": "{{consumer_key}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"equipmentNumber\": \"MCRU2000641\",\r\n  \"maintenanceShopCode\": \"{{maintenanceShopCode}}\",\r\n  \"maintenanceRepairModeCode\": \"43\",\r\n  \"vendorsReference\": \"\",\r\n  \"maintenanceOrderCause\": \"WEAR_AND_TEAR\",\r\n  \"damagedAt\": \"\",\r\n  \"reeferContainerCondition\": \"NOT_PROVIDED\",\r\n  \"attachedImages\": [\r\n    {\r\n      \"name\": \"ContainerImage.jpg\",\r\n      \"path\": \"21c4da19-d91b-485e-bf4a-c517b42f71d9.jpg\",\r\n      \"extension\": \"jpg\",\r\n      \"contentType\": \"xxxx\"\r\n    }\r\n  ],\r\n  \"maintenanceOrderManHours\": [\r\n    {\r\n      \"manHours\": 0.5,\r\n      \"manHoursType\": \"REGULAR\"\r\n    },\r\n    {\r\n      \"manHours\": 0,\r\n      \"manHoursType\": \"OVERTIME\"\r\n    },\r\n    {\r\n      \"manHours\": 0,\r\n      \"manHoursType\": \"DOUBLETIME\"\r\n    },\r\n    {\r\n      \"manHours\": 0,\r\n      \"manHoursType\": \"MISCELLANEOUS\"\r\n    }\r\n  ],\r\n  \"maintenanceOrderLines\": [\r\n    {\r\n      \"equipmentDamageCode\": \"IE\",\r\n      \"maintenanceOrderParts\": [\r\n        {\r\n          \"partNumber\": \"818623CMRP\",\r\n          \"unitQuantity\": 1,\r\n          \"unitPrice\": 156.23,\r\n          \"replacedSerialNumbers\": [\r\n            \"ABC\"\r\n          ]\r\n        }\r\n      ],\r\n      \"maintenanceRepairLocationCode\": \"MV\",\r\n      \"maintenanceTypeCode\": \"1221\",\r\n      \"thirdPartyIndicator\": \"MANUFACTURE_WARRANTY\",\r\n      \"repairQuantity\": 1,\r\n      \"materialCostPerPiece\": 0,\r\n      \"manHoursPerPiece\": 0.3,\r\n      \"attachedImages\": []\r\n    },\r\n    {\r\n      \"equipmentDamageCode\": \"IE\",\r\n      \"maintenanceOrderParts\": [\r\n        {\r\n          \"partNumber\": \"818522F\",\r\n          \"unitQuantity\": 1,\r\n          \"unitPrice\": 99.48,\r\n          \"replacedSerialNumbers\": [\r\n            \"DEF\"\r\n          ]\r\n        },\r\n        {\r\n          \"partNumber\": \"818522C\",\r\n          \"unitQuantity\": 1,\r\n          \"unitPrice\": 267.49,\r\n          \"replacedSerialNumbers\": [\r\n            \"GHI\"\r\n          ]\r\n        }\r\n      ],\r\n      \"maintenanceRepairLocationCode\": \"MV\",\r\n      \"maintenanceTypeCode\": \"1641\",\r\n      \"thirdPartyIndicator\": \"WEAR_AND_TEAR\",\r\n      \"repairQuantity\": 1,\r\n      \"materialCostPerPiece\": 0,\r\n      \"manHoursPerPiece\": 0.2,\r\n      \"attachedImages\": []\r\n    },\r\n    {\r\n      \"equipmentDamageCode\": \"IE\",\r\n      \"maintenanceOrderParts\": [],\r\n      \"maintenanceRepairLocationCode\": \"MV\",\r\n      \"maintenanceTypeCode\": \"0619\",\r\n      \"thirdPartyIndicator\": \"WEAR_AND_TEAR\",\r\n      \"repairQuantity\": 1,\r\n      \"materialCostPerPiece\": \"100\",\r\n      \"manHoursPerPiece\": 0,\r\n      \"attachedImages\": []\r\n    }\r\n  ],\r\n  \"maintenanceOrderRemarks\": [\r\n    {\r\n      \"maintenanceOrderRemarkText\": \"Sample Remark\",\r\n      \"maintenanceOrderRemarkScope\": 1\r\n    }\r\n  ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://api-stage.maersk.com/aems/orders/api/maintenance-orders",
+					"protocol": "https",
+					"host": [
+						"api-stage",
+						"maersk",
+						"com"
+					],
+					"path": [
+						"aems",
+						"orders",
+						"api",
+						"maintenance-orders"
+					]
+				},
+				"description": "Prerequsite: run **get-authentication-token**"
+			},
+			"response": []
+		},
+		{
+			"name": "get-order-by-id",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{access_token}}",
+						"type": "text"
+					},
+					{
+						"key": "Consumer-Key",
+						"value": "{{consumer_key}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "https://api-stage.maersk.com/aems/orders/api/maintenance-orders/500000218",
+					"protocol": "https",
+					"host": [
+						"api-stage",
+						"maersk",
+						"com"
+					],
+					"path": [
+						"aems",
+						"orders",
+						"api",
+						"maintenance-orders",
+						"500000218"
+					]
+				},
+				"description": "Prerequsite: run **get-authentication-token**"
+			},
+			"response": []
+		},
+		{
+			"name": "get-orders",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{access_token}}",
+						"type": "text"
+					},
+					{
+						"key": "Consumer-Key",
+						"value": "{{consumer_key}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "https://api-stage.maersk.com/aems/orders/api/maintenance-orders/?page=1&limit=20&sort=maintenanceOrderStatusUpdatedTimestamp:asc&maintenanceRepairModes=43&fromDate=2024-09-01T00:00:00Z&toDate=2024-09-13T00:00:00Z&maintenanceShopCodes=3FI",
+					"protocol": "https",
+					"host": [
+						"api-stage",
+						"maersk",
+						"com"
+					],
+					"path": [
+						"aems",
+						"orders",
+						"api",
+						"maintenance-orders",
+						""
+					],
+					"query": [
+						{
+							"key": "page",
+							"value": "1"
+						},
+						{
+							"key": "limit",
+							"value": "20"
+						},
+						{
+							"key": "sort",
+							"value": "maintenanceOrderStatusUpdatedTimestamp:asc"
+						},
+						{
+							"key": "maintenanceRepairModes",
+							"value": "43"
+						},
+						{
+							"key": "fromDate",
+							"value": "2024-09-01T00:00:00Z"
+						},
+						{
+							"key": "toDate",
+							"value": "2024-09-13T00:00:00Z"
+						},
+						{
+							"key": "maintenanceShopCodes",
+							"value": "3FI"
+						}
+					]
+				},
+				"description": "Prerequsite: run **get-authentication-token**"
+			},
+			"response": []
+		},
+		{
+			"name": "update-order",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{access_token}}",
+						"type": "text"
+					},
+					{
+						"key": "Consumer-Key",
+						"value": "{{consumer_key}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"equipmentNumber\": \"MCRU2000641\",\r\n  \"maintenanceShopCode\": \"{{maintenanceShopCode}}\",\r\n  \"maintenanceRepairModeCode\": \"43\",\r\n  \"vendorsReference\": \"\",\r\n  \"maintenanceOrderCause\": \"WEAR_AND_TEAR\",\r\n  \"damagedAt\": \"\",\r\n  \"reeferContainerCondition\": \"NOT_PROVIDED\",\r\n  \"attachedImages\": [\r\n    {\r\n      \"name\": \"\",\r\n      \"path\": \"21c4da19-d91b-485e-bf4a-c517b42f71d9.jpg\",\r\n      \"extension\": \"jpg\",\r\n      \"contentType\": \"xxxx\"\r\n    }\r\n  ],\r\n  \"maintenanceOrderManHours\": [\r\n    {\r\n      \"manHours\": 0.5,\r\n      \"manHoursType\": \"REGULAR\"\r\n    },\r\n    {\r\n      \"manHours\": 0,\r\n      \"manHoursType\": \"OVERTIME\"\r\n    },\r\n    {\r\n      \"manHours\": 0,\r\n      \"manHoursType\": \"DOUBLETIME\"\r\n    },\r\n    {\r\n      \"manHours\": 0,\r\n      \"manHoursType\": \"MISCELLANEOUS\"\r\n    }\r\n  ],\r\n  \"maintenanceOrderLines\": [\r\n    {\r\n      \"equipmentDamageCode\": \"IE\",\r\n      \"maintenanceOrderParts\": [\r\n        {\r\n          \"partNumber\": \"818623CMRP\",\r\n          \"unitQuantity\": 1,\r\n          \"unitPrice\": 156.23,\r\n          \"replacedSerialNumbers\": [\r\n            \"ABC\"\r\n          ]\r\n        }\r\n      ],\r\n      \"maintenanceRepairLocationCode\": \"MV\",\r\n      \"maintenanceTypeCode\": \"1221\",\r\n      \"thirdPartyIndicator\": \"MANUFACTURE_WARRANTY\",\r\n      \"repairQuantity\": 1,\r\n      \"materialCostPerPiece\": 0,\r\n      \"manHoursPerPiece\": 0.3,\r\n      \"attachedImages\": []\r\n    },\r\n    {\r\n      \"equipmentDamageCode\": \"IE\",\r\n      \"maintenanceOrderParts\": [\r\n        {\r\n          \"partNumber\": \"818522C\",\r\n          \"unitQuantity\": 1,\r\n          \"unitPrice\": 267.49,\r\n          \"replacedSerialNumbers\": [\r\n            \"GHI\"\r\n          ]\r\n        },\r\n        {\r\n          \"partNumber\": \"818522F\",\r\n          \"unitQuantity\": 1,\r\n          \"unitPrice\": 99.48,\r\n          \"replacedSerialNumbers\": [\r\n            \"DEF\"\r\n          ]\r\n        }\r\n      ],\r\n      \"maintenanceRepairLocationCode\": \"MV\",\r\n      \"maintenanceTypeCode\": \"1641\",\r\n      \"thirdPartyIndicator\": \"WEAR_AND_TEAR\",\r\n      \"repairQuantity\": 1,\r\n      \"materialCostPerPiece\": 0,\r\n      \"manHoursPerPiece\": 0.2,\r\n      \"attachedImages\": []\r\n    },\r\n    {\r\n      \"equipmentDamageCode\": \"IE\",\r\n      \"maintenanceOrderParts\": [],\r\n      \"maintenanceRepairLocationCode\": \"MV\",\r\n      \"maintenanceTypeCode\": \"0619\",\r\n      \"thirdPartyIndicator\": \"WEAR_AND_TEAR\",\r\n      \"repairQuantity\": 1,\r\n      \"materialCostPerPiece\": 100,\r\n      \"manHoursPerPiece\": 0,\r\n      \"attachedImages\": []\r\n    },\r\n    {\r\n      \"equipmentDamageCode\": \"FZ\",\r\n      \"maintenanceOrderParts\": [],\r\n      \"maintenanceRepairLocationCode\": \"MP\",\r\n      \"maintenanceTypeCode\": \"0624\",\r\n      \"thirdPartyIndicator\": \"MANUFACTURE_WARRANTY\",\r\n      \"repairQuantity\": 1,\r\n      \"materialCostPerPiece\": \"0\",\r\n      \"manHoursPerPiece\": 0,\r\n      \"attachedImages\": []\r\n    }\r\n  ],\r\n  \"maintenanceOrderRemarks\": [\r\n    {\r\n      \"maintenanceOrderRemarkText\": \"WO edit\",\r\n      \"maintenanceOrderRemarkScope\": 1\r\n    }\r\n  ],\r\n  \"maintenanceOrderNumber\": \"500000218\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://api-stage.maersk.com/aems/orders/api/maintenance-orders/500000218",
+					"protocol": "https",
+					"host": [
+						"api-stage",
+						"maersk",
+						"com"
+					],
+					"path": [
+						"aems",
+						"orders",
+						"api",
+						"maintenance-orders",
+						"500000218"
+					]
+				},
+				"description": "Prerequsite: run **get-authentication-token**\n\nNote that a validation error will occur if the another maintenance order with the same ID is already created. Then please try a new unused equipment number."
+			},
+			"response": []
+		},
+		{
+			"name": "create-order-remark",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{access_token}}",
+						"type": "text"
+					},
+					{
+						"key": "Consumer-Key",
+						"value": "{{consumer_key}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "[\r\n    {\r\n        \"maintenanceOrderRemarkScope\": 1,\r\n        \"maintenanceOrderRemarkText\": \"Adding additional remark_1 to work order\",\r\n        \"createUserId\": \"Kumar Kunal\",\r\n        \"createTimestamp\": \"2024-09-13T11:09:26.837Z\"\r\n    },\r\n    {\r\n        \"maintenanceOrderRemarkScope\": 1,\r\n        \"maintenanceOrderRemarkText\": \"Adding additional remark_2 to work order\",\r\n        \"createUserId\": \"Kumar Kunal\",\r\n        \"createTimestamp\": \"2024-09-13T11:09:26.837Z\"\r\n    }\r\n]",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://api-stage.maersk.com/aems/orders/api/maintenance-orders/500000218/remarks",
+					"protocol": "https",
+					"host": [
+						"api-stage",
+						"maersk",
+						"com"
+					],
+					"path": [
+						"aems",
+						"orders",
+						"api",
+						"maintenance-orders",
+						"500000218",
+						"remarks"
+					]
+				},
+				"description": "Prerequsite: run **get-authentication-token**"
+			},
+			"response": []
+		},
+		{
+			"name": "get-order-remarks",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{access_token}}",
+						"type": "text"
+					},
+					{
+						"key": "Consumer-Key",
+						"value": "{{consumer_key}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "https://api-stage.maersk.com/aems/orders/api/maintenance-orders/500000218/remarks",
+					"protocol": "https",
+					"host": [
+						"api-stage",
+						"maersk",
+						"com"
+					],
+					"path": [
+						"aems",
+						"orders",
+						"api",
+						"maintenance-orders",
+						"500000218",
+						"remarks"
+					]
+				},
+				"description": "Prerequsite: run **get-authentication-token**"
+			},
+			"response": []
+		},
+		{
+			"name": "mark-order-as-completed",
+			"request": {
+				"method": "PATCH",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{access_token}}",
+						"type": "text"
+					},
+					{
+						"key": "Consumer-Key",
+						"value": "{{consumer_key}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "https://api-stage.maersk.com/aems/orders/api/maintenance-orders/500000216/complete-repair",
+					"protocol": "https",
+					"host": [
+						"api-stage",
+						"maersk",
+						"com"
+					],
+					"path": [
+						"aems",
+						"orders",
+						"api",
+						"maintenance-orders",
+						"500000216",
+						"complete-repair"
+					]
+				},
+				"description": "Prerequsite: run **get-authentication-token**"
+			},
+			"response": []
+		},
+		{
+			"name": "delete-order-by-id",
+			"request": {
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{access_token}}",
+						"type": "text"
+					},
+					{
+						"key": "Consumer-Key",
+						"value": "{{consumer_key}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "https://api-stage.maersk.com/aems/orders/api/maintenance-orders/500000216",
+					"protocol": "https",
+					"host": [
+						"api-stage",
+						"maersk",
+						"com"
+					],
+					"path": [
+						"aems",
+						"orders",
+						"api",
+						"maintenance-orders",
+						"500000216"
+					]
+				},
+				"description": "Prerequsite: run **get-authentication-token**"
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "consumer_key",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "client_secret",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "maintenanceShopCode",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "access_token",
+			"value": "<auto-generated>"
+		}
+	]
+}

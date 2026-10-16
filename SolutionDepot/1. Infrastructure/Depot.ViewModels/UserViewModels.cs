@@ -18,6 +18,15 @@ namespace Depot.ViewModels
         public string RoleName { get; set; } = "GATE_OP";
         public bool IsActive { get; set; } = true;
         public List<string> AllowedTabs { get; set; } = new();
+        /// <summary>Mật khẩu tạm sinh ngẫu nhiên — CHỈ có giá trị trong response ngay sau khi tạo tài
+        /// khoản mới (xem CreateUserAsync), để admin gửi cho nhân viên. Luôn null ở mọi response khác
+        /// (GetUsers/Update...) vì không lưu plaintext trong DB.</summary>
+        public string? TemporaryPassword { get; set; }
+        /// <summary>JWT truy cập — CHỈ có giá trị trong response đăng nhập (UsersController.Login), null ở
+        /// mọi response khác. Frontend gửi lại qua header "Authorization: Bearer ...".</summary>
+        public string? AccessToken { get; set; }
+        /// <summary>Thời điểm (UTC) token hết hạn.</summary>
+        public DateTime? AccessTokenExpiresAt { get; set; }
     }
 
     public class CreateSystemUserRequest

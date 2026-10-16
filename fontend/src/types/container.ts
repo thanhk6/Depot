@@ -105,6 +105,29 @@ export interface SurveyRecord {
   photos: SurveyPhotoPayload[];
   // true = "Lưu Tạm" (job giữ nguyên SURVEYING); false/mặc định = nộp phiếu thật.
   isDraft?: boolean;
+  // CreateSurveyModal thu thập đủ các field dưới đây qua 4 tab nhưng trước đây không có chỗ nào trong
+  // type này để nhận — bị TS excess-property-check chặn ngầm hoặc rơi mất khi build payload.
+  owner?: string;
+  containerTypeName?: string;
+  manufactureMonthYear?: string;
+  maxGrossWeightKg?: number;
+  material?: string;
+  floorType?: string;
+  cscPlateNo?: string;
+  standard?: string;
+  standardNotes?: string;
+  qualityGrade?: string;
+  actionRequired?: string;
+  shift?: string;
+  yardLocationNote?: string;
+  cargoStatus?: string;
+  reeferBrand?: string;
+  reeferModel?: string;
+  reeferSetTemperatureC?: number;
+  ptiStatus?: string;
+  compressorHours?: number;
+  humidityPercent?: number;
+  ventilationCmh?: number;
 }
 
 export interface OperationTicket {

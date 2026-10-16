@@ -1,0 +1,81 @@
+# Triển khai SolutionDepot lên VPS (thư mục /opt/depot) — PostgreSQL 17 cài trực tiếp trên VPS,
+# KHÔNG chạy trong docker. Cấu hình đọc từ file .env cùng thư mục (xem .env.example).
+# Chạy: docker compose pull && docker compose up -d   (3 service: fileserver → backend → frontend)
+#
+# Cả 3 service dùng network_mode: host vì PostgreSQL trên VPS chỉ lắng nghe 127.0.0.1:5432 — host
+# network cho backend nối thẳng tới đó mà không phải mở PostgreSQL ra ngoài hay sửa pg_hba.conf.
+# Backend chỉ bind 127.0.0.1 (không public), mọi truy cập từ ngoài đi qua frontend (proxy /api/*).
+
+services:
+  backend:
+    image: ${DOCKERHUB_USER:-thanhnguyenit89}/depot-backend:${TAG:-latest}
+    container_name: depot-backend
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://127.0.0.1:${BACKEND_PORT:-50210}
+      ConnectionStrings__PostgreSqlConnection: "Host=${DB_HOST:-127.0.0.1};Port=${DB_PORT:-5432};Database=${DB_NAME:?DB_NAME is required};Username=${DB_USER:?DB_USER is required};Password=${DB_PASSWORD:?DB_PASSWORD is required};"
+      Webhooks__BankSharedSecret: ${WEBHOOK_SECRET:?WEBHOOK_SECRET is required}
+      # Key ký JWT (≥32 ký tự, sinh: openssl rand -hex 32) — backend Production từ chối khởi động nếu thiếu/để key mẫu.
+      Jwt__Key: ${JWT_KEY:?JWT_KEY is required}
+      # Mật khẩu ban đầu của các tài khoản seed (chỉ dùng khi tạo mới tài khoản seed).
+      Seed__DefaultPassword: ${SEED_DEFAULT_PASSWORD:?SEED_DEFAULT_PASSWORD is required}
+      # Địa chỉ nội bộ backend gọi FileServer để upload/xóa file. URL ảnh trả cho trình duyệt là tương
+      # đối (/api/files/...) và đi qua frontend — xem service fileserver bên dưới.
+      FileServer__BaseUrl: http://127.0.0.1:${FILESERVER_PORT:-50211}
+    depends_on:
+      fileserver:
+        condition: service_healthy
+    # Healthcheck mặc định trong image trỏ cổng 8080 — ghi đè cho đúng cổng thực tế.
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:${BACKEND_PORT:-50210}/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  frontend:
+    image: ${DOCKERHUB_USER:-thanhnguyenit89}/depot-cms:${TAG:-latest}
+    container_name: depot-frontend
+    restart: unless-stopped
+    network_mode: host
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: ${FRONTEND_PORT:-3001}
+      DEPOT_BACKEND_URL: http://127.0.0.1:${BACKEND_PORT:-50210}
+      # server.ts proxy GET /api/files/* (tải ảnh) thẳng sang FileServer.
+      DEPOT_FILESERVER_URL: http://127.0.0.1:${FILESERVER_PORT:-50211}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://127.0.0.1:${FRONTEND_PORT:-3001}/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  # Depot.FileServer — lưu file vật lý (ảnh giám định, ảnh sau sửa...). Chỉ bind 127.0.0.1: trình duyệt tải
+  # ảnh qua frontend (/api/files/*), backend upload/xóa qua FileServer__BaseUrl. File nằm trên ổ VPS tại
+  # FILE_STORAGE_PATH (mặc định /opt/depot/storage-files) — giữ nguyên khi pull image mới/tạo lại container,
+  # nhớ đưa thư mục này vào backup cùng database.
+  fileserver:
+    image: ${DOCKERHUB_USER:-thanhnguyenit89}/depot-fileserver:${TAG:-latest}
+    container_name: depot-fileserver
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://127.0.0.1:${FILESERVER_PORT:-50211}
+      Storage__RootPath: /data/storage-files
+      Storage__MaxFileSizeBytes: ${FILE_MAX_SIZE_BYTES:-20971520}
+    volumes:
+      - ${FILE_STORAGE_PATH:-/opt/depot/storage-files}:/data/storage-files
+    # Healthcheck mặc định trong image trỏ cổng 8080 — ghi đè cho đúng cổng thực tế.
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:${FILESERVER_PORT:-50211}/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s

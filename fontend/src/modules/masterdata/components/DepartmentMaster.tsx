@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { DepartmentItem } from '../types/department';
-import { INITIAL_DEPARTMENTS, DIVISION_CATEGORIES } from '../data/departmentMockData';
+import { DIVISION_CATEGORIES } from '../data/departmentMockData';
 import { DepartmentModal } from './DepartmentModal';
 import {
   Building2,
@@ -21,7 +21,6 @@ import {
   List,
   GitFork,
   Download,
-  RotateCcw,
   Sparkles,
   Tag,
   AlertCircle,
@@ -37,20 +36,13 @@ export const DepartmentMaster: React.FC<DepartmentMasterProps> = ({
   departments: propDepartments,
   onUpdateDepartments
 }) => {
-  const [departments, setDepartments] = useState<DepartmentItem[]>(
-    propDepartments && propDepartments.length > 0 ? propDepartments : INITIAL_DEPARTMENTS
-  );
+  // Chỉ hiển thị phòng ban thật từ backend (catalog DEPARTMENT) — không còn dữ liệu mẫu làm khung chờ.
+  const [departments, setDepartments] = useState<DepartmentItem[]>(propDepartments || []);
 
-  // `propDepartments` tới từ `MasterDataPage` qua fetch API bất đồng bộ — lúc component này mount lần
-  // đầu (vd vào thẳng qua sidebar "DM Phòng Ban Depot"), prop luôn rỗng nên `useState` ở trên tạm dùng
-  // `INITIAL_DEPARTMENTS` (dữ liệu mẫu cứng) làm khung hiển thị lúc chờ tải. Nhưng vì `useState(...)` chỉ
-  // đọc giá trị MỘT LẦN lúc khởi tạo, nếu không có effect này thì dù API tải xong 8 phòng ban thật từ
-  // database, màn hình vẫn mãi hiện đúng dữ liệu mẫu cứng ban đầu — chỉ tự đúng khi người dùng đổi tab
-  // rồi quay lại (ép remount). Effect này thay bằng dữ liệu thật ngay khi prop có dữ liệu.
+  // `propDepartments` tới từ MasterDataPage qua fetch bất đồng bộ — `useState` chỉ đọc prop 1 lần nên cần
+  // effect đồng bộ lại khi dữ liệu thật về (xem docs/backend-progress/23-master-data.md "Bug thật thứ 4").
   useEffect(() => {
-    if (propDepartments && propDepartments.length > 0) {
-      setDepartments(propDepartments);
-    }
+    setDepartments(propDepartments || []);
   }, [propDepartments]);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -177,13 +169,6 @@ export const DepartmentMaster: React.FC<DepartmentMasterProps> = ({
     }
   };
 
-  // Reset to default
-  const handleResetDefaults = () => {
-    if (window.confirm('Khôi phục danh mục 12 phòng ban cơ bản chuẩn Depot?')) {
-      updateDepartmentsList(INITIAL_DEPARTMENTS);
-      showToast('🔄 Đã khôi phục danh mục phòng ban chuẩn hệ thống.');
-    }
-  };
 
   // Export JSON
   const handleExportJSON = () => {
@@ -208,34 +193,34 @@ export const DepartmentMaster: React.FC<DepartmentMasterProps> = ({
     <div className="space-y-6">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="p-4 bg-slate-900 border-2 border-indigo-500 rounded-2xl flex items-center justify-between text-xs text-indigo-200 shadow-2xl animate-fade-in">
+        <div className="p-4 bg-white border-2 border-indigo-500 rounded-2xl flex items-center justify-between text-xs text-indigo-200 shadow-2xl animate-fade-in">
           <div className="flex items-center gap-3">
-            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
             <span className="font-bold">{toastMessage}</span>
           </div>
-          <button onClick={() => setToastMessage(null)} className="text-slate-400 hover:text-white p-1">
+          <button onClick={() => setToastMessage(null)} className="text-slate-500 hover:text-slate-900 p-1">
             &times;
           </button>
         </div>
       )}
 
       {/* Main Header Card */}
-      <div className="p-6 bg-slate-900 border border-slate-800 rounded-3xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
+      <div className="p-6 bg-white border border-slate-200 rounded-3xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
         <div className="flex items-center gap-4">
-          <div className="p-3.5 bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 rounded-2xl shadow-lg">
+          <div className="p-3.5 bg-indigo-50 border border-indigo-200 text-indigo-600 rounded-2xl shadow-lg">
             <Building2 className="w-8 h-8" />
           </div>
           <div>
             <div className="flex items-center gap-2.5 flex-wrap">
-              <h2 className="text-xl font-bold text-white tracking-tight">
+              <h2 className="text-xl font-bold text-slate-900 tracking-tight">
                 DANH MỤC PHÒNG BAN &amp; CƠ CẤU TỔ CHỨC (ORGANIZATIONAL DEPARTMENTS)
               </h2>
-              <span className="px-2.5 py-0.5 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[11px] font-bold rounded-full flex items-center gap-1">
-                <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
+              <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px] font-bold rounded-full flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
                 <span>Depot Core Structure</span>
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-1 max-w-3xl leading-relaxed">
+            <p className="text-xs text-slate-500 mt-1 max-w-3xl leading-relaxed">
               Quản lý danh mục các khối phòng ban nghiệp vụ, trưởng bộ phận, định biên nhân sự, vị trí tại bãi bãi/tòa nhà, trung tâm chi phí và vai trò phân quyền RBAC tương ứng.
             </p>
           </div>
@@ -245,20 +230,11 @@ export const DepartmentMaster: React.FC<DepartmentMasterProps> = ({
         <div className="flex items-center gap-2.5 flex-wrap">
           <button
             onClick={handleExportJSON}
-            className="px-3.5 py-2.5 bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-700 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow"
+            className="px-3.5 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow"
             title="Xuất file JSON danh mục phòng ban"
           >
-            <Download className="w-4 h-4 text-emerald-400" />
+            <Download className="w-4 h-4 text-emerald-600" />
             <span>Xuất JSON</span>
-          </button>
-
-          <button
-            onClick={handleResetDefaults}
-            className="px-3.5 py-2.5 bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-700 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow"
-            title="Khôi phục 12 phòng ban mặc định"
-          >
-            <RotateCcw className="w-4 h-4 text-amber-400" />
-            <span>Mặc Định</span>
           </button>
 
           <button
@@ -266,7 +242,7 @@ export const DepartmentMaster: React.FC<DepartmentMasterProps> = ({
               setEditingDepartment(null);
               setIsModalOpen(true);
             }}
-            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-lg shadow-indigo-600/30"
+            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-lg "
           >
             <Plus className="w-4 h-4" />
             <span>Thêm Mới Phòng Ban</span>
@@ -276,39 +252,39 @@ export const DepartmentMaster: React.FC<DepartmentMasterProps> = ({
 
       {/* KPI Stats Overview */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-        <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-1">
-          <div className="flex items-center justify-between text-xs font-bold text-slate-400">
+        <div className="p-4 bg-white border border-slate-200 rounded-2xl space-y-1">
+          <div className="flex items-center justify-between text-xs font-bold text-slate-500">
             <span>Tổng Số Phòng Ban</span>
-            <Building2 className="w-4 h-4 text-indigo-400" />
+            <Building2 className="w-4 h-4 text-indigo-600" />
           </div>
-          <div className="text-2xl font-black text-white font-mono">{totalDepts}</div>
+          <div className="text-2xl font-black text-slate-900 font-mono">{totalDepts}</div>
           <span className="text-[10px] text-slate-500">Thuộc 5 khối chuyên trách</span>
         </div>
 
-        <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-1">
-          <div className="flex items-center justify-between text-xs font-bold text-slate-400">
+        <div className="p-4 bg-white border border-slate-200 rounded-2xl space-y-1">
+          <div className="flex items-center justify-between text-xs font-bold text-slate-500">
             <span>Định Biên Nhân Sự</span>
-            <Users className="w-4 h-4 text-emerald-400" />
+            <Users className="w-4 h-4 text-emerald-600" />
           </div>
-          <div className="text-2xl font-black text-emerald-400 font-mono">{totalHeadcount}</div>
+          <div className="text-2xl font-black text-emerald-600 font-mono">{totalHeadcount}</div>
           <span className="text-[10px] text-slate-500">Cán bộ &amp; Công nhân viên</span>
         </div>
 
-        <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-1">
-          <div className="flex items-center justify-between text-xs font-bold text-slate-400">
+        <div className="p-4 bg-white border border-slate-200 rounded-2xl space-y-1">
+          <div className="flex items-center justify-between text-xs font-bold text-slate-500">
             <span>Đơn Vị Trực Ca 24/7</span>
-            <Clock className="w-4 h-4 text-sky-400" />
+            <Clock className="w-4 h-4 text-sky-600" />
           </div>
-          <div className="text-2xl font-black text-sky-400 font-mono">{shift247Count} Đơn vị</div>
+          <div className="text-2xl font-black text-sky-600 font-mono">{shift247Count} Đơn vị</div>
           <span className="text-[10px] text-slate-500">Cổng, Giám định, Xe nâng, IT</span>
         </div>
 
-        <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-1">
-          <div className="flex items-center justify-between text-xs font-bold text-slate-400">
+        <div className="p-4 bg-white border border-slate-200 rounded-2xl space-y-1">
+          <div className="flex items-center justify-between text-xs font-bold text-slate-500">
             <span>Tỷ Lệ Hoạt Động (Active)</span>
-            <CheckCircle2 className="w-4 h-4 text-purple-400" />
+            <CheckCircle2 className="w-4 h-4 text-purple-600" />
           </div>
-          <div className="text-2xl font-black text-purple-400 font-mono">
+          <div className="text-2xl font-black text-purple-600 font-mono">
             {Math.round((activeDepts / (totalDepts || 1)) * 100)}%
           </div>
           <span className="text-[10px] text-slate-500">{activeDepts}/{totalDepts} phòng ban hoạt động</span>
@@ -316,7 +292,7 @@ export const DepartmentMaster: React.FC<DepartmentMasterProps> = ({
       </div>
 
       {/* Filter & View Mode Controls */}
-      <div className="p-4 bg-slate-900 border border-slate-800 rounded-3xl space-y-3">
+      <div className="p-4 bg-white border border-slate-200 rounded-3xl space-y-3">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           {/* Search */}
           <div className="relative flex-1 min-w-[260px]">
@@ -326,7 +302,7 @@ export const DepartmentMaster: React.FC<DepartmentMasterProps> = ({
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Tìm kiếm theo mã, tên phòng ban, trưởng bộ phận, vị trí, tags..."
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 text-white text-xs rounded-xl focus:outline-none focus:border-indigo-500"
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 text-slate-900 text-xs rounded-xl focus:outline-none focus:border-indigo-500"
             />
           </div>
 
@@ -335,7 +311,7 @@ export const DepartmentMaster: React.FC<DepartmentMasterProps> = ({
             <select
               value={selectedDivision}
               onChange={(e) => setSelectedDivision(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 text-white text-xs rounded-xl focus:outline-none focus:border-indigo-500"
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 text-slate-900 text-xs rounded-xl focus:outline-none focus:border-indigo-500"
             >
               {DIVISION_CATEGORIES.map((cat) => (
                 <option key={cat.id} value={cat.id}>
@@ -350,7 +326,7 @@ export const DepartmentMaster: React.FC<DepartmentMasterProps> = ({
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 text-white text-xs rounded-xl focus:outline-none focus:border-indigo-500"
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 text-slate-900 text-xs rounded-xl focus:outline-none focus:border-indigo-500"
             >
               <option value="ALL">Tất cả trạng thái</option>
               <option value="ACTIVE">🟢 Đang Hoạt Động</option>
@@ -359,13 +335,13 @@ export const DepartmentMaster: React.FC<DepartmentMasterProps> = ({
           </div>
 
           {/* View Mode Switcher */}
-          <div className="flex items-center gap-1 p-1 bg-slate-950 border border-slate-800 rounded-2xl shrink-0">
+          <div className="flex items-center gap-1 p-1 bg-slate-50 border border-slate-200 rounded-2xl shrink-0">
             <button
               onClick={() => setViewMode('GRID')}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
                 viewMode === 'GRID'
                   ? 'bg-indigo-600 text-white shadow'
-                  : 'text-slate-400 hover:text-white'
+                  : 'text-slate-500 hover:text-slate-900'
               }`}
               title="Xem dạng Lưới Thẻ Chi Tiết"
             >
@@ -378,7 +354,7 @@ export const DepartmentMaster: React.FC<DepartmentMasterProps> = ({
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
                 viewMode === 'TABLE'
                   ? 'bg-indigo-600 text-white shadow'
-                  : 'text-slate-400 hover:text-white'
+                  : 'text-slate-500 hover:text-slate-900'
               }`}
               title="Xem dạng Bảng Dữ Liệu"
             >
@@ -391,7 +367,7 @@ export const DepartmentMaster: React.FC<DepartmentMasterProps> = ({
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
                 viewMode === 'TREE'
                   ? 'bg-indigo-600 text-white shadow'
-                  : 'text-slate-400 hover:text-white'
+                  : 'text-slate-500 hover:text-slate-900'
               }`}
               title="Xem Cơ Cấu Phân Cấp Khối"
             >
@@ -402,14 +378,14 @@ export const DepartmentMaster: React.FC<DepartmentMasterProps> = ({
         </div>
 
         {/* Search Info Bar */}
-        <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-800/60">
+        <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-200/60">
           <span>
-            Tìm thấy <strong className="text-white">{filteredDepartments.length}</strong> phòng ban phù hợp
+            Tìm thấy <strong className="text-slate-900">{filteredDepartments.length}</strong> phòng ban phù hợp
           </span>
           {searchTerm && (
             <button
               onClick={() => setSearchTerm('')}
-              className="text-indigo-400 hover:underline cursor-pointer"
+              className="text-indigo-600 hover:underline cursor-pointer"
             >
               Xóa bộ lọc tìm kiếm
             </button>
@@ -426,24 +402,24 @@ export const DepartmentMaster: React.FC<DepartmentMasterProps> = ({
             return (
               <div
                 key={dept.id}
-                className="p-5 bg-slate-900 border border-slate-800 hover:border-indigo-500/50 rounded-3xl flex flex-col justify-between space-y-4 shadow-xl transition group duration-200"
+                className="p-5 bg-white border border-slate-200 hover:border-indigo-200 rounded-3xl flex flex-col justify-between space-y-4 shadow-xl transition group duration-200"
               >
                 {/* Card Top */}
                 <div className="space-y-3">
                   {/* Division Badge & Status */}
                   <div className="flex items-center justify-between gap-2">
-                    <span className="px-2.5 py-0.5 bg-slate-950 border border-slate-800 text-slate-400 rounded-lg text-[10px] font-bold">
+                    <span className="px-2.5 py-0.5 bg-slate-50 border border-slate-200 text-slate-500 rounded-lg text-[10px] font-bold">
                       {dept.divisionName}
                     </span>
 
                     <div className="flex items-center gap-2">
                       {dept.status === 'ACTIVE' ? (
-                        <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-[10px] font-bold inline-flex items-center gap-1 font-mono">
+                        <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-lg text-[10px] font-bold inline-flex items-center gap-1 font-mono">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                           Active
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 bg-slate-800 text-slate-400 rounded-lg text-[10px] font-bold inline-flex items-center gap-1 font-mono">
+                        <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded-lg text-[10px] font-bold inline-flex items-center gap-1 font-mono">
                           Inactive
                         </span>
                       )}
@@ -453,36 +429,36 @@ export const DepartmentMaster: React.FC<DepartmentMasterProps> = ({
                   {/* Code & Title */}
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 bg-indigo-950 text-indigo-300 border border-indigo-800 rounded font-mono font-bold text-[11px]">
+                      <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded font-mono font-bold text-[11px]">
                         {dept.code}
                       </span>
                       <span className="text-[10px] font-mono text-slate-500">{dept.costCenter}</span>
                     </div>
-                    <h3 className="text-sm font-bold text-white mt-1.5 leading-snug group-hover:text-indigo-300 transition">
+                    <h3 className="text-sm font-bold text-slate-900 mt-1.5 leading-snug group-hover:text-indigo-700 transition">
                       {dept.name}
                     </h3>
-                    <p className="text-[11px] text-slate-400 line-clamp-2 mt-1 leading-relaxed">
+                    <p className="text-[11px] text-slate-500 line-clamp-2 mt-1 leading-relaxed">
                       {dept.description}
                     </p>
                   </div>
 
                   {/* Manager & Contact */}
-                  <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-2xl space-y-1.5">
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-1.5">
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-slate-500 text-[10px] font-bold uppercase">Trưởng Bộ Phận:</span>
-                      <span className="font-bold text-white flex items-center gap-1">
-                        <Users className="w-3 h-3 text-indigo-400" />
+                      <span className="font-bold text-slate-900 flex items-center gap-1">
+                        <Users className="w-3 h-3 text-indigo-600" />
                         {dept.managerName}
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 text-[11px] font-mono text-slate-400 pt-1 border-t border-slate-800/60">
+                    <div className="grid grid-cols-2 gap-2 text-[11px] font-mono text-slate-500 pt-1 border-t border-slate-200/60">
                       <div className="flex items-center gap-1 truncate" title={dept.managerPhone}>
-                        <Phone className="w-3 h-3 text-emerald-400 shrink-0" />
+                        <Phone className="w-3 h-3 text-emerald-600 shrink-0" />
                         <span className="truncate">{dept.managerPhone}</span>
                       </div>
                       <div className="flex items-center gap-1 truncate" title={dept.managerEmail}>
-                        <Mail className="w-3 h-3 text-sky-400 shrink-0" />
+                        <Mail className="w-3 h-3 text-sky-600 shrink-0" />
                         <span className="truncate">{dept.managerEmail}</span>
                       </div>
                     </div>
@@ -490,27 +466,27 @@ export const DepartmentMaster: React.FC<DepartmentMasterProps> = ({
 
                   {/* Location & Meta Info */}
                   <div className="space-y-1.5 text-xs">
-                    <div className="flex items-center gap-1.5 text-slate-300 text-[11px]">
-                      <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <div className="flex items-center gap-1.5 text-slate-700 text-[11px]">
+                      <MapPin className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                       <span className="truncate" title={dept.location}>{dept.location}</span>
                     </div>
 
                     <div className="flex items-center justify-between gap-2 text-[11px]">
-                      <div className="flex items-center gap-1 text-slate-400">
-                        <Clock className={`w-3.5 h-3.5 shrink-0 ${is247 ? 'text-cyan-400' : 'text-slate-500'}`} />
-                        <span className={is247 ? 'text-cyan-300 font-bold font-mono' : ''}>
+                      <div className="flex items-center gap-1 text-slate-500">
+                        <Clock className={`w-3.5 h-3.5 shrink-0 ${is247 ? 'text-cyan-600' : 'text-slate-500'}`} />
+                        <span className={is247 ? 'text-cyan-700 font-bold font-mono' : ''}>
                           {dept.operatingHours}
                         </span>
                       </div>
 
-                      <div className="px-2 py-0.5 bg-slate-800 text-slate-300 rounded font-mono font-bold text-[10px]">
+                      <div className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded font-mono font-bold text-[10px]">
                         {dept.headcount} Nhân sự
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5 text-slate-400 text-[11px]">
-                      <ShieldCheck className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                      <span className="text-purple-300 font-medium truncate">{dept.primaryRole}</span>
+                    <div className="flex items-center gap-1.5 text-slate-500 text-[11px]">
+                      <ShieldCheck className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                      <span className="text-purple-700 font-medium truncate">{dept.primaryRole}</span>
                     </div>
                   </div>
 
@@ -519,7 +495,7 @@ export const DepartmentMaster: React.FC<DepartmentMasterProps> = ({
                     {dept.tags.map((tag, idx) => (
                       <span
                         key={idx}
-                        className="px-2 py-0.5 bg-slate-950 border border-slate-800 text-slate-400 rounded-md text-[10px]"
+                        className="px-2 py-0.5 bg-slate-50 border border-slate-200 text-slate-500 rounded-md text-[10px]"
                       >
                         #{tag}
                       </span>
@@ -528,13 +504,13 @@ export const DepartmentMaster: React.FC<DepartmentMasterProps> = ({
                 </div>
 
                 {/* Card Footer Actions */}
-                <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                <div className="pt-3 border-t border-slate-200/80 flex items-center justify-between gap-2">
                   <button
                     onClick={() => handleToggleStatus(dept)}
                     className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition cursor-pointer ${
                       dept.status === 'ACTIVE'
-                        ? 'bg-slate-950 text-slate-400 hover:text-rose-400 hover:bg-slate-800'
-                        : 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                        ? 'bg-slate-50 text-slate-500 hover:text-rose-600 hover:bg-slate-100'
+                        : 'bg-emerald-50 text-emerald-600 border border-emerald-200'
                     }`}
                   >
                     {dept.status === 'ACTIVE' ? 'Tạm Dừng' : 'Kích Hoạt'}
@@ -546,7 +522,7 @@ export const DepartmentMaster: React.FC<DepartmentMasterProps> = ({
                         setEditingDepartment(dept);
                         setIsModalOpen(true);
                       }}
-                      className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl transition cursor-pointer"
+                      className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-xl transition cursor-pointer"
                       title="Chỉnh sửa phòng ban"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
@@ -554,7 +530,7 @@ export const DepartmentMaster: React.FC<DepartmentMasterProps> = ({
 
                     <button
                       onClick={() => handleDeleteDepartment(dept)}
-                      className="p-1.5 bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 rounded-xl transition cursor-pointer"
+                      className="p-1.5 bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 rounded-xl transition cursor-pointer"
                       title="Xóa phòng ban"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -569,11 +545,11 @@ export const DepartmentMaster: React.FC<DepartmentMasterProps> = ({
 
       {/* VIEW 2: TABLE VIEW */}
       {viewMode === 'TABLE' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
+        <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-xl">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-slate-950/80 border-b border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   <th className="p-4">Mã &amp; Phòng Ban</th>
                   <th className="p-4">Khối Nghiệp Vụ</th>
                   <th className="p-4">Trưởng Bộ Phận &amp; Liên Hệ</th>
@@ -585,18 +561,18 @@ export const DepartmentMaster: React.FC<DepartmentMasterProps> = ({
                   <th className="p-4 text-right">Thao Tác</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/80">
+              <tbody className="divide-y divide-slate-200/80">
                 {filteredDepartments.map((dept) => (
                   <tr key={dept.id} className="hover:bg-slate-850 transition duration-150">
                     <td className="p-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 flex items-center justify-center font-bold font-mono text-xs shrink-0">
+                        <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center justify-center font-bold font-mono text-xs shrink-0">
                           {dept.code.slice(0, 3)}
                         </div>
                         <div>
-                          <div className="font-bold text-white text-sm">{dept.name}</div>
-                          <div className="text-[11px] text-slate-400 font-mono flex items-center gap-2 mt-0.5">
-                            <span className="text-indigo-400 font-bold">{dept.code}</span>
+                          <div className="font-bold text-slate-900 text-sm">{dept.name}</div>
+                          <div className="text-[11px] text-slate-500 font-mono flex items-center gap-2 mt-0.5">
+                            <span className="text-indigo-600 font-bold">{dept.code}</span>
                             <span>&bull;</span>
                             <span>{dept.costCenter}</span>
                           </div>
@@ -605,46 +581,46 @@ export const DepartmentMaster: React.FC<DepartmentMasterProps> = ({
                     </td>
 
                     <td className="p-4">
-                      <span className="px-2 py-0.5 bg-slate-950 border border-slate-800 text-slate-300 rounded text-[11px] font-medium">
+                      <span className="px-2 py-0.5 bg-slate-50 border border-slate-200 text-slate-700 rounded text-[11px] font-medium">
                         {dept.divisionName}
                       </span>
                     </td>
 
                     <td className="p-4">
-                      <div className="font-bold text-white">{dept.managerName}</div>
-                      <div className="text-[10px] font-mono text-slate-400 mt-0.5">
+                      <div className="font-bold text-slate-900">{dept.managerName}</div>
+                      <div className="text-[10px] font-mono text-slate-500 mt-0.5">
                         {dept.managerPhone} &bull; {dept.managerEmail}
                       </div>
                     </td>
 
-                    <td className="p-4 text-slate-300 max-w-[200px]">
+                    <td className="p-4 text-slate-700 max-w-[200px]">
                       <div className="truncate" title={dept.location}>{dept.location}</div>
                     </td>
 
-                    <td className="p-4 font-mono font-bold text-white text-center">
-                      <span className="px-2 py-0.5 bg-slate-800 rounded">
+                    <td className="p-4 font-mono font-bold text-slate-900 text-center">
+                      <span className="px-2 py-0.5 bg-slate-100 rounded">
                         {dept.headcount}
                       </span>
                     </td>
 
-                    <td className="p-4 font-mono text-[11px] text-slate-300">
+                    <td className="p-4 font-mono text-[11px] text-slate-700">
                       {dept.operatingHours}
                     </td>
 
                     <td className="p-4">
-                      <span className="px-2 py-0.5 bg-purple-950 text-purple-300 border border-purple-800 rounded text-[10px] font-mono font-bold">
+                      <span className="px-2 py-0.5 bg-purple-50 text-purple-700 border border-purple-200 rounded text-[10px] font-mono font-bold">
                         {dept.primaryRoleCode}
                       </span>
                     </td>
 
                     <td className="p-4">
                       {dept.status === 'ACTIVE' ? (
-                        <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 font-mono">
+                        <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 font-mono">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                           <span>Hoạt Động</span>
                         </span>
                       ) : (
-                        <span className="px-2.5 py-1 bg-slate-800 text-slate-400 border border-slate-700 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 font-mono">
+                        <span className="px-2.5 py-1 bg-slate-100 text-slate-500 border border-slate-200 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 font-mono">
                           <span>Tạm Dừng</span>
                         </span>
                       )}
@@ -657,14 +633,14 @@ export const DepartmentMaster: React.FC<DepartmentMasterProps> = ({
                             setEditingDepartment(dept);
                             setIsModalOpen(true);
                           }}
-                          className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl transition cursor-pointer"
+                          className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-xl transition cursor-pointer"
                           title="Sửa phòng ban"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => handleDeleteDepartment(dept)}
-                          className="p-1.5 bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 rounded-xl transition cursor-pointer"
+                          className="p-1.5 bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 rounded-xl transition cursor-pointer"
                           title="Xóa phòng ban"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -685,16 +661,16 @@ export const DepartmentMaster: React.FC<DepartmentMasterProps> = ({
           {groupedByDivision.map(([divisionKey, group]) => (
             <div
               key={divisionKey}
-              className="p-6 bg-slate-900 border border-slate-800 rounded-3xl space-y-4 shadow-xl"
+              className="p-6 bg-white border border-slate-200 rounded-3xl space-y-4 shadow-xl"
             >
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-3">
                 <div className="flex items-center gap-2.5">
-                  <div className="p-2 bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 rounded-xl">
+                  <div className="p-2 bg-indigo-50 border border-indigo-200 text-indigo-600 rounded-xl">
                     <GitFork className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-white">{group.title}</h3>
-                    <span className="text-[11px] text-slate-400">
+                    <h3 className="text-sm font-bold text-slate-900">{group.title}</h3>
+                    <span className="text-[11px] text-slate-500">
                       Gồm {group.items.length} phòng ban &bull; Tổng định biên:{' '}
                       {group.items.reduce((s, i) => s + i.headcount, 0)} nhân sự
                     </span>
@@ -706,23 +682,23 @@ export const DepartmentMaster: React.FC<DepartmentMasterProps> = ({
                 {group.items.map((dept) => (
                   <div
                     key={dept.id}
-                    className="p-4 bg-slate-950/80 border border-slate-800 rounded-2xl space-y-2 hover:border-indigo-500/40 transition"
+                    className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2 hover:border-indigo-200 transition"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="px-2 py-0.5 bg-indigo-950 text-indigo-300 border border-indigo-800 rounded font-mono font-bold text-[10px]">
+                      <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded font-mono font-bold text-[10px]">
                         {dept.code}
                       </span>
-                      <span className="text-[10px] font-mono text-emerald-400 font-bold">
+                      <span className="text-[10px] font-mono text-emerald-600 font-bold">
                         {dept.headcount} Nhân sự
                       </span>
                     </div>
 
-                    <h4 className="text-xs font-bold text-white">{dept.name}</h4>
-                    <p className="text-[11px] text-slate-400">
-                      Trưởng bộ phận: <strong className="text-slate-200">{dept.managerName}</strong>
+                    <h4 className="text-xs font-bold text-slate-900">{dept.name}</h4>
+                    <p className="text-[11px] text-slate-500">
+                      Trưởng bộ phận: <strong className="text-slate-700">{dept.managerName}</strong>
                     </p>
                     <div className="text-[10px] text-slate-500 flex items-center gap-1">
-                      <MapPin className="w-3 h-3 text-amber-400" />
+                      <MapPin className="w-3 h-3 text-amber-600" />
                       <span className="truncate">{dept.location}</span>
                     </div>
                   </div>

@@ -30,25 +30,30 @@ public sealed class WarehouseService : IWarehouseService
     public async Task<MaterialStockTransaction> RecordTransactionAsync(MaterialStockTransactionRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.MaterialCode) || request.Quantity <= 0 || string.IsNullOrWhiteSpace(request.ReferenceId)) throw new ArgumentException("MaterialCode, Quantity và ReferenceId là bắt buộc.");
-        var before = await db.MaterialStockTransactions.Where(x => x.MaterialCode == request.MaterialCode).OrderByDescending(x => x.PerformedAt).Select(x => (decimal?)x.AfterQuantity).FirstOrDefaultAsync() ?? 0;
+        // BUG-019: trước đây ghi được giao dịch cho mã vật tư không tồn tại và loại giao dịch tuỳ ý (loại lạ bị
+        // tính như xuất kho), để lại dòng mồ côi trong thẻ kho/báo cáo.
+        if (request.TransactionType is not ("RECEIPT" or "ISSUE" or "RETURN" or "ADJUSTMENT_IN" or "ADJUSTMENT_OUT"))
+            throw new ArgumentException($"Loại giao dịch '{request.TransactionType}' không hợp lệ (RECEIPT, ISSUE, RETURN, ADJUSTMENT_IN, ADJUSTMENT_OUT).");
+        if (request.UnitCost < 0) throw new ArgumentException("Đơn giá vật tư không được âm.");
+        var materialCode = request.MaterialCode.Trim().ToUpperInvariant();
+        var material = await db.Materials.FirstOrDefaultAsync(x => !x.IsDeleted && x.Code.ToUpper() == materialCode)
+            ?? throw new ArgumentException($"Mã vật tư '{request.MaterialCode.Trim()}' không có trong danh mục vật tư.");
+        // Tồn trước giao dịch đọc theo mã đã chuẩn hoá — trước đây so mã thô client gửi với mã đã UPPER trong DB.
+        var before = await db.MaterialStockTransactions.Where(x => x.MaterialCode == materialCode).OrderByDescending(x => x.PerformedAt).Select(x => (decimal?)x.AfterQuantity).FirstOrDefaultAsync() ?? 0;
         var increases = request.TransactionType is "RECEIPT" or "RETURN" or "ADJUSTMENT_IN";
         var after = increases ? before + request.Quantity : before - request.Quantity;
         if (after < 0) throw new InvalidOperationException("Tồn kho không đủ để xuất vật tư.");
-        var transaction = new MaterialStockTransaction { MaterialCode = request.MaterialCode.Trim().ToUpperInvariant(), TransactionType = request.TransactionType, Quantity = request.Quantity, UnitCost = request.UnitCost, TotalCost = request.Quantity * request.UnitCost, BeforeQuantity = before, AfterQuantity = after, ReferenceType = request.ReferenceType, ReferenceId = request.ReferenceId, WorkOrderNo = request.WorkOrderNo, ContainerNo = request.ContainerNo, SupplierCode = request.SupplierCode, PerformedBy = request.PerformedBy, PerformedAt = DateTime.UtcNow, Note = request.Note };
+        var transaction = new MaterialStockTransaction { MaterialCode = materialCode, TransactionType = request.TransactionType, Quantity = request.Quantity, UnitCost = request.UnitCost, TotalCost = request.Quantity * request.UnitCost, BeforeQuantity = before, AfterQuantity = after, ReferenceType = request.ReferenceType, ReferenceId = request.ReferenceId, WorkOrderNo = request.WorkOrderNo, ContainerNo = request.ContainerNo, SupplierCode = request.SupplierCode, PerformedBy = request.PerformedBy, PerformedAt = DateTime.UtcNow, Note = request.Note };
         db.MaterialStockTransactions.Add(transaction);
 
-        var material = await db.Materials.FirstOrDefaultAsync(x => x.Code == transaction.MaterialCode);
-        if (material != null)
+        material.StockQuantity = (int)after;
+        if (request.TransactionType == "RECEIPT" && request.UnitCost > 0)
         {
-            material.StockQuantity = (int)after;
-            if (request.TransactionType == "RECEIPT" && request.UnitCost > 0)
-            {
-                material.LastPurchaseCost = request.UnitCost;
-                // Bình quân gia quyền đơn giản: (tồn cũ*giá cũ + nhập mới*giá mới) / tồn mới.
-                var beforeValue = before * material.AverageCost;
-                var incomingValue = request.Quantity * request.UnitCost;
-                material.AverageCost = after > 0 ? (beforeValue + incomingValue) / after : request.UnitCost;
-            }
+            material.LastPurchaseCost = request.UnitCost;
+            // Bình quân gia quyền đơn giản: (tồn cũ*giá cũ + nhập mới*giá mới) / tồn mới.
+            var beforeValue = before * material.AverageCost;
+            var incomingValue = request.Quantity * request.UnitCost;
+            material.AverageCost = after > 0 ? (beforeValue + incomingValue) / after : request.UnitCost;
         }
 
         await db.SaveChangesAsync();

@@ -59,8 +59,17 @@ namespace Depot.Application.Services
 
         public async Task<List<UserDto>> GetUsersAsync()
         {
-            var users = await _db.Users.AsNoTracking().Include(x => x.Role).OrderBy(x => x.Username).ToListAsync();
+            var users = await _db.Users.AsNoTracking().Include(x => x.Role).Where(x => !x.IsDeleted).OrderBy(x => x.Username).ToListAsync();
             return users.Select(ToDto).ToList();
+        }
+
+        public async Task<UserDto?> GetProfileAsync(long id)
+        {
+            var user = await _db.Users.AsNoTracking().Include(x => x.Role).FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted && x.IsActive);
+            if (user == null) return null;
+            var dto = ToDto(user);
+            dto.AllowedTabs = GetRoleTabs(user.Role?.RoleCode ?? string.Empty);
+            return dto;
         }
 
         public async Task<UserDto?> CreateUserAsync(CreateSystemUserRequest request)
@@ -68,10 +77,16 @@ namespace Depot.Application.Services
             if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.RoleName)) return null;
             var role = await _db.Roles.FirstOrDefaultAsync(x => x.RoleCode == request.RoleName.Trim());
             if (role == null || await _db.Users.AnyAsync(x => x.Username == request.Username)) return null;
+            ValidateEmail(request.Email);
+            // Trước đây gán cứng "123456" cho MỌI tài khoản mới — ai biết username cũng đăng nhập được
+            // ngay mà không cần biết mật khẩu thật (brute-force/đoán mật khẩu tầm thường). Sinh mật khẩu
+            // tạm ngẫu nhiên, chỉ trả về đúng 1 lần trong response tạo tài khoản để admin gửi cho nhân
+            // viên — không lưu plaintext trong DB.
+            var temporaryPassword = PasswordHashHelper.GenerateTemporaryPassword();
             var entity = new Depot.Data.Entities.System.SystemUser
             {
                 Username = request.Username.Trim(),
-                PasswordHash = PasswordHashHelper.HashPassword("123456"),
+                PasswordHash = PasswordHashHelper.HashPassword(temporaryPassword),
                 FullName = request.FullName.Trim(),
                 Email = request.Email.Trim(),
                 RoleId = role.Id,
@@ -80,7 +95,9 @@ namespace Depot.Application.Services
             };
             _db.Users.Add(entity);
             await _db.SaveChangesAsync();
-            return ToDto(entity);
+            var dto = ToDto(entity);
+            dto.TemporaryPassword = temporaryPassword;
+            return dto;
         }
 
         public async Task<UserDto?> UpdateUserAsync(long id, UpdateSystemUserRequest request)
@@ -88,6 +105,7 @@ namespace Depot.Application.Services
             var entity = await _db.Users.FirstOrDefaultAsync(x => x.Id == id);
             var role = await _db.Roles.FirstOrDefaultAsync(x => x.RoleCode == request.RoleName.Trim());
             if (entity == null || role == null) return null;
+            ValidateEmail(request.Email);
             entity.Username = request.Username.Trim(); entity.FullName = request.FullName.Trim();
             entity.Email = request.Email.Trim(); entity.RoleId = role.Id; entity.Role = role; entity.IsActive = request.IsActive;
             await _db.SaveChangesAsync();
@@ -96,9 +114,16 @@ namespace Depot.Application.Services
 
         public async Task<bool> DeleteUserAsync(long id)
         {
-            var entity = await _db.Users.FirstOrDefaultAsync(x => x.Id == id);
+            // Xoá mềm (IsDeleted) thay vì Remove() cứng — trước đây xoá cứng để lại FK "ma" trên
+            // DepotJob.GateInStaffId/SurveyClaimedByStaffId (cột chỉ lưu số tham chiếu, KHÔNG có FK
+            // constraint thật ở DB, xem comment DepotJobConfiguration.cs), khiến các job cũ tra ngược
+            // ra nhân viên sẽ nhận null âm thầm sau khi tài khoản bị xoá. Đồng bộ đúng pattern soft-delete
+            // đã dùng cho Customer/Driver/Vehicle/PortalUser ở MasterDataService.cs.
+            var entity = await _db.Users.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
             if (entity == null) return false;
-            _db.Users.Remove(entity);
+            entity.IsDeleted = true;
+            entity.IsActive = false;
+            entity.DeletedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();
             return true;
         }
@@ -203,28 +228,21 @@ namespace Depot.Application.Services
             return log;
         }
 
+        // BUG-024: email người dùng trước đây lưu được chuỗi bất kỳ ("abc").
+        private static void ValidateEmail(string? email)
+        {
+            if (string.IsNullOrWhiteSpace(email)) return;
+            if (!System.Net.Mail.MailAddress.TryCreate(email.Trim(), out var parsed) || parsed.Address != email.Trim() || !parsed.Host.Contains('.'))
+                throw new ArgumentException($"Email '{email}' không đúng định dạng.");
+        }
+
         private static UserDto ToDto(Depot.Data.Entities.System.SystemUser user) => new()
         {
             Id = user.Id, Username = user.Username, FullName = user.FullName, Email = user.Email,
             RoleName = user.Role?.RoleCode ?? string.Empty, IsActive = user.IsActive, AllowedTabs = new List<string>()
         };
 
-        private List<string> GetRoleTabs(string role)
-        {
-            return role.ToUpper() switch
-            {
-                "ADMIN" => new List<string> { "dashboard", "jobs", "survey", "operation", "payment", "estimate", "repair", "qc", "yard", "forklift", "inventory", "masterdata", "report", "permissions", "portal_users", "dotnet" },
-                "SURVEYOR" => new List<string> { "jobs", "survey", "yard" },
-                "GATE_OP" => new List<string> { "jobs", "operation", "payment" },
-                "CASHIER" => new List<string> { "dashboard", "jobs", "payment", "inventory", "masterdata", "report" },
-                "ESTIMATOR" => new List<string> { "jobs", "estimate", "survey" },
-                "TECHNICIAN" => new List<string> { "jobs", "repair", "yard" },
-                "QC_ENG" => new List<string> { "jobs", "qc", "repair", "survey" },
-                "FORKLIFT" => new List<string> { "jobs", "forklift", "yard" },
-                "CARRIER" => new List<string> { "jobs", "estimate" },
-                "CLEANING" => new List<string> { "cleaning", "yard", "jobs" },
-                _ => new List<string> { "jobs", "yard" }
-            };
-        }
+        // Cùng ma trận với phân quyền API ([RequirePermission]) để menu và API không bao giờ lệch nhau.
+        private static List<string> GetRoleTabs(string role) => RolePermissions.ForRole(role).ToList();
     }
 }

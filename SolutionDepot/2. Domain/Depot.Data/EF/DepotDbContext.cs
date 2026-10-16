@@ -7,6 +7,7 @@ using Depot.Data.Entities.Inventory;
 using Depot.Data.Entities.Yard;
 using Depot.Data.Entities.Integration;
 using Depot.Data.Entities.Cleaning;
+using Depot.Data.Entities.Storage;
 
 namespace Depot.Data.EF
 {
@@ -50,6 +51,7 @@ namespace Depot.Data.EF
 
         #region Finance, Inventory & Yard DbSets
         public DbSet<Payment> Payments => Set<Payment>();
+        public DbSet<PaymentLog> PaymentLogs => Set<PaymentLog>();
         public DbSet<ShippingLineDebt> ShippingLineDebts => Set<ShippingLineDebt>();
         public DbSet<DebtPeriod> DebtPeriods => Set<DebtPeriod>();
         public DbSet<ArPayment> ArPayments => Set<ArPayment>();
@@ -78,6 +80,10 @@ namespace Depot.Data.EF
         public DbSet<CleaningRecord> CleaningRecords => Set<CleaningRecord>();
         #endregion
 
+        #region Storage DbSets
+        public DbSet<DepotFile> DepotFiles => Set<DepotFile>();
+        #endregion
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -95,10 +101,19 @@ namespace Depot.Data.EF
             modelBuilder.Entity<Estimate>().Property(x => x.TotalLaborCost).HasPrecision(18, 2);
             modelBuilder.Entity<Estimate>().Property(x => x.TotalMaterialCost).HasPrecision(18, 2);
             modelBuilder.Entity<Estimate>().Property(x => x.TotalTax).HasPrecision(18, 2);
+            modelBuilder.Entity<Estimate>().Property(x => x.ApprovedAmount).HasPrecision(18, 2);
             modelBuilder.Entity<Estimate>().Property(x => x.GrandTotal).HasPrecision(18, 2);
             modelBuilder.Entity<EstimateItem>().Property(x => x.Quantity).HasPrecision(18, 2);
             modelBuilder.Entity<EstimateItem>().Property(x => x.UnitPrice).HasPrecision(18, 2);
             modelBuilder.Entity<EstimateItem>().Property(x => x.Amount).HasPrecision(18, 2);
+            modelBuilder.Entity<EstimateItem>().Property(x => x.ManHoursPerPiece).HasPrecision(18, 2);
+            modelBuilder.Entity<Estimate>().Property(x => x.LaborRate).HasPrecision(18, 2);
+            modelBuilder.Entity<Estimate>().Property(x => x.TotalManHours).HasPrecision(18, 2);
+            modelBuilder.Entity<Estimate>().Property(x => x.PreparationHours).HasPrecision(18, 2);
+            modelBuilder.Entity<Estimate>().Property(x => x.OrdinaryHours).HasPrecision(18, 2);
+            modelBuilder.Entity<Estimate>().Property(x => x.Ot1Hours).HasPrecision(18, 2);
+            modelBuilder.Entity<Estimate>().Property(x => x.Ot2Hours).HasPrecision(18, 2);
+            modelBuilder.Entity<Estimate>().Property(x => x.Ot3Hours).HasPrecision(18, 2);
             modelBuilder.Entity<Payment>().Property(x => x.Amount).HasPrecision(18, 2);
             modelBuilder.Entity<Payment>().Property(x => x.Tax).HasPrecision(18, 2);
             modelBuilder.Entity<Payment>().Property(x => x.TotalAmount).HasPrecision(18, 2);

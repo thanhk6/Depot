@@ -43,20 +43,20 @@ export const ForkliftJobCard: React.FC<ForkliftJobCardProps> = ({
     switch (p) {
       case 'URGENT':
         return (
-          <span className="px-2.5 py-0.5 rounded-full bg-rose-950 text-rose-400 border border-rose-800 text-[10px] font-bold flex items-center gap-1 animate-pulse">
-            <Flame className="w-3 h-3 text-rose-400" />
+          <span className="px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200 text-[10px] font-bold flex items-center gap-1 animate-pulse">
+            <Flame className="w-3 h-3 text-rose-600" />
             <span>GẤP / ƯU TIÊN CAO</span>
           </span>
         );
       case 'HIGH':
         return (
-          <span className="px-2.5 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800 text-[10px] font-bold">
+          <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold">
             ƯU TIÊN
           </span>
         );
       default:
         return (
-          <span className="px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 text-[10px] font-medium">
+          <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200 text-[10px] font-medium">
             Bình Thường
           </span>
         );
@@ -67,35 +67,35 @@ export const ForkliftJobCard: React.FC<ForkliftJobCardProps> = ({
     switch (status) {
       case 'WAITING':
         return (
-          <span className="px-3 py-1 rounded-xl bg-amber-950/80 text-amber-300 border border-amber-800/80 text-xs font-mono font-bold flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 text-amber-400 animate-spin" />
+          <span className="px-3 py-1 rounded-xl bg-amber-50 text-amber-700 border border-amber-200/80 text-xs font-mono font-bold flex items-center gap-1.5">
+            <Clock className="w-3.5 h-3.5 text-amber-600 animate-spin" />
             <span>CHỜ HẠ BÃI (WAITING)</span>
           </span>
         );
       case 'CLAIMED':
         return (
-          <span className="px-3 py-1 rounded-xl bg-purple-950/80 text-purple-300 border border-purple-800/80 text-xs font-mono font-bold flex items-center gap-1.5">
-            <Lock className="w-3.5 h-3.5 text-purple-400" />
+          <span className="px-3 py-1 rounded-xl bg-purple-50 text-purple-700 border border-purple-200/80 text-xs font-mono font-bold flex items-center gap-1.5">
+            <Lock className="w-3.5 h-3.5 text-purple-600" />
             <span>ĐÃ NHẬN LỆNH (CLAIMED)</span>
           </span>
         );
       case 'IN_PROGRESS':
         return (
-          <span className="px-3 py-1 rounded-xl bg-sky-950/80 text-sky-300 border border-sky-800/80 text-xs font-mono font-bold flex items-center gap-1.5 animate-pulse">
-            <Truck className="w-3.5 h-3.5 text-sky-400" />
+          <span className="px-3 py-1 rounded-xl bg-sky-50 text-sky-700 border border-sky-200/80 text-xs font-mono font-bold flex items-center gap-1.5 animate-pulse">
+            <Truck className="w-3.5 h-3.5 text-sky-600" />
             <span>ĐANG VẬN CHUYỂN (IN PROGRESS)</span>
           </span>
         );
       case 'COMPLETED':
         return (
-          <span className="px-3 py-1 rounded-xl bg-emerald-950/80 text-emerald-300 border border-emerald-800/80 text-xs font-mono font-bold flex items-center gap-1.5">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+          <span className="px-3 py-1 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-xs font-mono font-bold flex items-center gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
             <span>ĐÃ HẠ BÃI (COMPLETED)</span>
           </span>
         );
       default:
         return (
-          <span className="px-3 py-1 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold">
+          <span className="px-3 py-1 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold">
             {status}
           </span>
         );
@@ -105,32 +105,32 @@ export const ForkliftJobCard: React.FC<ForkliftJobCardProps> = ({
   const getConditionColor = (cond: string) => {
     switch (cond) {
       case 'AV':
-        return 'text-emerald-400 bg-emerald-950/80 border-emerald-800';
+        return 'text-emerald-600 bg-emerald-50 border-emerald-200';
       case 'CL':
-        return 'text-amber-400 bg-amber-950/80 border-amber-800';
+        return 'text-amber-600 bg-amber-50 border-amber-200';
       case 'DM':
-        return 'text-rose-400 bg-rose-950/80 border-rose-800';
+        return 'text-rose-600 bg-rose-50 border-rose-200';
       default:
-        return 'text-slate-300 bg-slate-800 border-slate-700';
+        return 'text-slate-700 bg-slate-100 border-slate-200';
     }
   };
 
   return (
     <div className={`p-5 rounded-3xl border transition-all duration-200 ${
       job.status === 'IN_PROGRESS'
-        ? 'bg-slate-900/95 border-sky-500/70 shadow-xl shadow-sky-950/40 ring-1 ring-sky-500/40'
+        ? 'bg-white border-sky-200 shadow-xl  ring-1 ring-sky-500/40'
         : job.status === 'CLAIMED'
         ? isClaimedByMe
-          ? 'bg-slate-900/95 border-purple-500/70 shadow-xl shadow-purple-950/30'
-          : 'bg-slate-900/60 border-slate-800/80 opacity-80'
+          ? 'bg-white border-purple-200 shadow-xl '
+          : 'bg-white border-slate-200/80 opacity-80'
         : job.status === 'COMPLETED'
-        ? 'bg-slate-900/60 border-emerald-500/40'
-        : 'bg-slate-900 border-slate-800 hover:border-slate-700 shadow-md'
+        ? 'bg-white border-emerald-200'
+        : 'bg-white border-slate-200 hover:border-slate-200 shadow-md'
     }`}>
       {/* Top Meta Row */}
-      <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-800/80">
+      <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200/80">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-mono font-bold text-slate-400">
+          <span className="text-xs font-mono font-bold text-slate-500">
             #{job.jobNo}
           </span>
           <span className="text-slate-600">&bull;</span>
@@ -147,7 +147,7 @@ export const ForkliftJobCard: React.FC<ForkliftJobCardProps> = ({
         {/* Col 1: Container Info (4 cols) */}
         <div className="md:col-span-4 space-y-2">
           <div className="flex items-center gap-2.5">
-            <span className="text-2xl font-black font-mono text-white tracking-wider">
+            <span className="text-2xl font-black font-mono text-slate-900 tracking-wider">
               {job.containerNo}
             </span>
             <span className={`px-2 py-0.5 rounded-lg border text-xs font-bold font-mono ${getConditionColor(job.condition)}`}>
@@ -155,38 +155,38 @@ export const ForkliftJobCard: React.FC<ForkliftJobCardProps> = ({
             </span>
           </div>
 
-          <div className="flex items-center gap-2 text-xs text-slate-300">
-            <span className="px-2 py-0.5 rounded bg-slate-800 text-sky-300 font-mono font-bold border border-slate-700">
+          <div className="flex items-center gap-2 text-xs text-slate-700">
+            <span className="px-2 py-0.5 rounded bg-slate-100 text-sky-700 font-mono font-bold border border-slate-200">
               {job.size}
             </span>
-            <span className="font-semibold text-blue-400 font-mono">
+            <span className="font-semibold text-blue-600 font-mono">
               {job.shippingLine}
             </span>
             <span className="text-slate-500">&bull;</span>
-            <span className="text-slate-400">{job.isoCode}</span>
+            <span className="text-slate-500">{job.isoCode}</span>
           </div>
 
-          <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-mono">
-            <Clock className="w-3 h-3 text-amber-400" />
-            <span>Chờ: <strong>{job.waitingDurationMinutes || 12} phút</strong></span>
-            <span>({job.waitingSince?.substring(11, 16) || '08:45'})</span>
+          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-mono">
+            <Clock className="w-3 h-3 text-amber-600" />
+            <span>Chờ: <strong>{job.waitingDurationMinutes ?? 0} phút</strong></span>
+            <span>({job.waitingSince?.substring(11, 16) || '—'})</span>
           </div>
         </div>
 
         {/* Col 2: Routing (From Location -> Planned / Actual Location) (5 cols) */}
-        <div className="md:col-span-5 p-3.5 bg-slate-950/80 rounded-2xl border border-slate-800/80 space-y-2">
+        <div className="md:col-span-5 p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
           {/* From */}
           <div className="flex items-start gap-2 text-xs">
             <div className="w-2 h-2 rounded-full bg-rose-400 mt-1.5 shrink-0" />
             <div>
               <div className="text-[10px] uppercase font-bold text-slate-500">Vị Trí Lấy (From Location):</div>
-              <div className="font-semibold text-slate-200 font-mono">{job.fromLocation}</div>
+              <div className="font-semibold text-slate-700 font-mono">{job.fromLocation}</div>
             </div>
           </div>
 
           {/* Arrow Divider */}
-          <div className="pl-3 py-0.5 flex items-center gap-1 text-[10px] font-mono text-teal-400">
-            <ArrowRight className="w-3 h-3 text-teal-400" />
+          <div className="pl-3 py-0.5 flex items-center gap-1 text-[10px] font-mono text-teal-600">
+            <ArrowRight className="w-3 h-3 text-teal-600" />
             <span>Vận chuyển đến bãi lưu trữ:</span>
           </div>
 
@@ -194,17 +194,17 @@ export const ForkliftJobCard: React.FC<ForkliftJobCardProps> = ({
           <div className="flex items-start gap-2 text-xs">
             <div className="w-2 h-2 rounded-full bg-teal-400 mt-1.5 shrink-0" />
             <div>
-              <div className="text-[10px] uppercase font-bold text-teal-400">
+              <div className="text-[10px] uppercase font-bold text-teal-600">
                 {job.status === 'COMPLETED' ? 'Vị Trí Thực Tế (Actual Location):' : 'Vị Trí Dự Kiến (Planned Location):'}
               </div>
-              <div className="font-black text-sm text-cyan-300 font-mono">
+              <div className="font-black text-sm text-cyan-700 font-mono">
                 {job.status === 'COMPLETED' && job.actualLocation ? (
                   <>
                     BLOCK {job.actualLocation.block} &bull; BAY {job.actualLocation.bay} &bull; ROW {job.actualLocation.row} &bull; TIER {job.actualLocation.tier}
                   </>
                 ) : (
                   <>
-                    BLOCK {job.plannedLocation.block} &bull; BAY {job.plannedLocation.bay} &bull; ROW {job.plannedLocation.row} &bull; TIER {job.plannedLocation.tier}
+                    {job.plannedLocation.block ? <>{job.plannedLocation.block} &bull; BAY {job.plannedLocation.bay} &bull; ROW {job.plannedLocation.row} &bull; TIER {job.plannedLocation.tier}</> : <span className="text-slate-500 font-normal">Tài xế chọn vị trí khi hạ bãi</span>}
                   </>
                 )}
               </div>
@@ -215,13 +215,13 @@ export const ForkliftJobCard: React.FC<ForkliftJobCardProps> = ({
         {/* Col 3: Operator & Forklift Assignment (3 cols) */}
         <div className="md:col-span-3 space-y-2 text-xs">
           {job.claimedByOperatorName ? (
-            <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 space-y-1">
+            <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
               <div className="text-[10px] text-slate-500 uppercase font-semibold">Tài xế &amp; Xe nâng:</div>
-              <div className="font-bold text-slate-200 flex items-center gap-1.5">
-                <Truck className="w-3.5 h-3.5 text-amber-400" />
+              <div className="font-bold text-slate-700 flex items-center gap-1.5">
+                <Truck className="w-3.5 h-3.5 text-amber-600" />
                 <span>{job.assignedForkliftCode || 'FL-001'}</span>
               </div>
-              <div className="text-slate-300 truncate">
+              <div className="text-slate-700 truncate">
                 {job.claimedByOperatorName}
               </div>
               {job.claimedAt && (
@@ -231,7 +231,7 @@ export const ForkliftJobCard: React.FC<ForkliftJobCardProps> = ({
               )}
             </div>
           ) : (
-            <div className="p-3 bg-slate-950/40 rounded-2xl border border-dashed border-slate-800 text-center text-slate-500 italic text-[11px]">
+            <div className="p-3 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-center text-slate-500 italic text-[11px]">
               Chưa có xe nâng nhận lệnh
             </div>
           )}
@@ -239,30 +239,30 @@ export const ForkliftJobCard: React.FC<ForkliftJobCardProps> = ({
       </div>
 
       {/* Action Footer Button Bar (Touch Friendly) */}
-      <div className="pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3">
-        <div className="text-xs text-slate-400">
+      <div className="pt-3 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
+        <div className="text-xs text-slate-500">
           {job.status === 'WAITING' && (
-            <span className="text-emerald-400 font-medium">
+            <span className="text-emerald-600 font-medium">
               &bull; Sẵn sàng nhận lệnh hạ bãi ngay
             </span>
           )}
           {job.status === 'CLAIMED' && isClaimedByMe && (
-            <span className="text-purple-300 font-medium">
+            <span className="text-purple-700 font-medium">
               &bull; Bạn đã khóa container này. Hãy đến vị trí lấy container.
             </span>
           )}
           {job.status === 'CLAIMED' && isClaimedByOther && (
-            <span className="text-slate-400 italic">
+            <span className="text-slate-500 italic">
               &bull; Đã được khóa bởi <strong>{job.claimedByOperatorName}</strong> ({job.assignedForkliftCode})
             </span>
           )}
           {job.status === 'IN_PROGRESS' && isClaimedByMe && (
-            <span className="text-sky-300 font-medium animate-pulse">
+            <span className="text-sky-700 font-medium animate-pulse">
               &bull; Đang cẩu nâng di chuyển... Hãy hạ bãi và xác nhận vị trí.
             </span>
           )}
           {job.status === 'COMPLETED' && (
-            <span className="text-emerald-400 font-mono">
+            <span className="text-emerald-600 font-mono">
               &bull; Hoàn tất: {job.completedAt?.substring(11, 16) || '09:15'}
             </span>
           )}
@@ -274,7 +274,7 @@ export const ForkliftJobCard: React.FC<ForkliftJobCardProps> = ({
           {job.status === 'WAITING' && (
             <button
               onClick={() => onClaim(job)}
-              className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 active:scale-98 text-white font-black text-sm rounded-2xl shadow-lg shadow-emerald-600/30 transition flex items-center gap-2 cursor-pointer"
+              className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 active:scale-98 text-white font-black text-sm rounded-2xl shadow-lg  transition flex items-center gap-2 cursor-pointer"
             >
               <Lock className="w-4 h-4" />
               <span>[ NHẬN LỆNH ]</span>
@@ -286,7 +286,7 @@ export const ForkliftJobCard: React.FC<ForkliftJobCardProps> = ({
             <>
               <button
                 onClick={() => onCancelClaim(job)}
-                className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white text-xs font-semibold rounded-xl transition flex items-center gap-1 cursor-pointer"
+                className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-900 text-xs font-semibold rounded-xl transition flex items-center gap-1 cursor-pointer"
                 title="Hủy nhận lệnh và trả về hàng đợi chung"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
@@ -295,7 +295,7 @@ export const ForkliftJobCard: React.FC<ForkliftJobCardProps> = ({
 
               <button
                 onClick={() => onStartExecution(job)}
-                className="px-6 py-3 bg-purple-600 hover:bg-purple-500 active:scale-98 text-white font-black text-sm rounded-2xl shadow-lg shadow-purple-600/30 transition flex items-center gap-2 cursor-pointer"
+                className="px-6 py-3 bg-purple-600 hover:bg-purple-500 active:scale-98 text-white font-black text-sm rounded-2xl shadow-lg  transition flex items-center gap-2 cursor-pointer"
               >
                 <Play className="w-4 h-4" />
                 <span>[ BẮT ĐẦU THỰC HIỆN ]</span>
@@ -305,7 +305,7 @@ export const ForkliftJobCard: React.FC<ForkliftJobCardProps> = ({
 
           {/* 2B. STATE: CLAIMED BY OTHER -> DISABLED */}
           {job.status === 'CLAIMED' && isClaimedByOther && (
-            <div className="px-4 py-2.5 bg-slate-950 rounded-xl border border-slate-800 text-xs text-slate-400 flex items-center gap-1.5">
+            <div className="px-4 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-500 flex items-center gap-1.5">
               <Lock className="w-3.5 h-3.5 text-slate-500" />
               <span>Đang khóa bởi xe khác</span>
             </div>
@@ -315,7 +315,7 @@ export const ForkliftJobCard: React.FC<ForkliftJobCardProps> = ({
           {job.status === 'IN_PROGRESS' && isClaimedByMe && (
             <button
               onClick={() => onOpenDropModal(job)}
-              className="px-6 py-3 bg-teal-600 hover:bg-teal-500 active:scale-98 text-white font-black text-sm rounded-2xl shadow-lg shadow-teal-600/30 transition flex items-center gap-2 cursor-pointer animate-bounce"
+              className="px-6 py-3 bg-teal-600 hover:bg-teal-500 active:scale-98 text-white font-black text-sm rounded-2xl shadow-lg  transition flex items-center gap-2 cursor-pointer animate-bounce"
             >
               <CheckCircle2 className="w-4 h-4" />
               <span>[ XÁC NHẬN ĐÃ HẠ ]</span>
@@ -324,7 +324,7 @@ export const ForkliftJobCard: React.FC<ForkliftJobCardProps> = ({
 
           {/* 3B. STATE: IN PROGRESS BY OTHER */}
           {job.status === 'IN_PROGRESS' && isClaimedByOther && (
-            <div className="px-4 py-2.5 bg-slate-950 rounded-xl border border-slate-800 text-xs text-sky-400 flex items-center gap-1.5">
+            <div className="px-4 py-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-sky-600 flex items-center gap-1.5">
               <Truck className="w-3.5 h-3.5 animate-pulse" />
               <span>Xe {job.assignedForkliftCode} đang vận chuyển</span>
             </div>
@@ -334,7 +334,7 @@ export const ForkliftJobCard: React.FC<ForkliftJobCardProps> = ({
           {job.status === 'COMPLETED' && (
             <button
               onClick={() => onViewYard(job)}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-teal-400 font-bold text-xs rounded-xl border border-slate-700 transition flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-teal-600 font-bold text-xs rounded-xl border border-slate-200 transition flex items-center gap-1.5 cursor-pointer"
             >
               <MapPin className="w-3.5 h-3.5" />
               <span>Xem Tọa Độ Trên Yard 2D</span>

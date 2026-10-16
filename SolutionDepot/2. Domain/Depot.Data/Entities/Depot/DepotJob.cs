@@ -1,9 +1,5 @@
 using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations.Schema;
 using Depot.Data.Entities.Base;
-using Depot.Data.Entities.Finance;
-using Depot.Data.Entities.Master;
 
 namespace Depot.Data.Entities.Depot
 {
@@ -21,11 +17,6 @@ namespace Depot.Data.Entities.Depot
         public string IsoSize { get; set; } = "40HC";
         /// <summary>Khóa ngoại trỏ tới ShippingLine.Id.</summary>
         public long ShippingLineId { get; set; }
-        /// <summary>Thực thể hãng tàu liên quan tới job.</summary>
-        public virtual ShippingLine? ShippingLine { get; set; }
-        /// <summary>Mã hãng tàu dạng phẳng phục vụ frontend (không cần load object lồng nhau).</summary>
-        [NotMapped]
-        public string? ShippingLineCode => ShippingLine?.Code;
         /// <summary>Trọng lượng vỏ container (kg).</summary>
         public int TareWeightKg { get; set; } = 3820;
         /// <summary>Khối lượng hàng tối đa cho phép (kg).</summary>
@@ -59,6 +50,11 @@ namespace Depot.Data.Entities.Depot
         public string? GateInDriverPhone { get; set; }
         /// <summary>Số seal lúc hạ vỏ Gate-In.</summary>
         public string? GateInSealNo { get; set; }
+        /// <summary>Số bằng lái xe của tài xế giao container lúc Gate-In — form Survey/Gate-In có thu thập
+        /// nhưng trước đây không có cột nào lưu, mất trắng sau khi nộp phiếu.</summary>
+        public string? GateInDriverLicense { get; set; }
+        /// <summary>Số seal hải quan (khác với GateInSealNo là seal hãng tàu) kiểm tra lúc Gate-In.</summary>
+        public string? GateInCustomsSealNo { get; set; }
         /// <summary>Số booking liên quan lúc Gate-In.</summary>
         public string? GateInBookingNo { get; set; }
         /// <summary>Đơn vị vận tải giao container lúc Gate-In.</summary>
@@ -78,24 +74,31 @@ namespace Depot.Data.Entities.Depot
         /// <summary>Thời điểm nhận khóa giám định; dùng để tự động hết hạn khóa nếu bỏ ngang quá lâu.</summary>
         public DateTime? SurveyClaimedAt { get; set; }
 
-        /// <summary>Mã block bãi hiện tại.</summary>
-        public string BlockCode { get; set; } = "BLOCK_A";
-        /// <summary>Số bay bãi hiện tại.</summary>
-        public int Bay { get; set; } = 1;
-        /// <summary>Số row bãi hiện tại.</summary>
-        public int Row { get; set; } = 1;
-        /// <summary>Số tier bãi hiện tại.</summary>
-        public int Tier { get; set; } = 1;
+        /// <summary>Mã tài xế xe nâng đang giữ khóa "nhận lệnh" cho lần di chuyển đang chờ hiện tại (nếu
+        /// job đang ở trạng thái cần xe nâng di chuyển), null nếu chưa ai nhận. Không phải FK tới Users.Id
+        /// vì tài xế xe nâng hiện là hồ sơ ca trực giả lập ở frontend (FORKLIFT_OPERATORS), chưa có tài
+        /// khoản đăng nhập thật — cùng lý do GateInStaffName/TechnicianName dùng string thay vì FK. Dùng để
+        /// chặn 2 tài xế trên 2 tablet khác nhau cùng nhận 1 lần di chuyển (xem ClaimForkliftJobAsync) —
+        /// trước đây việc nhận lệnh hoàn toàn cục bộ trên trình duyệt, không đồng bộ giữa các tablet.</summary>
+        public string? ForkliftClaimedByOperatorId { get; set; }
+        /// <summary>Họ tên tài xế xe nâng đang giữ khóa (snapshot hiển thị nhanh).</summary>
+        public string? ForkliftClaimedByOperatorName { get; set; }
+        /// <summary>Mã xe nâng được chọn khi nhận lệnh.</summary>
+        public string? ForkliftAssignedVehicleCode { get; set; }
+        /// <summary>Thời điểm nhận khóa lệnh xe nâng.</summary>
+        public DateTime? ForkliftClaimedAt { get; set; }
+        /// <summary>Thời điểm tài xế bấm "Bắt đầu thực hiện" (chuyển IN_PROGRESS).</summary>
+        public DateTime? ForkliftStartedAt { get; set; }
 
-        /// <summary>Phiếu giám định phát sinh từ job này.</summary>
-        public virtual Survey? Survey { get; set; }
-        /// <summary>Báo giá phát sinh từ job này.</summary>
-        public virtual Estimate? Estimate { get; set; }
-        /// <summary>Lệnh sửa chữa phát sinh từ job này.</summary>
-        public virtual RepairOrder? RepairOrder { get; set; }
-        /// <summary>Phiếu thanh toán phát sinh từ job này.</summary>
-        public virtual Payment? Payment { get; set; }
-        /// <summary>Toàn bộ lịch sử audit của job.</summary>
-        public virtual ICollection<JobAuditLog> AuditLogs { get; set; } = new List<JobAuditLog>();
+        /// <summary>Mã block bãi hiện tại. Rỗng = chưa hạ bãi (container còn ở khu giám định / khu vệ sinh);
+        /// chỉ được ghi khi xe nâng hạ bãi hoặc dời vị trí trên sơ đồ bãi. Trước đây Gate-In gán sẵn
+        /// BLOCK_A/1/1/1 nên mọi container chưa vào bãi đều hiện vị trí giả này.</summary>
+        public string BlockCode { get; set; } = string.Empty;
+        /// <summary>Số bay bãi hiện tại (0 = chưa hạ bãi).</summary>
+        public int Bay { get; set; }
+        /// <summary>Số row bãi hiện tại (0 = chưa hạ bãi).</summary>
+        public int Row { get; set; }
+        /// <summary>Số tier bãi hiện tại (0 = chưa hạ bãi).</summary>
+        public int Tier { get; set; }
     }
 }

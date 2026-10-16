@@ -5,22 +5,13 @@ import {
   Printer,
   Download,
   X,
-  CheckCircle2,
   QrCode,
-  ShieldCheck,
-  Sparkles,
-  AlertTriangle,
   Wrench,
   Building,
   UserCheck,
   Droplets,
   Thermometer,
-  Layers,
-  ArrowRight,
   Clock,
-  Check,
-  MapPin,
-  Truck,
   Send
 } from 'lucide-react';
 
@@ -99,8 +90,8 @@ export const EEIRModal: React.FC<EEIRModalProps> = ({
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
                 Mã e-EIR:{' '}
-                <strong className="font-mono text-emerald-600">{survey.eeirNo || `EIR-2026-${survey.containerNo.substring(0, 4)}-${Math.floor(1000 + Math.random() * 9000)}`}</strong>{' '}
-                &bull; Khảo sát lúc: <span className="font-mono text-slate-700">{survey.surveyDate || '2026-08-14 09:00'}</span>
+                <strong className="font-mono text-emerald-600">{survey.eeirNo || '—'}</strong>{' '}
+                &bull; Khảo sát lúc: <span className="font-mono text-slate-700">{survey.surveyDate || '—'}</span>
               </p>
             </div>
           </div>
@@ -148,15 +139,10 @@ export const EEIRModal: React.FC<EEIRModalProps> = ({
               <div className="flex items-center gap-2">
                 <Building className="w-6 h-6 text-blue-900" />
                 <h1 className="text-lg font-black tracking-tight text-slate-900 uppercase">
-                  TỔNG CÔNG TY DEPOT CONTAINER QUỐC TẾ (ICD PORT)
+                  SOLUTION DEPOT
                 </h1>
               </div>
-              <p className="text-xs text-slate-600">
-                Địa chỉ: Bãi Depot ICD Cát Lái - Phường Cát Lái, TP. Thủ Đức, TP. Hồ Chí Minh
-              </p>
-              <p className="text-xs text-slate-600">
-                Hotline 24/7: 1900 6868 &bull; Email: survey.depot@interdepot.com.vn &bull; Cổng tra cứu: eir.interdepot.vn
-              </p>
+              {/* Tên/địa chỉ/hotline công ty gõ cứng trước đây là thông tin bịa — hệ thống chưa có bảng cấu hình doanh nghiệp. */}
             </div>
 
             <div className="text-right flex flex-col items-end space-y-1 flex-shrink-0">
@@ -172,7 +158,7 @@ export const EEIRModal: React.FC<EEIRModalProps> = ({
               BIÊN BẢN GIÁM ĐỊNH &amp; BÀN GIAO THIẾT BỊ CONTAINER ĐIỆN TỬ (e-EIR)
             </h2>
             <p className="text-xs font-mono text-slate-500">
-              Số e-EIR: <strong className="text-slate-900">{survey.eeirNo || `EIR-2026-${survey.containerNo.substring(0, 4)}-889`}</strong> | Ngày giờ giám định: {survey.surveyDate || '2026-08-14 09:00'}
+              Số e-EIR: <strong className="text-slate-900">{survey.eeirNo || '—'}</strong> | Ngày giờ giám định: {survey.surveyDate || '—'}
             </p>
           </div>
 
@@ -186,7 +172,7 @@ export const EEIRModal: React.FC<EEIRModalProps> = ({
             <div>
               <span className="text-[10px] text-slate-500 font-semibold uppercase block">Kích Cỡ / Chủng Loại:</span>
               <strong className="font-bold text-slate-800 block">{survey.size} {survey.type}</strong>
-              <span className="text-[10px] font-mono text-slate-600">Mã ISO: {survey.isoCode || '45G1'}</span>
+              <span className="text-[10px] font-mono text-slate-600">Mã ISO: {survey.isoCode || '—'}</span>
             </div>
 
             <div>
@@ -197,7 +183,7 @@ export const EEIRModal: React.FC<EEIRModalProps> = ({
 
             <div>
               <span className="text-[10px] text-slate-500 font-semibold uppercase block">Tiêu Chuẩn Giám Định:</span>
-              <strong className="font-bold text-slate-800 block">{survey.standard || 'IICL-6'}</strong>
+              <strong className="font-bold text-slate-800 block">{survey.standard || '—'}</strong>
               <span className="text-[10px] text-slate-500">Quy chuẩn kỹ thuật áp dụng</span>
             </div>
 
@@ -208,18 +194,18 @@ export const EEIRModal: React.FC<EEIRModalProps> = ({
 
             <div>
               <span className="text-[10px] text-slate-500 font-semibold uppercase block">Tài Xế &amp; Xe Đầu Kéo:</span>
-              <strong className="font-bold text-slate-800 block">{survey.driverName || 'Trần Văn Tùng'}</strong>
-              <span className="text-[10px] font-mono text-slate-600">{survey.truckPlate || '51C-889.12'} / {survey.trailerPlate || '51R-099.45'}</span>
+              <strong className="font-bold text-slate-800 block">{survey.driverName || '—'}</strong>
+              <span className="text-[10px] font-mono text-slate-600">{survey.truckPlate || '—'} / {survey.trailerPlate || '—'}</span>
             </div>
 
             <div>
               <span className="text-[10px] text-slate-500 font-semibold uppercase block">Thời Điểm Giao Nhận:</span>
-              <span className="font-mono font-semibold text-slate-800">{survey.gateInTime || '2026-08-14 08:30'}</span>
+              <span className="font-mono font-semibold text-slate-800">{survey.gateInTime || '—'}</span>
             </div>
 
             <div>
               <span className="text-[10px] text-slate-500 font-semibold uppercase block">Trọng Lượng (Tare / Gross):</span>
-              <span className="font-mono text-slate-700">Tare: {survey.tareWeightKg || 3900} kg / Max: {survey.maxGrossWeightKg || 32500} kg</span>
+              <span className="font-mono text-slate-700">Tare: {survey.tareWeightKg || '—'} kg / Max: {survey.maxGrossWeightKg || '—'} kg</span>
             </div>
           </div>
 
@@ -245,7 +231,7 @@ export const EEIRModal: React.FC<EEIRModalProps> = ({
             </div>
 
             <div className="text-right font-mono text-[11px] text-slate-600 flex-shrink-0">
-              Vị trí dự kiến: <strong>{survey.yardLocation || 'A02-04-02-1'}</strong>
+              Vị trí dự kiến: <strong>{survey.yardLocation || '—'}</strong>
             </div>
           </div>
 
@@ -260,7 +246,7 @@ export const EEIRModal: React.FC<EEIRModalProps> = ({
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-slate-800">
                 <div>
                   <span className="text-[10px] text-slate-500 block">Hãng máy lạnh:</span>
-                  <strong>{survey.reeferBrand || 'CARRIER TRANSICOLD'}</strong>
+                  <strong>{survey.reeferBrand || '—'}</strong>
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-500 block">Nhiệt độ cài đặt / Thực tế:</span>
@@ -269,12 +255,12 @@ export const EEIRModal: React.FC<EEIRModalProps> = ({
                 <div>
                   <span className="text-[10px] text-slate-500 block">Kết quả kiểm tra PTI:</span>
                   <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-bold text-[10px]">
-                    {survey.ptiStatus || 'PASSED (ĐẠT CHUẨN)'}
+                    {survey.ptiStatus || '—'}
                   </span>
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-500 block">Giờ chạy máy nén / Cáp điện:</span>
-                  <span className="font-mono text-slate-700">{survey.compressorHours || 12450} hrs / Cáp 32A tốt</span>
+                  <span className="font-mono text-slate-700">{survey.compressorHours != null ? `${survey.compressorHours} hrs` : '—'}</span>
                 </div>
               </div>
             </div>
@@ -385,7 +371,7 @@ export const EEIRModal: React.FC<EEIRModalProps> = ({
                       />
                       <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/75 text-[9px] font-mono text-amber-300 rounded flex items-center gap-0.5">
                         <Clock className="w-2.5 h-2.5" />
-                        <span>{p.uploadedAt || survey.surveyDate || '2026-08-14 09:00'}</span>
+                        <span>{p.uploadedAt || survey.surveyDate || '—'}</span>
                       </div>
                     </div>
                     <span className="text-[10px] text-slate-700 truncate block font-semibold">{p.caption}</span>
@@ -399,7 +385,7 @@ export const EEIRModal: React.FC<EEIRModalProps> = ({
           <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-1">
             <strong className="text-slate-800 font-bold block">Ghi chú của Giám định viên:</strong>
             <p className="text-slate-700">
-              {survey.remarks || 'Vỏ container đã hoàn tất kiểm tra kỹ thuật tại cổng tiếp nhận. Dữ liệu đã số hóa lưu trữ và đồng bộ e-EIR.'}
+              {survey.remarks || '—'}
             </p>
           </div>
 
@@ -410,7 +396,7 @@ export const EEIRModal: React.FC<EEIRModalProps> = ({
               <div className="p-2 border-b border-dashed border-slate-400 w-52 mx-auto text-slate-500 font-mono italic text-[11px]">
                 (Xác nhận điện tử qua App Tài Xế)
               </div>
-              <p className="font-bold text-slate-900">{survey.driverName || 'Trần Văn Tùng'}</p>
+              <p className="font-bold text-slate-900">{survey.driverName || '—'}</p>
             </div>
 
             <div className="text-center space-y-6">

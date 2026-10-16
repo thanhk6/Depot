@@ -15,13 +15,13 @@ namespace Depot.Application.Services
         Task<List<Material>> GetAllMaterialsAsync();
         Task<Material> AddMaterialAsync(MaterialViewModel model);
         Task<Material?> UpdateMaterialAsync(long id, MaterialViewModel model);
-        Task<List<MasterCatalogItem>> GetCatalogAsync(string catalogType);
+        Task<List<MasterCatalogItem>> GetCatalogAsync(string catalogType, bool includeInactive = false);
         Task<MasterCatalogItem> CreateCatalogItemAsync(MasterCatalogItemRequest request);
         Task<MasterCatalogItem?> UpdateCatalogItemAsync(long id, MasterCatalogItemRequest request);
         Task<bool> DeactivateCatalogItemAsync(long id);
         // Cước Nâng Hạ (LoLo) — bảng riêng ServiceTariff, tách khỏi catalog "SERVICE_TARIFF" dùng chung
         // cũ (xem docs/frontend-tariff-catalog-split.md).
-        Task<List<ServiceTariff>> GetServiceTariffsAsync();
+        Task<List<ServiceTariff>> GetServiceTariffsAsync(bool includeInactive = false);
         Task<ServiceTariff> CreateServiceTariffAsync(ServiceTariffRequest request);
         Task<ServiceTariff?> UpdateServiceTariffAsync(long id, ServiceTariffRequest request);
         Task<bool> DeactivateServiceTariffAsync(long id);

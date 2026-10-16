@@ -90,23 +90,23 @@ export const ForkliftDispatchModal: React.FC<ForkliftDispatchModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl animate-fade-in text-xs">
+      <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl animate-fade-in text-xs">
         {/* Header */}
-        <div className="p-5 bg-slate-950/90 border-b border-slate-800 flex items-center justify-between">
+        <div className="p-5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-amber-600/20 text-amber-400 rounded-2xl border border-amber-500/30">
+            <div className="p-2.5 bg-amber-50 text-amber-600 rounded-2xl border border-amber-200">
               <Truck className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-white text-base">PHÁT LỆNH ĐIỀU ĐỘ XE NÂNG (FORKLIFT DISPATCH)</h3>
-              <p className="text-slate-400 text-xs">
+              <h3 className="font-bold text-slate-900 text-base">PHÁT LỆNH ĐIỀU ĐỘ XE NÂNG (FORKLIFT DISPATCH)</h3>
+              <p className="text-slate-500 text-xs">
                 Chỉ định phương tiện & vạch tuyến di chuyển container trên mặt bằng bãi
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl transition cursor-pointer"
+            className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-900 rounded-xl transition cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -114,16 +114,16 @@ export const ForkliftDispatchModal: React.FC<ForkliftDispatchModalProps> = ({
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           {/* Target Container Info */}
-          <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-between">
+          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between">
             <div className="space-y-1">
               <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
                 Container Chỉ Định
               </span>
               <div className="flex items-center gap-2">
-                <span className="text-base font-black font-mono text-teal-300">
+                <span className="text-base font-black font-mono text-teal-700">
                   {container.containerNo}
                 </span>
-                <span className="px-2 py-0.5 bg-slate-800 rounded text-[10px] text-slate-300 font-mono">
+                <span className="px-2 py-0.5 bg-slate-100 rounded text-[10px] text-slate-700 font-mono">
                   {container.isoType} ({container.size}FT)
                 </span>
               </div>
@@ -133,30 +133,30 @@ export const ForkliftDispatchModal: React.FC<ForkliftDispatchModalProps> = ({
               <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-0.5">
                 Vị Trí Hiện Tại
               </span>
-              <span className="font-mono font-bold text-amber-300 text-sm">
+              <span className="font-mono font-bold text-amber-700 text-sm">
                 {container.locationCode}
               </span>
             </div>
           </div>
 
           {/* Destination Slot Builder */}
-          <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
+          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-teal-400" />
+              <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-teal-600" />
                 <span>Vị Trí Đích Đến (Destination Slot)</span>
               </span>
-              <span className="font-mono font-bold text-teal-400 text-xs">{targetLocationCode}</span>
+              <span className="font-mono font-bold text-teal-600 text-xs">{targetLocationCode}</span>
             </div>
 
             <div className="grid grid-cols-4 gap-2.5">
               {/* Block */}
               <div>
-                <label className="text-[10px] text-slate-400 block mb-1">Block:</label>
+                <label className="text-[10px] text-slate-500 block mb-1">Block:</label>
                 <select
                   value={destBlock}
                   onChange={(e) => setDestBlock(e.target.value)}
-                  className="w-full px-2.5 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white font-bold cursor-pointer"
+                  className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 font-bold cursor-pointer"
                 >
                   {blocks.map((b) => (
                     <option key={b.id} value={b.blockCode}>
@@ -168,11 +168,11 @@ export const ForkliftDispatchModal: React.FC<ForkliftDispatchModalProps> = ({
 
               {/* Bay */}
               <div>
-                <label className="text-[10px] text-slate-400 block mb-1">Bay (1 - {maxBay}):</label>
+                <label className="text-[10px] text-slate-500 block mb-1">Bay (1 - {maxBay}):</label>
                 <select
                   value={destBay}
                   onChange={(e) => setDestBay(Number(e.target.value))}
-                  className="w-full px-2.5 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white font-mono cursor-pointer"
+                  className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 font-mono cursor-pointer"
                 >
                   {Array.from({ length: maxBay }, (_, i) => i + 1).map((b) => (
                     <option key={b} value={b}>
@@ -184,11 +184,11 @@ export const ForkliftDispatchModal: React.FC<ForkliftDispatchModalProps> = ({
 
               {/* Row */}
               <div>
-                <label className="text-[10px] text-slate-400 block mb-1">Row (1 - {maxRow}):</label>
+                <label className="text-[10px] text-slate-500 block mb-1">Row (1 - {maxRow}):</label>
                 <select
                   value={destRow}
                   onChange={(e) => setDestRow(Number(e.target.value))}
-                  className="w-full px-2.5 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white font-mono cursor-pointer"
+                  className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 font-mono cursor-pointer"
                 >
                   {Array.from({ length: maxRow }, (_, i) => i + 1).map((r) => (
                     <option key={r} value={r}>
@@ -200,11 +200,11 @@ export const ForkliftDispatchModal: React.FC<ForkliftDispatchModalProps> = ({
 
               {/* Tier */}
               <div>
-                <label className="text-[10px] text-slate-400 block mb-1">Tier (1 - {maxTier}):</label>
+                <label className="text-[10px] text-slate-500 block mb-1">Tier (1 - {maxTier}):</label>
                 <select
                   value={destTier}
                   onChange={(e) => setDestTier(Number(e.target.value))}
-                  className="w-full px-2.5 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white font-mono font-bold text-teal-300 cursor-pointer"
+                  className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 font-mono font-bold text-teal-700 cursor-pointer"
                 >
                   {Array.from({ length: maxTier }, (_, i) => i + 1).map((t) => (
                     <option key={t} value={t}>
@@ -218,7 +218,7 @@ export const ForkliftDispatchModal: React.FC<ForkliftDispatchModalProps> = ({
 
           {/* Forklift Selection */}
           <div className="space-y-2">
-            <label className="text-[11px] font-bold text-slate-300 uppercase tracking-wider block">
+            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
               Chọn Xe Nâng Thực Hiện (Available Forklifts)
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
@@ -230,31 +230,31 @@ export const ForkliftDispatchModal: React.FC<ForkliftDispatchModalProps> = ({
                     onClick={() => setSelectedForkliftId(fl.id)}
                     className={`p-3 rounded-2xl border transition cursor-pointer flex flex-col justify-between ${
                       isSelected
-                        ? 'bg-amber-950/40 border-amber-500 shadow-lg ring-1 ring-amber-400'
-                        : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                        ? 'bg-amber-50 border-amber-500 shadow-lg ring-1 ring-amber-400'
+                        : 'bg-slate-50 border-slate-200 hover:border-slate-200'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="font-mono font-bold text-white text-xs">{fl.code}</span>
+                      <span className="font-mono font-bold text-slate-900 text-xs">{fl.code}</span>
                       <span
                         className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
                           fl.status === 'AVAILABLE'
-                            ? 'bg-emerald-950 text-emerald-300'
-                            : 'bg-amber-950 text-amber-300'
+                            ? 'bg-emerald-50 text-emerald-700'
+                            : 'bg-amber-50 text-amber-700'
                         }`}
                       >
                         {fl.status}
                       </span>
                     </div>
 
-                    <div className="space-y-1 text-[10px] text-slate-400">
+                    <div className="space-y-1 text-[10px] text-slate-500">
                       <div className="flex items-center gap-1 truncate">
                         <User className="w-3 h-3 text-slate-500" />
                         <span>{fl.driverName}</span>
                       </div>
                       <div className="flex items-center justify-between text-slate-500">
                         <span>Tải: {fl.maxCapacityTons}T</span>
-                        <span className="flex items-center gap-1 text-emerald-400 font-mono">
+                        <span className="flex items-center gap-1 text-emerald-600 font-mono">
                           <BatteryCharging className="w-3 h-3" />
                           {fl.batteryPercent}%
                         </span>
@@ -267,8 +267,8 @@ export const ForkliftDispatchModal: React.FC<ForkliftDispatchModalProps> = ({
           </div>
 
           {/* Priority */}
-          <div className="flex items-center justify-between p-3 bg-slate-950 rounded-2xl border border-slate-800">
-            <span className="font-medium text-slate-300 text-[11px]">Mức Độ Ưu Tiên Lệnh:</span>
+          <div className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-200">
+            <span className="font-medium text-slate-700 text-[11px]">Mức Độ Ưu Tiên Lệnh:</span>
             <div className="flex items-center gap-2">
               {(['NORMAL', 'URGENT', 'HIGH'] as const).map((p) => (
                 <button
@@ -280,7 +280,7 @@ export const ForkliftDispatchModal: React.FC<ForkliftDispatchModalProps> = ({
                       ? p === 'HIGH' || p === 'URGENT'
                         ? 'bg-rose-600 text-white'
                         : 'bg-teal-600 text-white'
-                      : 'bg-slate-800 text-slate-400 hover:text-white'
+                      : 'bg-slate-100 text-slate-500 hover:text-slate-900'
                   }`}
                 >
                   {p === 'NORMAL' ? 'Bình Thường' : p === 'URGENT' ? 'Khẩn Cấp' : 'Ưu Tiên Cao'}
@@ -290,11 +290,11 @@ export const ForkliftDispatchModal: React.FC<ForkliftDispatchModalProps> = ({
           </div>
 
           {/* Footer Actions */}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-semibold transition cursor-pointer"
+              className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition cursor-pointer"
             >
               HỦY LỆNH
             </button>

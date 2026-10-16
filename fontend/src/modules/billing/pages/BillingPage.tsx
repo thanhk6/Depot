@@ -32,6 +32,8 @@ import {
   CheckCircle2,
   AlertCircle
 } from 'lucide-react';
+import { getApiErrorMessage } from '../../../utils/apiError';
+import { LoadErrorBanner } from '../../../components/common/LoadErrorBanner';
 
 export const BillingPage: React.FC = () => {
   const { currentUser } = useAuth();
@@ -54,7 +56,11 @@ export const BillingPage: React.FC = () => {
     }).catch((error) => console.error('Không thể tải hãng tàu cho Billing:', error));
   }, []);
 
+  // Lỗi tải phải hiện rõ — trước đây nuốt lỗi, màn hiện "không có khoản nợ" + tổng 0đ như thể hết nợ (BUG-016).
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const reloadBillingData = () => {
+    setLoadError(null);
     Promise.all([
       billingApi.getDebts(),
       billingApi.getPeriods(),
@@ -65,7 +71,7 @@ export const BillingPage: React.FC = () => {
       if (periodsRes.statusCode === 200) setPeriods((periodsRes.data || []).map(mapPeriodDto));
       if (paymentsRes.statusCode === 200) setPayments((paymentsRes.data || []).map(mapPaymentDto));
       if (agingRes.statusCode === 200) setAgingData((agingRes.data || []).map(mapAgingDto));
-    }).catch((error) => console.error('Không thể tải dữ liệu Công Nợ từ Backend:', error));
+    }).catch((error) => setLoadError(getApiErrorMessage(error, 'Không thể tải dữ liệu công nợ.')));
   };
 
   useEffect(() => {
@@ -83,7 +89,7 @@ export const BillingPage: React.FC = () => {
 
   // Modals
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState<boolean>(false);
-  const [paymentModalDefaultCarrier, setPaymentModalDefaultCarrier] = useState<string>('MAERSK');
+  const [paymentModalDefaultCarrier, setPaymentModalDefaultCarrier] = useState<string>('');
   const [paymentModalDefaultDebtId, setPaymentModalDefaultDebtId] = useState<string | undefined>(undefined);
 
   const [detailModalDebt, setDetailModalDebt] = useState<ShippingLineDebt | null>(null);
@@ -284,9 +290,10 @@ export const BillingPage: React.FC = () => {
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      {loadError && <LoadErrorBanner message={loadError} onRetry={reloadBillingData} />}
       {/* Toast Alert */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-sky-600 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-sky-400/30 animate-bounce">
+        <div className="fixed bottom-6 right-6 z-50 bg-sky-600 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-sky-200 animate-bounce">
           <CheckCircle2 className="w-5 h-5 text-sky-200" />
           <div className="text-xs font-bold">{toastMessage}</div>
         </div>
@@ -316,19 +323,19 @@ export const BillingPage: React.FC = () => {
       />
 
       {/* 2. SUB-NAVIGATION TABS */}
-      <div className="bg-slate-900/95 border border-slate-800 rounded-2xl p-1.5 shadow-md">
+      <div className="bg-white border border-slate-200 rounded-2xl p-1.5 shadow-md">
         <div className="flex items-center gap-1.5 overflow-x-auto touch-pan-x overscroll-x-contain pb-1 sm:pb-0 scrollbar-none select-none">
           <button
             onClick={() => setActiveTab('CONTAINER_LEDGER')}
             className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === 'CONTAINER_LEDGER'
                 ? 'bg-sky-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
             <Container className="w-3.5 h-3.5" />
             <span>Chi tiết Công Nợ Container</span>
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-sky-950 text-sky-300 border border-sky-800">
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-sky-50 text-sky-700 border border-sky-200">
               {debts.length}
             </span>
           </button>
@@ -338,12 +345,12 @@ export const BillingPage: React.FC = () => {
             className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === 'SUMMARY'
                 ? 'bg-sky-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
             <Building2 className="w-3.5 h-3.5" />
             <span>Tổng Hợp Theo Hãng Tàu</span>
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-800 text-slate-300">
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-700">
               {shippingLines.length}
             </span>
           </button>
@@ -353,7 +360,7 @@ export const BillingPage: React.FC = () => {
             className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === 'PERIODS'
                 ? 'bg-sky-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
             <CalendarCheck className="w-3.5 h-3.5" />
@@ -365,12 +372,12 @@ export const BillingPage: React.FC = () => {
             className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === 'PAYMENTS'
                 ? 'bg-sky-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
             <CreditCard className="w-3.5 h-3.5" />
             <span>Thanh Toán & Phân Bổ</span>
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800">
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200">
               {payments.length}
             </span>
           </button>
@@ -380,7 +387,7 @@ export const BillingPage: React.FC = () => {
             className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === 'AGING'
                 ? 'bg-sky-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
             <BarChart3 className="w-3.5 h-3.5" />
@@ -395,6 +402,7 @@ export const BillingPage: React.FC = () => {
         <ContainerDebtLedgerTab
           debts={filteredDebts}
           selectedCarrier={selectedCarrier}
+          carriers={shippingLines}
           onChangeCarrier={setSelectedCarrier}
           selectedStatus={selectedStatus}
           onChangeStatus={setSelectedStatus}
@@ -476,6 +484,7 @@ export const BillingPage: React.FC = () => {
         onClose={() => setIsPaymentModalOpen(false)}
         debts={debts}
         defaultCarrierId={paymentModalDefaultCarrier}
+        shippingLines={shippingLines}
         defaultDebtId={paymentModalDefaultDebtId}
         onSubmitPayment={handleSubmitPayment}
         currency="VND"

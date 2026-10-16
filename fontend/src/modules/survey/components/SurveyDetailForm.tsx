@@ -1,10 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   SurveyItemRecord,
-  ContainerConditionGrade,
-  QualityGradeType,
   CleaningReasonType,
-  CleaningMethodType,
   CleaningTariffMasterItem,
   SurveyCleaningItemRecord,
   InspectionZoneKey,
@@ -15,39 +12,27 @@ import {
   DamageLocationMasterItem,
   DamageCodeMasterItem,
   RepairCodeMasterItem,
-  GradeMasterItem
+  GradeMasterItem,
+  InspectionStandardMasterItem
 } from '../types';
 import { DamageListTable } from './DamageListTable';
 import { DamageFormModal } from './DamageFormModal';
+import { depotFileApi } from '../../../api';
 import {
   ClipboardCheck,
   CheckCircle2,
   AlertTriangle,
   Wrench,
-  Sparkles,
   ShieldCheck,
   Camera,
-  Image as ImageIcon,
   ArrowLeft,
-  Truck,
-  Ship,
-  Calendar,
-  User,
   Plus,
   Trash2,
-  HelpCircle,
   Maximize2,
-  XCircle,
-  AlertCircle,
   Tag,
   Zap,
   Droplets,
   Receipt,
-  DollarSign,
-  CheckSquare,
-  Square,
-  Flame,
-  Check,
   Clock
 } from 'lucide-react';
 
@@ -90,19 +75,21 @@ const recomputeChecklistFromDamages = (
   });
 
 interface SurveyDetailFormProps {
+
   survey: SurveyItemRecord;
   locations: DamageLocationMasterItem[];
   damageCodes: DamageCodeMasterItem[];
   repairCodes: RepairCodeMasterItem[];
   grades: GradeMasterItem[];
+  standards: InspectionStandardMasterItem[];
   cleaningTariffs: CleaningTariffMasterItem[];
   currentUser: string;
   onBack: () => void;
   // Trả về Promise để các nút Hoàn Tất/Phát Hành phía dưới có thể `await` và biết chắc
   // đã lưu xuống SQL Server thành công hay chưa trước khi báo "thành công" cho người dùng.
   onSaveSurvey: (updated: SurveyItemRecord, isDraft?: boolean) => Promise<void>;
-  onOpenEEIR: (survey: SurveyItemRecord) => void;
-  onTransferToOperation?: (survey: SurveyItemRecord) => void;
+  /** Gọi sau khi Hoàn Tất Giám Định lưu thành công — trang cha báo thông báo và quay về danh sách. */
+  onCompleted?: (completed: SurveyItemRecord) => void;
 }
 
 export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
@@ -111,12 +98,12 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
   damageCodes,
   repairCodes,
   grades,
+  standards,
   cleaningTariffs,
   currentUser,
   onBack,
   onSaveSurvey,
-  onOpenEEIR,
-  onTransferToOperation
+  onCompleted
 }) => {
   // Form working states - Default tab is directly DAMAGES
   const [formData, setFormData] = useState<SurveyItemRecord>({ ...survey });
@@ -279,13 +266,14 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
   // Quick Damage Direct Entry Inline State
   const [quickLocation, setQuickLocation] = useState<string>('RIGHT_W');
   const [quickDamageCode, setQuickDamageCode] = useState<string>('BENT');
+  
   // Mã 'RP_STR_PANEL' (Straighten Corrugation) — trước đây để 'RP_STRAIGHT', mã này không tồn tại trong
   // INITIAL_REPAIR_CODES nên dropdown "Mã Sửa" hiển thị lệch với state ngay từ lần render đầu tiên.
   const [quickRepairCode, setQuickRepairCode] = useState<string>('RP_STR_PANEL');
   const [quickSeverity, setQuickSeverity] = useState<'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'>('MEDIUM');
   const [quickLength, setQuickLength] = useState<string>('150');
   const [quickWidth, setQuickWidth] = useState<string>('60');
-  const [quickQuantity, setQuickQuantity] = useState<string>('1');
+  const [quickQuantity] = useState<string>('1');
   const [quickNote, setQuickNote] = useState<string>('');
 
   // Photo viewer modal
@@ -312,60 +300,60 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
     }
   }, [validationErrors]);
 
-  // Quick photo upload simulation
-  const handleAddPhoto = (type: 'OVERVIEW' | 'DETAIL' | 'DOOR_SEAL' | 'INTERIOR_FLOOR') => {
-    const newPhoto: SurveyPhoto = {
-      id: 'PH-' + Math.random().toString(36).substring(2, 7).toUpperCase(),
-      url:
-        type === 'OVERVIEW'
-          ? 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=600&auto=format&fit=crop&q=60'
-          : type === 'DETAIL'
-          ? 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=600&auto=format&fit=crop&q=60'
-          : 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?w=600&auto=format&fit=crop&q=60',
-      type,
-      caption:
-        type === 'OVERVIEW'
-          ? `Ảnh toàn cảnh vỏ ${formData.containerNo}`
-          : type === 'DETAIL'
-          ? 'Ảnh chụp cận cảnh tổn thất hiện trường'
-          : 'Ảnh kiểm tra ron cao su cửa',
-      surveyor: currentUser,
-      uploadedAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      fileSizeKb: Math.floor(800 + Math.random() * 800)
-    };
+  // Upload ảnh thật: đẩy file lên Depot.FileServer qua depotFileApi (lưu vật lý + ghi metadata bảng
+  // DepotFiles), rồi gắn URL thật trả về vào formData.photos. Trước đây 2 hàm này chỉ mô phỏng — luôn gán
+  // cứng vài link ảnh Unsplash cố định bất kể người dùng chọn file gì, không có input chọn file thật nào.
+  // Dùng DepotJob.Id (formData.id) làm IdTable vì tại thời điểm upload, Survey CHƯA được lưu xuống DB
+  // (chỉ tạo khi bấm Hoàn Tất/Lưu Tạm) nên chưa có Survey.Id thật để gắn vào.
+  const overviewFileInputRef = useRef<HTMLInputElement | null>(null);
+  const detailFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [photoUploadError, setPhotoUploadError] = useState<string | null>(null);
 
-    setFormData((prev) => ({
-      ...prev,
-      photos: [...(prev.photos || []), newPhoto]
-    }));
-  };
+  const handlePhotoFileSelected = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    type: 'OVERVIEW' | 'DETAIL'
+  ) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
 
-  const handleAddStandardPhotoSet = () => {
-    const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 16);
-    const overviewPhoto: SurveyPhoto = {
-      id: 'PH-' + Math.random().toString(36).substring(2, 7).toUpperCase(),
-      url: 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=600&auto=format&fit=crop&q=60',
-      type: 'OVERVIEW',
-      caption: `[01/02] Ảnh toàn cảnh góc 45° vỏ ${formData.containerNo}`,
-      surveyor: currentUser,
-      uploadedAt: timestamp,
-      fileSizeKb: 890
-    };
+    const jobId = Number(formData.id);
+    if (!Number.isFinite(jobId) || jobId <= 0) {
+      setPhotoUploadError('Container chưa Gate-In thật (chưa có mã hồ sơ thật) nên chưa thể upload ảnh lúc này.');
+      return;
+    }
 
-    const detailPhoto: SurveyPhoto = {
-      id: 'PH-' + Math.random().toString(36).substring(2, 7).toUpperCase(),
-      url: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=600&auto=format&fit=crop&q=60',
-      type: 'DETAIL',
-      caption: `[02/02] Ảnh cận cảnh vị trí ${formData.condition === 'CL' ? 'cần vệ sinh' : 'hư hỏng/bẩn'}`,
-      surveyor: currentUser,
-      uploadedAt: timestamp,
-      fileSizeKb: 930
-    };
+    setIsUploadingPhoto(true);
+    setPhotoUploadError(null);
+    try {
+      const response = await depotFileApi.upload(file, jobId, 'DepotJob', 1);
+      const uploaded = response.data;
+      if (!uploaded) throw new Error('Upload không trả về dữ liệu file.');
 
-    setFormData((prev) => ({
-      ...prev,
-      photos: [...(prev.photos || []), overviewPhoto, detailPhoto]
-    }));
+      const newPhoto: SurveyPhoto = {
+        id: 'PH-' + Math.random().toString(36).substring(2, 7).toUpperCase(),
+        url: uploaded.url,
+        type,
+        caption:
+          type === 'OVERVIEW'
+            ? `Ảnh toàn cảnh vỏ ${formData.containerNo}`
+            : 'Ảnh chụp cận cảnh tổn thất hiện trường',
+        surveyor: currentUser,
+        uploadedAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        fileSizeKb: Math.round(file.size / 1024)
+      };
+
+      setFormData((prev) => ({
+        ...prev,
+        photos: [...(prev.photos || []), newPhoto]
+      }));
+    } catch (error: any) {
+      const detail = error?.response?.data?.data || error?.response?.data?.message;
+      setPhotoUploadError(typeof detail === 'string' && detail ? detail : (error instanceof Error ? error.message : 'Không thể upload ảnh.'));
+    } finally {
+      setIsUploadingPhoto(false);
+    }
   };
 
   const handleDeletePhoto = (photoId: string) => {
@@ -446,7 +434,7 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
       lengthMm: Number(quickLength) || 0,
       widthMm: Number(quickWidth) || 0,
       quantity: Number(quickQuantity) || 1,
-      photoUrl: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=600&auto=format&fit=crop&q=60',
+      photoUrl: '',
       createdBy: currentUser,
       createdAt: now
     };
@@ -487,9 +475,10 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
       }
       // Trước đây chỉ bắt buộc lý do vệ sinh — có thể hoàn tất/phát e-EIR với 0 dịch vụ vệ sinh nào được
       // chọn, container bị đưa vào bãi rửa mà không có hạng mục nào để tính phí.
-      if (!formData.cleaningItems || formData.cleaningItems.length === 0) {
-        errors.push('Vui lòng chọn ít nhất 01 dịch vụ vệ sinh (kèm đơn giá) khi phân loại CL.');
-      }
+    }
+    // Mọi container sau giám định đều chuyển Tổ Vệ Sinh (backend cũng chặn) — bắt buộc có dịch vụ vệ sinh.
+    if (!formData.cleaningItems || formData.cleaningItems.length === 0) {
+      errors.push('Vui lòng chọn ít nhất 01 dịch vụ vệ sinh (kèm đơn giá) ở tab Vệ Sinh — mọi container sau giám định đều chuyển Tổ Vệ Sinh.');
     }
 
     if (formData.condition === 'DM') {
@@ -524,6 +513,10 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
     try {
       await onSaveSurvey(completedRecord);
       setSaveErrorMessage(null);
+      if (onCompleted) {
+        onCompleted(completedRecord);
+        return;
+      }
       setSaveSuccessMessage('Đã hoàn tất giám định và tự động sinh số e-EIR thành công!');
       setTimeout(() => setSaveSuccessMessage(null), 4000);
     } catch (error) {
@@ -637,13 +630,20 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
             <span className="text-[10px] text-slate-500 uppercase font-semibold block">Tiêu Chuẩn Giám Định</span>
             <select
               value={formData.standard}
-              onChange={(e) => setFormData({ ...formData, standard: e.target.value as any })}
+              onChange={(e) => setFormData({ ...formData, standard: e.target.value })}
               className="mt-1 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-blue-700 font-bold text-xs focus:outline-none focus:border-blue-500 w-full"
             >
-              <option value="IICL-6">IICL-6 (Quốc Tế)</option>
-              <option value="MCIC">MCIC (Châu Á)</option>
-              <option value="MRIC">MRIC (SITC/Wan Hai)</option>
-              <option value="CARRIER_CUSTOM">CARRIER_CUSTOM</option>
+              {/* Lấy từ DM Tiêu Chuẩn Giám Định (trước gõ cứng 4 tiêu chuẩn không có trong danh mục). Giữ giá trị
+                  đang lưu nếu nó không còn trong danh mục để không tự đổi tiêu chuẩn của phiếu cũ. */}
+              <option value="">-- Chọn tiêu chuẩn --</option>
+              {formData.standard && !standards.some((st) => st.standardCode === formData.standard) && (
+                <option value={formData.standard}>{formData.standard}</option>
+              )}
+              {standards.filter((st) => st.status === 'ACTIVE').map((st) => (
+                <option key={st.id} value={st.standardCode}>
+                  {st.standardName}{!st.standardName.includes(st.standardCode) ? ` (${st.standardCode})` : ''}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -1339,36 +1339,51 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
               </p>
             </div>
 
-            {/* Quick Upload Buttons */}
+            {/* Quick Upload Buttons — chọn file thật, upload qua Depot.FileServer */}
             <div className="flex items-center gap-2 flex-wrap">
+              <input
+                type="file"
+                accept="image/*"
+                ref={overviewFileInputRef}
+                className="hidden"
+                onChange={(e) => handlePhotoFileSelected(e, 'OVERVIEW')}
+              />
+              <input
+                type="file"
+                accept="image/*"
+                ref={detailFileInputRef}
+                className="hidden"
+                onChange={(e) => handlePhotoFileSelected(e, 'DETAIL')}
+              />
+
               <button
                 type="button"
-                onClick={handleAddStandardPhotoSet}
-                className="px-3 py-1.5 bg-emerald-600/30 hover:bg-emerald-600/40 text-emerald-700 border border-emerald-500/40 font-bold text-xs rounded-xl transition flex items-center gap-1 cursor-pointer"
+                disabled={isUploadingPhoto}
+                onClick={() => overviewFileInputRef.current?.click()}
+                className="px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 disabled:opacity-50 disabled:cursor-not-allowed text-blue-700 border border-blue-500/30 font-bold text-xs rounded-xl transition flex items-center gap-1 cursor-pointer"
               >
-                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                <span>+ Bộ Ảnh Chuẩn (Toàn cảnh + Cận cảnh)</span>
+                <Camera className="w-3.5 h-3.5" />
+                <span>{isUploadingPhoto ? 'Đang tải lên...' : '+ Ảnh Toàn Cảnh'}</span>
               </button>
 
               <button
                 type="button"
-                onClick={() => handleAddPhoto('OVERVIEW')}
-                className="px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-700 border border-blue-500/30 font-bold text-xs rounded-xl transition flex items-center gap-1 cursor-pointer"
+                disabled={isUploadingPhoto}
+                onClick={() => detailFileInputRef.current?.click()}
+                className="px-3 py-1.5 bg-rose-600/20 hover:bg-rose-600/30 disabled:opacity-50 disabled:cursor-not-allowed text-rose-700 border border-rose-500/30 font-bold text-xs rounded-xl transition flex items-center gap-1 cursor-pointer"
               >
                 <Camera className="w-3.5 h-3.5" />
-                <span>+ Ảnh Toàn Cảnh</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleAddPhoto('DETAIL')}
-                className="px-3 py-1.5 bg-rose-600/20 hover:bg-rose-600/30 text-rose-700 border border-rose-500/30 font-bold text-xs rounded-xl transition flex items-center gap-1 cursor-pointer"
-              >
-                <Camera className="w-3.5 h-3.5" />
-                <span>+ Ảnh Chi Tiết Lỗi</span>
+                <span>{isUploadingPhoto ? 'Đang tải lên...' : '+ Ảnh Chi Tiết Lỗi'}</span>
               </button>
             </div>
           </div>
+
+          {photoUploadError && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-600 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>{photoUploadError}</span>
+            </div>
+          )}
 
           {/* Photo Cards Grid */}
           {(!formData.photos || formData.photos.length === 0) ? (

@@ -128,7 +128,7 @@ export const ShippingLineMaster: React.FC = () => {
       {/* Header */}
       <div className="p-6 bg-white border border-slate-200 rounded-3xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="p-3 bg-sky-500/20 border border-sky-500/30 text-sky-500 rounded-2xl">
+          <div className="p-3 bg-sky-50 border border-sky-200 text-sky-500 rounded-2xl">
             <Ship className="w-6 h-6" />
           </div>
           <div>
@@ -160,7 +160,7 @@ export const ShippingLineMaster: React.FC = () => {
       {/* Filters Bar */}
       <div className="flex items-center justify-between gap-3">
         <div className="relative flex-1 max-w-md">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             placeholder="Tìm theo Mã hãng tàu (MAEU, MSC...), Tên hãng tàu..."
@@ -208,16 +208,16 @@ export const ShippingLineMaster: React.FC = () => {
                     <td className="py-3.5 px-4 font-bold text-slate-900">{item.name}</td>
                     <td className="py-3.5 px-4 text-slate-700">
                       {item.contactEmail ? (
-                        <span className="flex items-center gap-1"><Mail className="w-3.5 h-3.5 text-slate-400" />{item.contactEmail}</span>
+                        <span className="flex items-center gap-1"><Mail className="w-3.5 h-3.5 text-slate-500" />{item.contactEmail}</span>
                       ) : (
-                        <span className="text-slate-400">—</span>
+                        <span className="text-slate-500">—</span>
                       )}
                     </td>
                     <td className="py-3.5 px-4 text-slate-700">
                       {item.phone ? (
-                        <span className="flex items-center gap-1"><Phone className="w-3.5 h-3.5 text-slate-400" />{item.phone}</span>
+                        <span className="flex items-center gap-1"><Phone className="w-3.5 h-3.5 text-slate-500" />{item.phone}</span>
                       ) : (
-                        <span className="text-slate-400">—</span>
+                        <span className="text-slate-500">—</span>
                       )}
                     </td>
                     <td className="py-3.5 px-4 text-right">
@@ -248,7 +248,7 @@ export const ShippingLineMaster: React.FC = () => {
 
       {/* Modal Add / Edit */}
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-white backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-lg w-full space-y-4 shadow-2xl animate-scale-up">
             <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -282,7 +282,7 @@ export const ShippingLineMaster: React.FC = () => {
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sky-700 font-mono font-bold focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
                 />
                 {editingItem && (
-                  <p className="text-[10px] text-slate-400 mt-1">Mã hãng tàu là khóa nghiệp vụ, không thể sửa sau khi tạo.</p>
+                  <p className="text-[10px] text-slate-500 mt-1">Mã hãng tàu là khóa nghiệp vụ, không thể sửa sau khi tạo.</p>
                 )}
               </div>
 

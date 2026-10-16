@@ -12,8 +12,6 @@ namespace Depot.Data.Entities.Depot
         public long DepotJobId { get; set; }
         /// <summary>Mã job nghiệp vụ mà log này thuộc về.</summary>
         public string JobNo { get; set; } = string.Empty;
-        /// <summary>Thực thể DepotJob gốc.</summary>
-        public virtual DepotJob? DepotJob { get; set; }
 
         /// <summary>Tên hành động đã thực hiện.</summary>
         public string Action { get; set; } = string.Empty;

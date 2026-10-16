@@ -160,17 +160,17 @@ export const ZaloOverviewPage: React.FC<ZaloOverviewPageProps> = ({
               </div>
               <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between">
                 <span className="text-slate-500">Official Account ID:</span>
-                <strong className="text-sky-600 font-mono">{settings?.oaId || '182736455241'}</strong>
+                <strong className="text-sky-600 font-mono">{settings?.oaId || '—'}</strong>
               </div>
               <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between">
                 <span className="text-slate-500">Zalo App ID:</span>
-                <strong className="text-slate-700 font-mono">{settings?.appId || '391029384756182'}</strong>
+                <strong className="text-slate-700 font-mono">{settings?.appId || '—'}</strong>
               </div>
               <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between">
                 <span className="text-slate-500">Access Token:</span>
                 <span className="text-emerald-600 font-mono text-[11px] flex items-center gap-1">
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Còn hiệu lực (Hết hạn: {settings?.tokenExpiresAt || '17/09/2026'})</span>
+                  <span>Còn hiệu lực (Hết hạn: {settings?.tokenExpiresAt || '—'})</span>
                 </span>
               </div>
             </div>
@@ -257,17 +257,17 @@ export const ZaloOverviewPage: React.FC<ZaloOverviewPageProps> = ({
           <div className="p-5 bg-white border border-slate-200 rounded-3xl space-y-4 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-emerald-400" />
+                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-emerald-600" />
                   <span>Tin Nhắn Zalo Gần Nhất (Live Stream)</span>
                 </h3>
-                <p className="text-[11px] text-slate-400 mt-0.5">
+                <p className="text-[11px] text-slate-500 mt-0.5">
                   Tự động phát qua Zalo OA khi có sự kiện Gate-In, Báo giá, QC hoặc Phê duyệt
                 </p>
               </div>
               <button
                 onClick={() => onNavigateSubTab('zalo_logs')}
-                className="text-xs text-sky-400 hover:text-sky-300 font-bold flex items-center gap-1 transition"
+                className="text-xs text-sky-600 hover:text-sky-700 font-bold flex items-center gap-1 transition"
               >
                 <span>Xem Tất Cả</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -278,21 +278,21 @@ export const ZaloOverviewPage: React.FC<ZaloOverviewPageProps> = ({
               {recentLogs.map((item) => (
                 <div
                   key={item.id}
-                  className="p-3.5 bg-slate-900/90 border border-slate-800 hover:border-slate-700 rounded-2xl flex items-start justify-between gap-3 transition"
+                  className="p-3.5 bg-white border border-slate-200 hover:border-slate-200 rounded-2xl flex items-start justify-between gap-3 transition"
                 >
                   <div className="flex items-start gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-blue-600/20 border border-blue-500/30 text-sky-400 flex items-center justify-center shrink-0 mt-0.5">
+                    <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-200 text-sky-600 flex items-center justify-center shrink-0 mt-0.5">
                       <MessageCircle className="w-4 h-4" />
                     </div>
                     <div>
-                      <div className="text-xs font-bold text-white flex items-center gap-2">
+                      <div className="text-xs font-bold text-slate-900 flex items-center gap-2">
                         <span>{item.title}</span>
                       </div>
-                      <p className="text-[11px] text-slate-400 mt-0.5 line-clamp-1">
+                      <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
                         {item.content}
                       </p>
                       <div className="flex items-center gap-2 mt-1.5 text-[10px] text-slate-500 font-mono">
-                        <span>Đến: <strong className="text-slate-300">{item.recipientName}</strong> ({item.recipientPhone})</span>
+                        <span>Đến: <strong className="text-slate-700">{item.recipientName}</strong> ({item.recipientPhone})</span>
                         <span>•</span>
                         <span>{item.createdAt?.split(' ')?.[1] || item.createdAt}</span>
                       </div>
@@ -300,7 +300,7 @@ export const ZaloOverviewPage: React.FC<ZaloOverviewPageProps> = ({
                   </div>
 
                   <div className="text-right shrink-0">
-                    <span className="inline-flex items-center gap-1 font-bold rounded-full border px-2 py-0.5 text-[10px] bg-emerald-950/70 border-emerald-500/40 text-emerald-400">
+                    <span className="inline-flex items-center gap-1 font-bold rounded-full border px-2 py-0.5 text-[10px] bg-emerald-50 border-emerald-200 text-emerald-600">
                       <CheckCircle2 className="w-2.5 h-2.5" /> SENT
                     </span>
                     <span className="block text-[10px] text-slate-500 font-mono mt-1">

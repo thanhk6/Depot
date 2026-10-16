@@ -1,10 +1,14 @@
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Depot.Application.Services;
+using Depot.BackendApi.Security;
 using Depot.ViewModels;
 
 namespace Depot.BackendApi.Controllers
 {
+    // Quản lý người dùng, vai trò, chính sách bảo mật và nhật ký hệ thống — chỉ ADMIN.
+    [Authorize(Roles = "ADMIN")]
     [ApiController]
     [Route("api/system")]
     public class SystemController : BaseController
@@ -12,71 +16,148 @@ namespace Depot.BackendApi.Controllers
         private readonly IUserService _service;
         public SystemController(IUserService service) => _service = service;
 
+        // BUG-010: trước đây audit chỉ được ghi khi frontend tự gọi POST audit-logs, nên tạo/xoá/đặt lại mật khẩu
+        // qua API không để lại dấu vết nào. Ghi ngay tại server sau mỗi thao tác quản trị thành công.
+        private Task AuditAsync(string action, string label, string target, string details) =>
+            _service.CreateAuditLogAsync(new CreateSystemAuditLogRequest
+            {
+                Action = action,
+                ActionLabel = label,
+                TargetResource = target,
+                Details = details,
+                PerformedByName = User.GetFullName() ?? User.GetUsername() ?? string.Empty,
+                PerformedByRole = User.FindFirst(CurrentUser.RoleClaim)?.Value,
+                IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+                DeviceInfo = Request.Headers.UserAgent.ToString(),
+                Status = "SUCCESS"
+            });
+
         [HttpGet("users")]
-        public async Task<IActionResult> GetUsers() => Ok(new ResponseSingleContentModel<dynamic> { StatusCode = 200, Message = "Lấy danh sách người dùng thành công", Data = await _service.GetUsersAsync() });
+        public async Task<IActionResult> GetUsers()
+        {
+            try { return Ok(new ResponseSingleContentModel<dynamic> { StatusCode = 200, Message = "Lấy danh sách người dùng thành công", Data = await _service.GetUsersAsync() }); }
+            catch (Exception ex) { return StatusCode(500, new ResponseSingleContentModel<string> { StatusCode = 500, Message = "Lỗi khi lấy danh sách người dùng", Data = ex.Message }); }
+        }
 
         [HttpPost("users")]
         public async Task<IActionResult> CreateUser([FromBody] CreateSystemUserRequest request)
         {
-            var user = await _service.CreateUserAsync(request);
-            return user == null
-                ? BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = "Không thể tạo người dùng", Data = "Username hoặc RoleCode không hợp lệ" })
-                : Ok(new ResponseSingleContentModel<UserDto> { StatusCode = 200, Message = "Tạo người dùng thành công", Data = user });
+            try
+            {
+                var user = await _service.CreateUserAsync(request);
+                if (user == null)
+                    return BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = "Không thể tạo người dùng", Data = "Username đã tồn tại hoặc RoleCode không hợp lệ" });
+                await AuditAsync("USER_CREATED", "Tạo người dùng", $"users/{user.Id}", $"Tạo tài khoản {user.Username} (vai trò {user.RoleName}).");
+                return Ok(new ResponseSingleContentModel<UserDto> { StatusCode = 200, Message = "Tạo người dùng thành công", Data = user });
+            }
+            catch (Exception ex) { return BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = ex.Message, Data = "Không thể tạo người dùng" }); }
         }
 
         [HttpPut("users/{id:long}")]
         public async Task<IActionResult> UpdateUser(long id, [FromBody] UpdateSystemUserRequest request)
         {
-            var user = await _service.UpdateUserAsync(id, request);
-            return user == null
-                ? NotFound(new ResponseSingleContentModel<string> { StatusCode = 404, Message = "Không tìm thấy người dùng", Data = id.ToString() })
-                : Ok(new ResponseSingleContentModel<UserDto> { StatusCode = 200, Message = "Cập nhật người dùng thành công", Data = user });
+            try
+            {
+                var user = await _service.UpdateUserAsync(id, request);
+                if (user == null)
+                    return NotFound(new ResponseSingleContentModel<string> { StatusCode = 404, Message = "Không tìm thấy người dùng", Data = id.ToString() });
+                await AuditAsync("USER_UPDATED", "Cập nhật người dùng", $"users/{id}", $"Cập nhật tài khoản {user.Username} (vai trò {user.RoleName}, {(user.IsActive ? "hoạt động" : "khoá")}).");
+                return Ok(new ResponseSingleContentModel<UserDto> { StatusCode = 200, Message = "Cập nhật người dùng thành công", Data = user });
+            }
+            catch (Exception ex) { return BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = ex.Message, Data = "Không thể cập nhật người dùng" }); }
         }
 
         [HttpDelete("users/{id:long}")]
         public async Task<IActionResult> DeleteUser(long id)
         {
-            var ok = await _service.DeleteUserAsync(id);
-            return ok
-                ? Ok(new ResponseSingleContentModel<string> { StatusCode = 200, Message = "Xóa người dùng thành công", Data = id.ToString() })
-                : NotFound(new ResponseSingleContentModel<string> { StatusCode = 404, Message = "Không tìm thấy người dùng", Data = id.ToString() });
+            try
+            {
+                // Admin tự xoá chính mình thì mất quyền quản trị ngay (có thể không còn admin nào khác).
+                if (User.GetUserId() == id)
+                    return BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = "Không thể xóa người dùng", Data = "Không được tự xoá tài khoản đang đăng nhập" });
+                var ok = await _service.DeleteUserAsync(id);
+                if (!ok)
+                    return NotFound(new ResponseSingleContentModel<string> { StatusCode = 404, Message = "Không tìm thấy người dùng", Data = id.ToString() });
+                await AuditAsync("USER_DELETED", "Xóa người dùng", $"users/{id}", $"Xoá tài khoản id {id}.");
+                return Ok(new ResponseSingleContentModel<string> { StatusCode = 200, Message = "Xóa người dùng thành công", Data = id.ToString() });
+            }
+            catch (Exception ex) { return BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = ex.Message, Data = "Không thể xóa người dùng" }); }
         }
 
         [HttpPost("users/{id:long}/reset-password")]
         public async Task<IActionResult> ResetPassword(long id, [FromBody] ResetPasswordRequest request)
         {
-            var ok = await _service.ResetPasswordAsync(id, request);
-            return ok
-                ? Ok(new ResponseSingleContentModel<string> { StatusCode = 200, Message = "Đặt lại mật khẩu thành công", Data = id.ToString() })
-                : BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = "Không thể đặt lại mật khẩu", Data = "Không tìm thấy người dùng hoặc mật khẩu mới không hợp lệ" });
+            try
+            {
+                var policyError = PasswordPolicyValidator.Validate(request.NewPassword, await _service.GetSecurityPolicyAsync());
+                if (policyError != null)
+                    return BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = "Mật khẩu không đạt chính sách bảo mật", Data = policyError });
+
+                var ok = await _service.ResetPasswordAsync(id, request);
+                if (ok) await AuditAsync("PASSWORD_RESET", "Đặt lại mật khẩu", $"users/{id}", $"Đặt lại mật khẩu tài khoản id {id}.");
+                return ok
+                    ? Ok(new ResponseSingleContentModel<string> { StatusCode = 200, Message = "Đặt lại mật khẩu thành công", Data = id.ToString() })
+                    : BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = "Không thể đặt lại mật khẩu", Data = "Không tìm thấy người dùng hoặc mật khẩu mới không hợp lệ" });
+            }
+            catch (Exception ex) { return BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = ex.Message, Data = "Không thể đặt lại mật khẩu" }); }
         }
 
         [HttpGet("roles")]
-        public async Task<IActionResult> GetRoles() => Ok(new ResponseSingleContentModel<dynamic> { StatusCode = 200, Message = "Lấy danh sách role thành công", Data = await _service.GetRolesAsync() });
+        public async Task<IActionResult> GetRoles()
+        {
+            try { return Ok(new ResponseSingleContentModel<dynamic> { StatusCode = 200, Message = "Lấy danh sách role thành công", Data = await _service.GetRolesAsync() }); }
+            catch (Exception ex) { return StatusCode(500, new ResponseSingleContentModel<string> { StatusCode = 500, Message = "Lỗi khi lấy danh sách role", Data = ex.Message }); }
+        }
 
         [HttpPut("roles/{roleCode}/permissions")]
         public async Task<IActionResult> UpdateRolePermissions(string roleCode, [FromBody] UpdateRolePermissionsRequest request)
         {
-            var ok = await _service.UpdateRolePermissionsAsync(roleCode, request);
-            return ok
-                ? Ok(new ResponseSingleContentModel<string> { StatusCode = 200, Message = "Cập nhật quyền cho vai trò thành công", Data = roleCode })
-                : NotFound(new ResponseSingleContentModel<string> { StatusCode = 404, Message = "Không tìm thấy vai trò", Data = roleCode });
+            try
+            {
+                var ok = await _service.UpdateRolePermissionsAsync(roleCode, request);
+                if (ok) await AuditAsync("ROLE_PERMISSIONS_UPDATED", "Cập nhật quyền vai trò", $"roles/{roleCode}", $"Quyền mới: {string.Join(", ", request.Permissions ?? new())}.");
+                return ok
+                    ? Ok(new ResponseSingleContentModel<string> { StatusCode = 200, Message = "Cập nhật quyền cho vai trò thành công", Data = roleCode })
+                    : NotFound(new ResponseSingleContentModel<string> { StatusCode = 404, Message = "Không tìm thấy vai trò", Data = roleCode });
+            }
+            catch (Exception ex) { return BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = ex.Message, Data = "Không thể cập nhật quyền" }); }
         }
 
         [HttpGet("security-policy")]
-        public async Task<IActionResult> GetSecurityPolicy() => Ok(new ResponseSingleContentModel<object> { StatusCode = 200, Message = "Lấy chính sách bảo mật thành công", Data = await _service.GetSecurityPolicyAsync() });
+        public async Task<IActionResult> GetSecurityPolicy()
+        {
+            try { return Ok(new ResponseSingleContentModel<object> { StatusCode = 200, Message = "Lấy chính sách bảo mật thành công", Data = await _service.GetSecurityPolicyAsync() }); }
+            catch (Exception ex) { return StatusCode(500, new ResponseSingleContentModel<string> { StatusCode = 500, Message = "Lỗi khi lấy chính sách bảo mật", Data = ex.Message }); }
+        }
 
         [HttpPut("security-policy")]
         public async Task<IActionResult> SaveSecurityPolicy([FromBody] SaveSecurityPolicyRequest request)
-            => Ok(new ResponseSingleContentModel<object> { StatusCode = 200, Message = "Lưu chính sách bảo mật thành công", Data = await _service.SaveSecurityPolicyAsync(request) });
+        {
+            try
+            {
+                var policy = await _service.SaveSecurityPolicyAsync(request);
+                await AuditAsync("SECURITY_POLICY_UPDATED", "Cập nhật chính sách bảo mật", "security-policy", $"Mật khẩu tối thiểu {request.PasswordMinLength} ký tự, khoá sau {request.MaxFailedAttempts} lần sai.");
+                return Ok(new ResponseSingleContentModel<object> { StatusCode = 200, Message = "Lưu chính sách bảo mật thành công", Data = policy });
+            }
+            catch (Exception ex) { return BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = ex.Message, Data = "Không thể lưu chính sách bảo mật" }); }
+        }
 
         [HttpGet("audit-logs")]
         public async Task<IActionResult> GetAuditLogs([FromQuery] int take = 200)
-            => Ok(new ResponseSingleContentModel<object> { StatusCode = 200, Message = "Lấy nhật ký hoạt động thành công", Data = await _service.GetAuditLogsAsync(take) });
+        {
+            try { return Ok(new ResponseSingleContentModel<object> { StatusCode = 200, Message = "Lấy nhật ký hoạt động thành công", Data = await _service.GetAuditLogsAsync(take) }); }
+            catch (Exception ex) { return StatusCode(500, new ResponseSingleContentModel<string> { StatusCode = 500, Message = "Lỗi khi lấy nhật ký hoạt động", Data = ex.Message }); }
+        }
 
         [HttpPost("audit-logs")]
         public async Task<IActionResult> CreateAuditLog([FromBody] CreateSystemAuditLogRequest request)
-            => Ok(new ResponseSingleContentModel<object> { StatusCode = 200, Message = "Ghi nhật ký hoạt động thành công", Data = await _service.CreateAuditLogAsync(request) });
+        {
+            // Người thực hiện lấy từ token, không tin tên client gửi — nhật ký audit mà tự khai được người
+            // thực hiện thì không còn giá trị truy vết.
+            request.PerformedByName = User.GetFullName() ?? User.GetUsername() ?? request.PerformedByName;
+            try { return Ok(new ResponseSingleContentModel<object> { StatusCode = 200, Message = "Ghi nhật ký hoạt động thành công", Data = await _service.CreateAuditLogAsync(request) }); }
+            catch (Exception ex) { return BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = ex.Message, Data = "Không thể ghi nhật ký hoạt động" }); }
+        }
 
         [HttpGet("permissions")]
         public IActionResult GetPermissions()

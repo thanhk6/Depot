@@ -29,12 +29,14 @@ import { CreateMaterialModal } from '../components/modals/CreateMaterialModal';
 import { CreateReceiptModal } from '../components/modals/CreateReceiptModal';
 import { CreateIssueModal } from '../components/modals/CreateIssueModal';
 import { MaterialStockCardModal } from '../components/modals/MaterialStockCardModal';
+import { getApiErrorMessage } from '../../../utils/apiError';
+import { LoadErrorBanner } from '../../../components/common/LoadErrorBanner';
 
 export const WarehousePage: React.FC = () => {
   // Default to stock balance (Nhập - Xuất - Tồn)
   const [activeSubTab, setActiveSubTab] = useState<string>('stock_balance');
 
-  // State loaded from warehouseService
+  // State loaded from backend (warehouseApi)
   const [materials, setMaterials] = useState<Material[]>([]);
   const [stockBalances, setStockBalances] = useState<StockBalance[]>([]);
   const [transactions, setTransactions] = useState<StockTransaction[]>([]);
@@ -159,34 +161,38 @@ export const WarehousePage: React.FC = () => {
     }))
   });
 
+  // BUG-016: trước đây lỗi tải (mất mạng, 403...) chỉ ghi console, màn hiện như kho rỗng.
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const reloadWarehouseData = () => {
+    setLoadError(null);
     masterDataApi.getMaterials().then((response: any) => {
       if (response?.statusCode === 200) setMaterials((response.data || []).map(mapMaterialDto));
-    }).catch((error) => console.error('Không thể tải vật tư kho:', error));
+    }).catch((error) => setLoadError((prev) => prev ?? getApiErrorMessage(error, 'Không thể tải vật tư kho.')));
 
     warehouseApi.getTransactions().then((response: any) => {
       if (response?.statusCode === 200) setTransactions((response.data || []).map(mapTransactionDto));
-    }).catch((error) => console.error('Không thể tải giao dịch kho:', error));
+    }).catch((error) => setLoadError((prev) => prev ?? getApiErrorMessage(error, 'Không thể tải giao dịch kho.')));
 
     warehouseApi.getStockBalances().then((response: any) => {
       if (response?.statusCode === 200) setStockBalances((response.data || []).map(mapStockBalanceDto));
-    }).catch((error) => console.error('Không thể tải tồn kho:', error));
+    }).catch((error) => setLoadError((prev) => prev ?? getApiErrorMessage(error, 'Không thể tải tồn kho.')));
 
     warehouseApi.getMaterialGroups().then((response: any) => {
       if (response?.statusCode === 200) setMaterialGroups((response.data || []).map(mapMaterialGroupDto));
-    }).catch((error) => console.error('Không thể tải nhóm vật tư:', error));
+    }).catch((error) => setLoadError((prev) => prev ?? getApiErrorMessage(error, 'Không thể tải nhóm vật tư.')));
 
     warehouseApi.getSuppliers().then((response: any) => {
       if (response?.statusCode === 200) setSuppliers((response.data || []).map(mapSupplierDto));
-    }).catch((error) => console.error('Không thể tải nhà cung cấp:', error));
+    }).catch((error) => setLoadError((prev) => prev ?? getApiErrorMessage(error, 'Không thể tải nhà cung cấp.')));
 
     warehouseApi.getReceipts().then((response: any) => {
       if (response?.statusCode === 200) setReceipts((response.data || []).map(mapDocumentDto));
-    }).catch((error) => console.error('Không thể tải phiếu nhập kho:', error));
+    }).catch((error) => setLoadError((prev) => prev ?? getApiErrorMessage(error, 'Không thể tải phiếu nhập kho.')));
 
     warehouseApi.getIssues().then((response: any) => {
       if (response?.statusCode === 200) setIssues((response.data || []).map(mapDocumentDto));
-    }).catch((error) => console.error('Không thể tải phiếu xuất kho:', error));
+    }).catch((error) => setLoadError((prev) => prev ?? getApiErrorMessage(error, 'Không thể tải phiếu xuất kho.')));
   };
 
   useEffect(() => {
@@ -207,7 +213,7 @@ export const WarehousePage: React.FC = () => {
   // HANDLERS
   // 1. Save Material — tạo mới hoặc cập nhật tuỳ có editMaterial.id hay không (trước đây luôn gọi
   // createMaterial kể cả lúc sửa, và chỉ gửi 5/17 field).
-  const handleSaveMaterial = (matData: Partial<Material>) => {
+  const handleSaveMaterial = async (matData: Partial<Material>): Promise<{ success: boolean; error?: string }> => {
     const payload = {
       code: matData.materialCode,
       name: matData.materialName,
@@ -227,40 +233,67 @@ export const WarehousePage: React.FC = () => {
       lastPurchaseCost: matData.lastPurchaseCost || matData.averageCost || 0,
       isActive: matData.isActive !== false
     };
-    const request = matData.id
-      ? masterDataApi.updateMaterial(matData.id, payload)
-      : masterDataApi.createMaterial(payload);
-    void request.then((response: any) => {
-      if (response?.statusCode === 200) reloadWarehouseData();
-    }).catch((error) => console.error('Không thể lưu vật tư:', error));
+    // Trước đây gọi API kiểu fire-and-forget (void request.then/catch) — lỗi trùng mã vật tư/validate
+    // chỉ log console.error, modal đã đóng ngay nên người dùng không hề biết vật tư KHÔNG được lưu.
+    // Đợi kết quả thật, trả {success,error} để CreateMaterialModal quyết định đóng hay báo lỗi.
+    try {
+      const response: any = matData.id
+        ? await masterDataApi.updateMaterial(matData.id, payload)
+        : await masterDataApi.createMaterial(payload);
+      if (response?.statusCode !== 200) {
+        return { success: false, error: response?.message || 'Backend từ chối lưu vật tư.' };
+      }
+      await reloadWarehouseData();
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error?.message || 'Lỗi kết nối khi lưu vật tư.' };
+    }
   };
 
   // 2. Receipt (Nhập kho -> Tự động cộng tồn kho)
-  const handleConfirmReceipt = (
+  // Trước đây hàm này không async, gọi API kiểu bắn-rồi-quên và modal đóng ngay không chờ kết quả —
+  // nếu backend từ chối (vật tư không tồn tại, dữ liệu sai...), phiếu vẫn "coi như đã nhập kho" trên UI
+  // trong khi tồn kho thật không hề đổi. Giờ trả về Promise kết quả thật để modal chờ và hiển thị lỗi.
+  const handleConfirmReceipt = async (
     supplierId: number,
     receiptDate: string,
     note: string,
     items: { materialId: number; quantity: number; unitCost: number; note?: string }[]
-  ) => {
+  ): Promise<{ success: boolean; error?: string }> => {
     const supplier = suppliers.find((s) => s.id === supplierId);
-    void Promise.all(items.map((item) => {
-      const material = materials.find((candidate) => candidate.id === item.materialId);
-      return warehouseApi.recordTransaction({
-        materialCode: material?.materialCode,
-        transactionType: 'RECEIPT',
-        quantity: item.quantity,
-        unitCost: item.unitCost,
-        referenceType: 'RECEIPT',
-        referenceId: `RECEIPT-${receiptDate}-${supplierId}`,
-        supplierCode: supplier?.supplierCode,
-        performedBy: 'Warehouse User',
-        note
-      });
-    })).then(() => reloadWarehouseData()).catch((error) => console.error('Không thể ghi nhận nhập kho:', error));
+    try {
+      const responses: any[] = await Promise.all(items.map((item) => {
+        const material = materials.find((candidate) => candidate.id === item.materialId);
+        return warehouseApi.recordTransaction({
+          materialCode: material?.materialCode,
+          transactionType: 'RECEIPT',
+          quantity: item.quantity,
+          unitCost: item.unitCost,
+          referenceType: 'RECEIPT',
+          referenceId: `RECEIPT-${receiptDate}-${supplierId}`,
+          supplierCode: supplier?.supplierCode,
+          performedBy: 'Warehouse User',
+          note
+        });
+      }));
+      const failed = responses.find((r) => r?.statusCode !== 200);
+      if (failed) {
+        return { success: false, error: failed?.message || failed?.data || 'Backend từ chối phiếu nhập kho.' };
+      }
+      reloadWarehouseData();
+      return { success: true };
+    } catch (error: any) {
+      const detail = error?.response?.data?.message || error?.response?.data?.data || (error instanceof Error ? error.message : null);
+      return { success: false, error: detail || 'Không thể ghi nhận nhập kho — lỗi kết nối backend.' };
+    }
   };
 
   // 3. Issue (Xuất kho -> Tự động trừ tồn kho)
-  const handleConfirmIssue = (
+  // Trước đây trả `{ success: true }` NGAY LẬP TỨC, trước khi Promise.all gọi API thật chạy xong — modal
+  // luôn đóng và luôn báo thành công dù backend từ chối (hết tồn kho, vật tư không tồn tại), khiến tồn
+  // kho hiển thị sai lệch với thực tế cho tới khi F5. Giờ trả về Promise, chỉ báo thành công sau khi toàn
+  // bộ giao dịch đã ghi nhận thật ở backend.
+  const handleConfirmIssue = async (
     workOrderId: string,
     workOrderNo: string,
     containerId: string,
@@ -269,12 +302,22 @@ export const WarehousePage: React.FC = () => {
     recipientName: string,
     note: string,
     items: { materialId: number; quantity: number; note?: string }[]
-  ) => {
-    void Promise.all(items.map((item) => {
-      const material = materials.find((candidate) => candidate.id === item.materialId);
-      return warehouseApi.recordTransaction({ materialCode: material?.materialCode, transactionType: 'ISSUE', quantity: item.quantity, unitCost: material?.averageCost || 0, referenceType: 'WORK_ORDER', referenceId: workOrderNo, workOrderNo, containerNo, performedBy: recipientName, note });
-    })).then(() => reloadWarehouseData()).catch((error) => console.error('Không thể ghi nhận xuất kho:', error));
-    return { success: true, message: 'Đã gửi yêu cầu xuất kho lên backend.' };
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const responses: any[] = await Promise.all(items.map((item) => {
+        const material = materials.find((candidate) => candidate.id === item.materialId);
+        return warehouseApi.recordTransaction({ materialCode: material?.materialCode, transactionType: 'ISSUE', quantity: item.quantity, unitCost: material?.averageCost || 0, referenceType: 'WORK_ORDER', referenceId: workOrderNo, workOrderNo, containerNo, performedBy: recipientName, note });
+      }));
+      const failed = responses.find((r) => r?.statusCode !== 200);
+      if (failed) {
+        return { success: false, error: failed?.message || failed?.data || 'Backend từ chối phiếu xuất kho (có thể do không đủ tồn kho).' };
+      }
+      reloadWarehouseData();
+      return { success: true };
+    } catch (error: any) {
+      const detail = error?.response?.data?.message || error?.response?.data?.data || (error instanceof Error ? error.message : null);
+      return { success: false, error: detail || 'Không thể ghi nhận xuất kho — lỗi kết nối backend.' };
+    }
   };
 
   // Stock Card Open
@@ -294,6 +337,7 @@ export const WarehousePage: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-12">
+      {loadError && <LoadErrorBanner message={loadError} onRetry={reloadWarehouseData} />}
       {/* Header & Sub-tab navigation */}
       <WarehouseHeader
         activeSubTab={activeSubTab}

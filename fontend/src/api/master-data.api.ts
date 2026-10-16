@@ -45,8 +45,12 @@ export const masterDataApi = {
     const response = await apiClient.put<ApiResponse<unknown>>(`/MasterData/materials/${id}`, request);
     return response.data;
   },
-  getCatalog: async (catalogType: string) => {
-    const response = await apiClient.get<ApiResponse<unknown[]>>(`${API_ENDPOINTS.MASTER_DATA.CATALOG}/${encodeURIComponent(catalogType)}`);
+  // `includeInactive: true` chỉ dành cho màn quản trị Master Data (cần thấy cả dòng "Tạm ngưng" để bật
+  // lại); các màn nghiệp vụ gọi mặc định để chỉ nhận dòng đang áp dụng.
+  getCatalog: async (catalogType: string, options?: { includeInactive?: boolean }) => {
+    const response = await apiClient.get<ApiResponse<unknown[]>>(`${API_ENDPOINTS.MASTER_DATA.CATALOG}/${encodeURIComponent(catalogType)}`, {
+      params: options?.includeInactive ? { includeInactive: true } : undefined
+    });
     return response.data;
   },
   createCatalog: async (request: unknown) => {
@@ -63,8 +67,11 @@ export const masterDataApi = {
   },
   // Cước Nâng Hạ (LoLo) — bảng riêng ServiceTariff, tách khỏi catalog "SERVICE_TARIFF" dùng chung cũ.
   // Xem docs/frontend-tariff-catalog-split.md.
-  getServiceTariffs: async () => {
-    const response = await apiClient.get<ApiResponse<unknown[]>>(API_ENDPOINTS.MASTER_DATA.SERVICE_TARIFFS);
+  // `includeInactive` chỉ cho màn quản trị Cước Nâng Hạ (cần thấy cả hạng mục "Tạm Ngưng").
+  getServiceTariffs: async (options?: { includeInactive?: boolean }) => {
+    const response = await apiClient.get<ApiResponse<unknown[]>>(API_ENDPOINTS.MASTER_DATA.SERVICE_TARIFFS, {
+      params: options?.includeInactive ? { includeInactive: true } : undefined
+    });
     return response.data;
   },
   createServiceTariff: async (request: unknown) => {

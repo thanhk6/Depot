@@ -88,3 +88,51 @@ không đổi gì (đã đúng từ trước) — chỉ sửa điều kiện ph�
       tariff) trong module này dùng mock data cục bộ — đã có backend thật ở nhóm MASTER DATA
       (`docs/backend-progress/23-master-data.md`), nhưng nối dây riêng cho các sub-tab NÀY (trong module
       Survey) vẫn chưa làm — để lại quyết định cho lượt sau nếu người dùng muốn.
+
+## Bug thật thứ 3 — form "Thêm Mới Phiếu Giám Định Container" mất ~20 field khi lưu (phát hiện 2026-09-06)
+
+Rà lại `CreateSurveyModal.tsx` (form "Thêm Mới Phiếu Giám Định Container") theo yêu cầu người dùng: form
+thu thập đầy đủ qua 4 tab (Container/Vận Hành/Phân Hạng/Hư Hỏng) nhưng chỉ có 2 nhóm dữ liệu thật sự đi
+tới backend (`containerApi.createGateIn` cho tab Vận Hành cơ bản, `surveyApi.submitSurvey` cho
+`ConditionRating/Notes/Damages/Cleaning*`) — toàn bộ phần còn lại (~20 field) chỉ tồn tại trong
+`newRecord` cục bộ rồi bị bỏ qua hoàn toàn khi build 2 payload trên, mất trắng ngay sau khi nộp phiếu,
+không lỗi không cảnh báo — cùng dạng lỗi im lặng với bug thứ 2 ở trên nhưng phạm vi lớn hơn nhiều.
+
+Người dùng chọn phương án sửa triệt để: thêm cột DB cho toàn bộ field, không bỏ field nào.
+
+**Backend:**
+- `DepotJob`: thêm `GateInDriverLicense`, `GateInCustomsSealNo` (Gate-In cũng thu thập nhưng thiếu cột).
+- `Survey`: thêm 21 cột — `SurveyNo` (backend tự sinh `SRV-{yyyyMMdd}-{6 số ngẫu nhiên}`, không nhận số
+  phiếu client tự sinh), `Owner`, `ContainerTypeName`, `ManufactureMonthYear`, `MaxGrossWeightKg`,
+  `Material`, `FloorType`, `CscPlateNo`, `Standard`, `StandardNotes`, `QualityGrade`, `ActionRequired`,
+  `Shift`, `YardLocationNote`, `CargoStatus`, và 7 field riêng cho Reefer (`ReeferBrand`, `ReeferModel`,
+  `ReeferSetTemperatureC`, `PtiStatus`, `CompressorHours`, `HumidityPercent`, `VentilationCmh`).
+- `CreateDepotJobRequest`/`DepotJobDto`: thêm `DriverLicense`/`CustomsSealNo` (request) và
+  `GateInDriverLicense`/`GateInCustomsSealNo` (dto).
+- `SurveyRecordViewModel`/`SurveyDto`: thêm đủ 20-21 field tương ứng.
+- `DepotJobService`: `CreateGateInJobAsync` gán 2 field Gate-In mới (null-safe trim giống `GateInSealNo`);
+  `SubmitSurveyAsync` gán 20 field Survey mới + tự sinh `SurveyNo` (chỉ khi tạo mới, không sinh lại khi
+  sửa/lưu nháp); mapping `DepotJobDto`/`SurveyDto` đọc lại đủ field cho response GET.
+- Migration `AddSurveyDetailFieldsAndGateInIdentityFields`: đã tạo và áp dụng vào Postgres thật
+  (`dotnet ef database update`).
+
+**Frontend:**
+- `types/container.ts` (`SurveyRecord`): thêm 20 field optional khớp `SurveyRecordViewModel`.
+- `api/container.api.ts` (`CreateGateInRequest`): thêm `driverLicense?`/`customsSealNo?`.
+- `SurveyModulePage.tsx`:
+  - `handleCreateNewSurvey` → `createGateIn`: gửi thêm `driverLicense`/`customsSealNo`.
+  - `handleSaveSurvey` → `submitSurvey`: gửi thêm 20 field còn lại.
+  - `mapJobToSurvey`: đọc lại toàn bộ field mới từ response GET (Gate-In: `truckPlate`, `trailerPlate`,
+    `driverName`, `driverPhone`, `sealNo`, `driverLicense`, `customsSealNo`; Survey: 15 field vật lý/vận
+    hành/reefer); đồng thời sửa 4 chỗ trước đây đoán/hardcode do chưa có cột lưu thật —
+    `surveyNo` giờ đọc `survey.surveyNo` thật (trước đây tạm dùng `survey.id`, không phải số phiếu
+    nghiệp vụ), `type`/`owner`/`standard`/`qualityGrade` ưu tiên giá trị đã lưu, fallback y hệt logic cũ
+    nếu record cũ (tạo trước migration) chưa có dữ liệu.
+
+**Đã verify thật:** `dotnet build` (0 Error) → tạo migration → `dotnet ef database update` (áp dụng
+Postgres thật) → `npx tsc --noEmit` (0 lỗi) → dựng lại `Depot.BackendApi` → gọi trực tiếp
+`POST /DepotJobs/gate-in` (kèm `driverLicense`/`customsSealNo`) rồi `POST /DepotJobs/{id}/survey` (kèm đủ
+20 field, có cả nhóm Reefer) → `GET /DepotJobs/{id}` xác nhận toàn bộ field trả về đúng giá trị đã gửi,
+`surveyNo` tự sinh dạng `SRV-20260907-211231` → dọn dữ liệu test (Gate-Out + xoá mềm job test).
+
+## Trạng thái: ✅ Xong (đã sửa thêm bug mất ~20 field của form Thêm Mới Phiếu Giám Định Container)

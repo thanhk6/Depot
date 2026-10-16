@@ -1,6 +1,4 @@
-using System.Collections.Generic;
 using Depot.Data.Entities.Base;
-using Depot.Data.Entities.Depot;
 
 namespace Depot.Data.Entities.Master
 {
@@ -17,10 +15,5 @@ namespace Depot.Data.Entities.Master
         public string? ContactEmail { get; set; }
         /// <summary>Số điện thoại liên hệ của hãng tàu.</summary>
         public string? Phone { get; set; }
-
-        /// <summary>Danh sách container đang tham chiếu hãng tàu này.</summary>
-        public virtual ICollection<Container> Containers { get; set; } = new List<Container>();
-        /// <summary>Danh sách DepotJob liên kết với hãng tàu này.</summary>
-        public virtual ICollection<DepotJob> DepotJobs { get; set; } = new List<DepotJob>();
     }
 }

@@ -32,20 +32,20 @@ export const GateOutEirModal: React.FC<GateOutEirModalProps> = ({ container, onC
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
-      <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[95vh]">
+    <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
+      <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[95vh]">
         {/* Top Control Bar */}
-        <div className="p-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between flex-wrap gap-3">
+        <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-2">
-            <span className="p-2 bg-indigo-600/20 text-indigo-400 rounded-xl border border-indigo-500/30">
+            <span className="p-2 bg-indigo-50 text-indigo-600 rounded-xl border border-indigo-200">
               <QrCode className="w-5 h-5" />
             </span>
             <div>
-              <h3 className="text-sm font-bold text-white font-mono">
+              <h3 className="text-sm font-bold text-slate-900 font-mono">
                 PHIẾU GIAO NHẬN CONTAINER XUẤT BÃI (EQUIPMENT INTERCHANGE RECEIPT - EIR OUT)
               </h3>
-              <p className="text-[11px] text-slate-400 font-mono">
-                Mã chứng từ: <strong className="text-amber-400">{details?.eirOutNo || 'EIR-OUT-2026-XXXX'}</strong>
+              <p className="text-[11px] text-slate-500 font-mono">
+                Mã chứng từ: <strong className="text-amber-700">{details?.eirOutNo || '—'}</strong>
               </p>
             </div>
           </div>
@@ -53,7 +53,7 @@ export const GateOutEirModal: React.FC<GateOutEirModalProps> = ({ container, onC
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrint}
-              className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow shadow-indigo-950"
+              className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
             >
               <Printer className="w-4 h-4" />
               <span>In Phiếu EIR</span>
@@ -61,7 +61,7 @@ export const GateOutEirModal: React.FC<GateOutEirModalProps> = ({ container, onC
 
             <button
               onClick={onClose}
-              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition cursor-pointer"
+              className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -75,25 +75,19 @@ export const GateOutEirModal: React.FC<GateOutEirModalProps> = ({ container, onC
             <div className="border-b-2 border-slate-900 pb-4 flex items-start justify-between">
               <div>
                 <h1 className="text-base font-black uppercase text-slate-900 tracking-wide">
-                  EMR CONTAINER LOGISTICS DEPOT CAT LAI (VNSGN)
+                  SOLUTION DEPOT
                 </h1>
-                <p className="text-[11px] text-slate-600 font-medium mt-0.5">
-                  Địa chỉ: Cụm Kho Bãi ICD Cát Lái, P. Cát Lái, TP. Thủ Đức, TP. Hồ Chí Minh
-                </p>
-                <p className="text-[11px] text-slate-600 font-medium">
-                  Hotline Điều Độ Cổng: 1900 8899 &bull; Website: www.emr-depot-vietnam.com
-                </p>
               </div>
 
               <div className="text-right">
                 <div className="text-lg font-black text-indigo-900 font-mono">
-                  {details?.eirOutNo || 'EIR-OUT-99182'}
+                  {details?.eirOutNo || '—'}
                 </div>
                 <div className="text-[10px] text-slate-500 font-mono mt-0.5">
                   Ngày xuất: {details?.gateOutTime || new Date().toISOString().slice(0, 19).replace('T', ' ')}
                 </div>
                 <div className="mt-1 inline-block px-2 py-0.5 bg-slate-100 border border-slate-400 font-mono text-[10px] font-bold uppercase text-slate-800">
-                  {details?.gateLane || 'LÀN 03 (CỔNG XUẤT)'}
+                  {details?.gateLane || '—'}
                 </div>
               </div>
             </div>
@@ -199,11 +193,11 @@ export const GateOutEirModal: React.FC<GateOutEirModalProps> = ({ container, onC
               </div>
               <div>
                 <span className="text-slate-500 text-[10px] block">Xe nâng thực hiện:</span>
-                <strong>{details?.forkliftOperator || 'Xe nâng #02'}</strong>
+                <strong>{details?.forkliftOperator || '—'}</strong>
               </div>
               <div>
                 <span className="text-slate-500 text-[10px] block">Cảng hạ bãi / Đích đến:</span>
-                <strong>{details?.destinationPort || 'Cảng Cát Lái (VNSGN)'}</strong>
+                <strong>{details?.destinationPort || '—'}</strong>
               </div>
             </div>
 
@@ -214,7 +208,7 @@ export const GateOutEirModal: React.FC<GateOutEirModalProps> = ({ container, onC
                   <span className="font-bold uppercase block text-slate-800">TÀI XẾ NHẬN VỎ</span>
                   <span className="text-[10px] text-slate-500 italic block">(Đã kiểm tra vỏ đạt chuẩn)</span>
                 </div>
-                <div className="font-bold text-slate-900 font-sans">{details?.driverName || 'Nguyễn Văn Hùng'}</div>
+                <div className="font-bold text-slate-900 font-sans">{details?.driverName || '—'}</div>
               </div>
 
               <div className="space-y-12">
@@ -222,7 +216,7 @@ export const GateOutEirModal: React.FC<GateOutEirModalProps> = ({ container, onC
                   <span className="font-bold uppercase block text-slate-800">LÁI XE NÂNG BÃI</span>
                   <span className="text-[10px] text-slate-500 italic block">(Gắp đúng số cont lên xe)</span>
                 </div>
-                <div className="font-bold text-slate-900 font-sans">Nguyễn Văn Ba</div>
+                <div className="font-bold text-slate-900 font-sans">{details?.forkliftOperator || '—'}</div>
               </div>
 
               <div className="space-y-12">
@@ -230,7 +224,7 @@ export const GateOutEirModal: React.FC<GateOutEirModalProps> = ({ container, onC
                   <span className="font-bold uppercase block text-slate-800">CÁN BỘ CỔNG XUẤT</span>
                   <span className="text-[10px] text-slate-500 italic block">(Ký duyệt &amp; Đóng dấu cổng)</span>
                 </div>
-                <div className="font-bold text-slate-900 font-sans">{details?.gateStaff || 'Đặng Quốc Huy'}</div>
+                <div className="font-bold text-slate-900 font-sans">{details?.gateStaff || '—'}</div>
               </div>
             </div>
 
@@ -246,14 +240,14 @@ export const GateOutEirModal: React.FC<GateOutEirModalProps> = ({ container, onC
         </div>
 
         {/* Modal Footer */}
-        <div className="p-4 bg-slate-950 border-t border-slate-800 flex items-center justify-between text-xs">
-          <span className="text-slate-400 font-mono">
-            Trạng thái: <strong className="text-emerald-400">ĐÃ XUẤT KHỎI BÃI (GATE-OUT COMPLETED)</strong>
+        <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs">
+          <span className="text-slate-500 font-mono">
+            Trạng thái: <strong className="text-emerald-700">ĐÃ XUẤT KHỎI BÃI (GATE-OUT COMPLETED)</strong>
           </span>
 
           <button
             onClick={onClose}
-            className="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold transition cursor-pointer"
+            className="px-5 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl font-bold shadow-sm transition cursor-pointer"
           >
             Đóng Cửa Sổ
           </button>

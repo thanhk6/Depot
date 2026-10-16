@@ -15,20 +15,25 @@ namespace Depot.Application.Services
         public async Task<ReportAnalyticsDto> GetAnalyticsAsync()
         {
             var now = DateTime.UtcNow;
-            var jobs = await db.DepotJobs.AsNoTracking().Include(x => x.ShippingLine).ToListAsync();
+            var jobs = await db.DepotJobs.AsNoTracking().ToListAsync();
             var activeJobs = jobs.Where(x => x.Status != "GATE_OUT").ToList();
+            // DepotJob không còn navigation ShippingLine/computed ShippingLineCode — join rời sang
+            // ShippingLine.Code 1 lần rồi tra theo ShippingLineId (xem docs/backend-progress/00-quy-tac-backend.md).
+            var shippingLineCodes = await db.ShippingLines.AsNoTracking().ToDictionaryAsync(s => s.Id, s => s.Code);
 
             return new ReportAnalyticsDto
             {
                 Throughput = await BuildThroughputAsync(jobs, now),
                 DamageCategories = await BuildDamageCategoriesAsync(),
                 TechnicianTeams = await BuildTechnicianProductivityAsync(),
-                AgingContainers = BuildAgingContainers(activeJobs, now),
-                DetailedLogs = await BuildDetailedLogsAsync(jobs),
+                AgingContainers = BuildAgingContainers(activeJobs, now, shippingLineCodes),
+                DetailedLogs = await BuildDetailedLogsAsync(jobs, shippingLineCodes),
                 RevenueBreakdown = await BuildRevenueBreakdownAsync(),
                 EmrRepairRevenueVnd = await db.Estimates.AsNoTracking().Where(x => x.Status == "APPROVED").SumAsync(x => x.GrandTotal),
                 BlockCapacity = await BuildBlockCapacityAsync(activeJobs),
-                GradeDistribution = await BuildGradeDistributionAsync()
+                GradeDistribution = await BuildGradeDistributionAsync(),
+                AgingTiers = BuildAgingTiers(activeJobs, now),
+                AvgDwellDaysInYard = activeJobs.Count > 0 ? Math.Round(activeJobs.Average(j => (now - j.GateInDate).TotalDays), 1) : null
             };
         }
 
@@ -83,7 +88,9 @@ namespace Depot.Application.Services
                     var avgHours = withDuration.Count > 0
                         ? withDuration.Average(x => (x.CompletedAt!.Value - x.StartedAt!.Value).TotalHours)
                         : 0;
-                    var passCount = g.Count(x => x.QcStatus == "PASS" || x.QcStatus == "PASSED");
+                    // QcStatus thực tế chỉ được ghi là "PASSED"/"FAILED" (xem RepairOrder.QcStatus ở
+                    // DepotJobService.CompleteRepairAsync) — bỏ nhánh "PASS" chết, không nơi nào ghi giá trị đó.
+                    var passCount = g.Count(x => x.QcStatus == "PASSED");
                     return new TechnicianProductivityDto
                     {
                         Name = g.Key,
@@ -96,7 +103,27 @@ namespace Depot.Application.Services
                 .ToList();
         }
 
-        private static List<AgingContainerDto> BuildAgingContainers(List<DepotJob> activeJobs, DateTime now, int thresholdDays = 15)
+        // Thay 4 dòng phần trăm gõ cứng ở màn Báo cáo (68% / 2.597 cont...) — đếm trên toàn bộ container trong bãi.
+        private static List<AgingTierDto> BuildAgingTiers(List<DepotJob> activeJobs, DateTime now)
+        {
+            var tiers = new (string Label, int From, int? To)[]
+            {
+                ("Dưới 8 ngày", 0, 7), ("8 – 14 ngày", 8, 14), ("15 – 30 ngày", 15, 30), ("Trên 30 ngày", 31, null)
+            };
+            var dwell = activeJobs.Select(j => (int)(now - j.GateInDate).TotalDays).ToList();
+            var total = dwell.Count;
+            return tiers.Select(t =>
+            {
+                var count = dwell.Count(d => d >= t.From && (t.To == null || d <= t.To));
+                return new AgingTierDto
+                {
+                    Label = t.Label, FromDay = t.From, ToDay = t.To, Count = count,
+                    Percent = total > 0 ? Math.Round((double)count / total * 100, 1) : 0
+                };
+            }).ToList();
+        }
+
+        private static List<AgingContainerDto> BuildAgingContainers(List<DepotJob> activeJobs, DateTime now, Dictionary<long, string> shippingLineCodes, int thresholdDays = 15)
         {
             return activeJobs
                 .Select(j => new { Job = j, Dwell = (int)(now - j.GateInDate).TotalDays })
@@ -106,16 +133,16 @@ namespace Depot.Application.Services
                 .Select(x => new AgingContainerDto
                 {
                     ContainerNo = x.Job.ContainerNo,
-                    ShippingLine = x.Job.ShippingLineCode,
+                    ShippingLine = shippingLineCodes.GetValueOrDefault(x.Job.ShippingLineId),
                     IsoSize = x.Job.IsoSize,
                     DwellDays = x.Dwell,
-                    Location = $"{x.Job.BlockCode}-{x.Job.Bay:D2}-{x.Job.Row:D2}-{x.Job.Tier:D2}",
+                    Location = string.IsNullOrEmpty(x.Job.BlockCode) ? "Chưa hạ bãi" : $"{x.Job.BlockCode}-{x.Job.Bay:D2}-{x.Job.Row:D2}-{x.Job.Tier:D2}",
                     Status = x.Job.Status
                 })
                 .ToList();
         }
 
-        private async Task<List<DetailedContainerLogDto>> BuildDetailedLogsAsync(List<DepotJob> jobs)
+        private async Task<List<DetailedContainerLogDto>> BuildDetailedLogsAsync(List<DepotJob> jobs, Dictionary<long, string> shippingLineCodes)
         {
             var estimatesByJob = await db.Estimates.AsNoTracking().ToDictionaryAsync(x => x.JobNo, x => x.GrandTotal);
             var surveysByJob = await db.Surveys.AsNoTracking().ToDictionaryAsync(x => x.JobNo, x => x.ConditionRating);
@@ -134,7 +161,7 @@ namespace Depot.Application.Services
                         Id = j.JobNo,
                         ContainerNo = j.ContainerNo,
                         IsoSize = j.IsoSize,
-                        ShippingLine = j.ShippingLineCode,
+                        ShippingLine = shippingLineCodes.GetValueOrDefault(j.ShippingLineId),
                         GateIn = j.GateInDate.ToString("dd/MM/yyyy HH:mm"),
                         GateOut = j.GateOutDate?.ToString("dd/MM/yyyy HH:mm"),
                         DwellDays = Math.Round(dwellDays, 1),
@@ -262,7 +289,7 @@ namespace Depot.Application.Services
                 var startedToday = list.Where(x => x.StartedAt.HasValue && x.StartedAt.Value.Date == today).ToList();
                 var pendingToday = list.Count(x => x.StartedAt == null && x.CreatedAt.Date == today);
                 var completedAll = list.Where(x => x.StartedAt.HasValue && x.CompletedAt.HasValue).ToList();
-                var passCount = completedAll.Count(x => x.QcStatus == "PASS" || x.QcStatus == "PASSED");
+                var passCount = completedAll.Count(x => x.QcStatus == "PASSED");
 
                 StaffCurrentTaskDto? currentTask = null;
                 if (inProgress != null)
@@ -322,7 +349,7 @@ namespace Depot.Application.Services
             {
                 var list = g.ToList();
                 var completedToday = list.Where(x => x.CompletedAt.HasValue && x.CompletedAt.Value.Date == today).ToList();
-                var passCount = list.Count(x => x.QcStatus == "PASS" || x.QcStatus == "PASSED");
+                var passCount = list.Count(x => x.QcStatus == "PASSED");
 
                 return new StaffRealtimeItemDto
                 {
@@ -341,7 +368,7 @@ namespace Depot.Application.Services
                     {
                         Id = o.Id.ToString(),
                         Time = o.CompletedAt!.Value.ToString("HH:mm"),
-                        Action = $"Nghiệm thu QC {(o.QcStatus == "PASS" || o.QcStatus == "PASSED" ? "ĐẠT" : "KHÔNG ĐẠT")}",
+                        Action = $"Nghiệm thu QC {(o.QcStatus == "PASSED" ? "ĐẠT" : "KHÔNG ĐẠT")}",
                         ContainerNo = containerByJobNo.TryGetValue(o.JobNo, out var c) ? c : o.JobNo,
                         Location = "Khu QC Nghiệm Thu",
                         Status = "COMPLETED",

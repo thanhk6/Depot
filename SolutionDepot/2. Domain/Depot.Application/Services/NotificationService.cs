@@ -48,6 +48,15 @@ public sealed class NotificationService : INotificationService
     public async Task<NotificationRecord> SendAsync(SendNotificationRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Title) || string.IsNullOrWhiteSpace(request.Content)) throw new ArgumentException("Title và Content là bắt buộc.");
+        // BUG-027: người nhận là username nhân viên hoặc mã khách hàng (xem GetEmployeesAsync/GetCustomersAsync);
+        // trước đây lưu được thông báo "đã gửi" cho người nhận không tồn tại.
+        if (!string.IsNullOrWhiteSpace(request.RecipientId))
+        {
+            var rid = request.RecipientId.Trim();
+            var exists = await db.Users.AnyAsync(u => u.Username == rid && !u.IsDeleted)
+                || await db.CustomerCompanies.AnyAsync(c => c.Code == rid && c.Status != "DELETED");
+            if (!exists) throw new ArgumentException($"Người nhận '{rid}' không tồn tại.");
+        }
         var record = new NotificationRecord
         {
             TrackingCode = $"NTF-{DateTime.UtcNow:yyyyMMddHHmmss}-{Random.Shared.Next(1000, 9999)}",
@@ -187,7 +196,10 @@ public sealed class NotificationService : INotificationService
 
     public async Task<NotificationTemplate> CreateTemplateAsync(NotificationTemplateRequest request)
     {
-        var template = new NotificationTemplate { Code = request.Code };
+        ValidateTemplate(request);
+        if (string.IsNullOrWhiteSpace(request.Code)) throw new ArgumentException("Mã mẫu tin là bắt buộc.");
+        if (await db.NotificationTemplates.AnyAsync(x => x.Code == request.Code.Trim())) throw new ArgumentException($"Mã mẫu tin '{request.Code.Trim()}' đã tồn tại.");
+        var template = new NotificationTemplate { Code = request.Code.Trim() };
         ApplyTemplateFields(template, request);
         db.NotificationTemplates.Add(template);
         await db.SaveChangesAsync();
@@ -198,9 +210,17 @@ public sealed class NotificationService : INotificationService
     {
         var template = await db.NotificationTemplates.FirstOrDefaultAsync(x => x.Code == code);
         if (template == null) return null;
+        ValidateTemplate(request);
         ApplyTemplateFields(template, request);
         await db.SaveChangesAsync();
         return template;
+    }
+
+    // BUG-027: mẫu tin nội dung rỗng trước đây vẫn lưu được, gửi ra tin trắng.
+    private static void ValidateTemplate(NotificationTemplateRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Name)) throw new ArgumentException("Tên mẫu tin là bắt buộc.");
+        if (string.IsNullOrWhiteSpace(request.ContentTemplate)) throw new ArgumentException("Nội dung mẫu tin là bắt buộc.");
     }
 
     private static void ApplyTemplateFields(NotificationTemplate template, NotificationTemplateRequest request)

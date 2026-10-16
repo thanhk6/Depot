@@ -1,14 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import {
   SurveyItemRecord,
-  SurveyType,
   SurveyStatus,
   ContainerConditionGrade,
-  QualityGradeType,
   CleaningReasonType,
   CleaningMethodType,
   CleaningTariffMasterItem,
-  SurveyCleaningItemRecord,
   InspectionZoneKey,
   ZoneCheckStatus,
   DamageRecord,
@@ -16,45 +13,32 @@ import {
   DamageLocationMasterItem,
   DamageCodeMasterItem,
   RepairCodeMasterItem,
-  GradeMasterItem
+  GradeMasterItem,
+  InspectionStandardMasterItem,
+  ContainerTypeMasterItem
 } from '../types';
-import {
-  validateContainerNumber,
-  CONTAINER_TYPE_PRESETS,
-  calculateIsoCheckDigit
-} from '../utils/containerValidator';
-import { INITIAL_CHECKLIST_TEMPLATE } from '../mockData';
+import { validateContainerNumber } from '../utils/containerValidator';
+import { fetchContainerTypes } from '../../masterdata/utils/containerTypeCatalog';
+import { masterDataApi } from '../../../api';
+import { useSurveyChecklistTemplate } from '../../masterdata/utils/checklistCatalog';
 import {
   ClipboardCheck,
+  Boxes,
   CheckCircle2,
   AlertTriangle,
   Wrench,
   Sparkles,
   ShieldCheck,
   Camera,
-  Image as ImageIcon,
   Plus,
   Trash2,
   X,
   Truck,
-  Ship,
-  Calendar,
-  User,
-  MapPin,
-  FileText,
-  Boxes,
   Thermometer,
-  Layers,
   Zap,
-  Info,
-  Check,
-  ArrowRight,
-  RefreshCw,
   Clock,
   Sparkle,
   Droplets,
-  DollarSign,
-  Flame,
   CheckSquare,
   Square
 } from 'lucide-react';
@@ -62,17 +46,18 @@ import {
 interface CreateSurveyModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSaveSurvey: (newSurvey: SurveyItemRecord, openImmediately?: boolean) => void;
+  // Trả về false khi lưu thất bại (vd Gate-In bị từ chối) để form giữ nguyên dữ liệu đã nhập.
+  onSaveSurvey: (newSurvey: SurveyItemRecord, openImmediately?: boolean) => boolean | void | Promise<boolean | void>;
   locations: DamageLocationMasterItem[];
   damageCodes: DamageCodeMasterItem[];
   repairCodes: RepairCodeMasterItem[];
   grades: GradeMasterItem[];
+  standards: InspectionStandardMasterItem[];
   cleaningTariffs: CleaningTariffMasterItem[];
   currentUser?: string;
   initialContainerNo?: string;
   initialShippingLine?: string;
   initialSize?: string;
-  initialIsPreSurvey?: boolean;
 }
 
 export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
@@ -83,73 +68,74 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
   damageCodes,
   repairCodes,
   grades,
+  standards,
   cleaningTariffs,
-  currentUser = 'Lê Hoàng Nam (SV-04)',
+  currentUser = '',
   initialContainerNo = '',
-  initialShippingLine = 'MAERSK',
-  initialSize = '40HC',
-  initialIsPreSurvey = false
+  initialShippingLine = '',
+  initialSize = ''
 }) => {
   // Active wizard / section tab
   const [activeTab, setActiveTab] = useState<'CONTAINER' | 'OPERATION' | 'GRADING' | 'DAMAGES_PHOTOS'>('CONTAINER');
 
   // Form State
-  const [surveyType, setSurveyType] = useState<SurveyType>(initialIsPreSurvey ? 'PRE_SURVEY' : 'GATE_IN');
-  const [surveyNo, setSurveyNo] = useState<string>(() => `SRV-2026-${Math.floor(1000 + Math.random() * 9000)}`);
   const [containerNo, setContainerNo] = useState<string>(initialContainerNo);
   const [shippingLine, setShippingLine] = useState<string>(initialShippingLine);
-  const [owner, setOwner] = useState<string>('MAERSK A/S Denmark');
   const [sizeType, setSizeType] = useState<string>(initialSize);
-  const [isoCode, setIsoCode] = useState<string>('45G1');
-  const [containerTypeName, setContainerTypeName] = useState<string>('Dry High Cube');
+  // Danh mục thật từ DB — trước đây là 12 hãng tàu + 11 loại container gõ cứng kèm tên chủ sở hữu và thông số.
+  const [containerTypeOptions, setContainerTypeOptions] = useState<ContainerTypeMasterItem[]>([]);
+  const [shippingLineOptions, setShippingLineOptions] = useState<Array<{ code: string; name: string }>>([]);
+  useEffect(() => {
+    fetchContainerTypes().then(setContainerTypeOptions).catch(() => setContainerTypeOptions([]));
+    masterDataApi.getShippingLines()
+      .then((res: any) => setShippingLineOptions((res?.data || []).map((l: any) => ({ code: l.code, name: l.name }))))
+      .catch(() => setShippingLineOptions([]));
+  }, []);
+  const [isoCode, setIsoCode] = useState<string>('');
+  const [containerTypeName, setContainerTypeName] = useState<string>('');
   const [isReefer, setIsReefer] = useState<boolean>(false);
-  const [manufactureYearMonth, setManufactureYearMonth] = useState<string>('08/2021');
-  const [tareWeightKg, setTareWeightKg] = useState<number>(3900);
-  const [maxGrossWeightKg, setMaxGrossWeightKg] = useState<number>(32500);
-  const [payloadKg, setPayloadKg] = useState<number>(28600);
-  const [material, setMaterial] = useState<string>('Thép Corten Steel chống ăn mòn');
-  const [floorType, setFloorType] = useState<string>('Gỗ dán Plywood (28mm)');
-  const [cscPlateNo, setCscPlateNo] = useState<string>('CSC-BV-2021-9876');
+  const [tareWeightKg, setTareWeightKg] = useState<number>(0);
+  const [payloadKg, setPayloadKg] = useState<number>(0);
+  // Vật liệu / loại sàn lấy theo DM Loại Container (không có ô nhập — giống Tiếp Nhận Cổng).
+  const [material, setMaterial] = useState<string>('');
+  const [floorType, setFloorType] = useState<string>('');
 
   // Operations & Logistics
-  const [isPreSurvey, setIsPreSurvey] = useState<boolean>(initialIsPreSurvey);
-  const [gateInTime, setGateInTime] = useState<string>(
-    initialIsPreSurvey
-      ? 'Chưa Gate-In (Đang chờ ngoài cổng)'
-      : new Date().toISOString().substring(0, 16).replace('T', ' ')
-  );
-  const [surveyDate, setSurveyDate] = useState<string>(new Date().toISOString().substring(0, 16).replace('T', ' '));
-  const [surveyor, setSurveyor] = useState<string>(currentUser);
+  // Giờ giám định / giờ Gate-In chỉ để hiển thị tạm trong phiên — backend tự ghi giờ thật khi lưu.
+  const surveyDate = new Date().toISOString().substring(0, 16).replace('T', ' ');
+  const surveyor = currentUser;
   const [shift, setShift] = useState<string>('Ca 1 (06:00 - 14:00)');
-  const [truckPlate, setTruckPlate] = useState<string>('51C-982.45');
-  const [trailerPlate, setTrailerPlate] = useState<string>('51R-089.12');
-  const [driverName, setDriverName] = useState<string>('Trần Văn Bình');
-  const [driverPhone, setDriverPhone] = useState<string>('0908123456');
-  const [driverLicense, setDriverLicense] = useState<string>('FC-79012345');
-  const [yardLocation, setYardLocation] = useState<string>('B02-08-03-2');
-  const [sealNo, setSealNo] = useState<string>('MSK-892104');
-  const [customsSealNo, setCustomsSealNo] = useState<string>('VN-CUST-4412');
+  const [truckPlate, setTruckPlate] = useState<string>('');
+  const [trailerPlate, setTrailerPlate] = useState<string>('');
+  const [driverName, setDriverName] = useState<string>('');
+  const [driverPhone, setDriverPhone] = useState<string>('');
+  const [driverLicense] = useState<string>('');
+  const [sealNo, setSealNo] = useState<string>('');
+  const [customsSealNo, setCustomsSealNo] = useState<string>('');
   const [cargoStatus, setCargoStatus] = useState<'EMPTY' | 'FULL_IMPORT' | 'FULL_EXPORT' | 'LCL'>('EMPTY');
 
   // Grading & Standards
-  const [standard, setStandard] = useState<'IICL-6' | 'MCIC' | 'MRIC' | 'CARRIER_CUSTOM'>('IICL-6');
-  const [standardNotes, setStandardNotes] = useState<string>('Áp dụng hạn mức IICL-6 tiêu chuẩn hãng tàu');
-  const [condition, setCondition] = useState<ContainerConditionGrade>('AV');
-  const [qualityGrade, setQualityGrade] = useState<QualityGradeType>('GRADE_A');
+  const [standard, setStandard] = useState<string>('');
+  const activeStandards = standards.filter((st) => st.status === 'ACTIVE');
+  const [standardNotes, setStandardNotes] = useState<string>('');
+  // Không chọn sẵn — giám định viên phải tự đánh giá (trước đây mặc định AV + GRADE_A).
+  const [condition, setCondition] = useState<ContainerConditionGrade | ''>('');
+  const [qualityGrade, setQualityGrade] = useState<string>('');
   // Thẻ Grade động lấy tên + mô tả trực tiếp từ Danh Mục Grade thật trong SQL — số thẻ AV/DM = số Grade
   // ACTIVE, không cố định. Xem giải thích đầy đủ ở SurveyDetailForm.tsx (chia theo vị trí sortOrder:
   // nửa đầu = AV, nửa sau = DM). CL không có Grade tương ứng nên giữ là 1 thẻ cố định riêng.
   const activeGrades = grades.filter((g) => g.status === 'ACTIVE').sort((a, b) => a.sortOrder - b.sortOrder);
-  const gradeBucket = (index: number, total: number): 'AV' | 'DM' => (index < Math.ceil(total / 2) ? 'AV' : 'DM');
   const [cleaningReasons, setCleaningReasons] = useState<CleaningReasonType[]>(['DUST', 'FLOOR_DIRTY']);
   const [cleaningMethod, setCleaningMethod] = useState<CleaningMethodType>('WATER_PRESSURE');
-  const [cleaningRemarks, setCleaningRemarks] = useState<string>('Bụi bám vách trong và vết đất dơ trên sàn sau trả hàng.');
+  const [cleaningRemarks, setCleaningRemarks] = useState<string>('');
   const [selectedCleaningCodes, setSelectedCleaningCodes] = useState<string[]>(['CLN_WASH_200BAR']);
   const [cleaningResponsibleParty, setCleaningResponsibleParty] = useState<'O' | 'U' | 'T'>('U');
-  const [cleaningEstimatedCost, setCleaningEstimatedCost] = useState<number>(420000);
+  const [cleaningEstimatedCost, setCleaningEstimatedCost] = useState<number>(0);
 
   // Helper to calculate price of a cleaning tariff for current container size & type
   const getTariffCost = (tariff: CleaningTariffMasterItem): number => {
+    const exact = tariff.priceByContainerType?.[sizeType];
+    if (exact && exact > 0) return exact;
     if (isReefer) {
       if (sizeType.includes('20')) return tariff.price20RF;
       return tariff.price40HR;
@@ -167,36 +153,55 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
         const item = cleaningTariffs.find((t) => t.cleaningCode === code);
         return total + (item ? getTariffCost(item) : 0);
       }, 0);
-      setCleaningEstimatedCost(sum > 0 ? sum : 250000);
+      setCleaningEstimatedCost(sum);
     }
   }, [selectedCleaningCodes, sizeType, isReefer, condition, cleaningTariffs]);
 
+  // Thuế suất hiệu dụng theo VAT % của từng dịch vụ đã chọn trong biểu phí (trước đây gõ cứng 8%).
+  const cleaningVatRate = (() => {
+    let base = 0;
+    let vat = 0;
+    for (const code of selectedCleaningCodes) {
+      const item = cleaningTariffs.find((t) => t.cleaningCode === code);
+      if (!item) continue;
+      const price = getTariffCost(item);
+      base += price;
+      vat += (price * (item.vatPercent || 0)) / 100;
+    }
+    return base > 0 ? vat / base : 0;
+  })();
+
   // Reefer Specs
   const [reeferBrand, setReeferBrand] = useState<'CARRIER' | 'THERMO_KING' | 'DAIKIN' | 'STAR_COOL'>('CARRIER');
-  const [reeferModel, setReeferModel] = useState<string>('ThinLINE 69NT40');
+  const [reeferModel] = useState<string>('');
   const [setTemperature, setSetTemperature] = useState<number>(-18);
-  const [ptiStatus, setPtiStatus] = useState<'PASSED' | 'PENDING' | 'FAILED' | 'NOT_REQUIRED'>('PASSED');
-  const [compressorHours, setCompressorHours] = useState<number>(12450);
-  const [humidityPercent, setHumidityPercent] = useState<number>(85);
-  const [ventilationCmh, setVentilationCmh] = useState<number>(15);
+  const [ptiStatus, setPtiStatus] = useState<'PASSED' | 'PENDING' | 'FAILED' | 'NOT_REQUIRED'>('PENDING');
+  const [compressorHours, setCompressorHours] = useState<number>(0);
+  const [humidityPercent] = useState<number>(0);
+  const [ventilationCmh] = useState<number>(0);
 
   // Checklist & Damages & Photos
-  const [checklist, setChecklist] = useState(INITIAL_CHECKLIST_TEMPLATE.map((c) => ({ ...c })));
+  // Checklist mẫu từ danh mục SURVEY_CHECKLIST (DB); điền vào khi tải xong nếu người dùng chưa đánh giá gì.
+  const checklistTemplate = useSurveyChecklistTemplate();
+  const [checklist, setChecklist] = useState<typeof checklistTemplate>([]);
+  useEffect(() => {
+    if (checklistTemplate.length > 0) setChecklist((prev) => (prev.length > 0 ? prev : checklistTemplate.map((c) => ({ ...c }))));
+  }, [checklistTemplate]);
   const [damages, setDamages] = useState<DamageRecord[]>([]);
   const [photos, setPhotos] = useState<SurveyPhoto[]>([]);
-  const [remarks, setRemarks] = useState<string>('Container tiếp nhận nguyên vẹn, đáp ứng tiêu chuẩn kiểm định IICL.');
-  const [actionRequired, setActionRequired] = useState<'AVAILABLE_FOR_DISPATCH' | 'SEND_TO_WASHING' | 'SEND_TO_REPAIR' | 'HOLD_FOR_SURVEYOR_REVIEW'>('AVAILABLE_FOR_DISPATCH');
+  const [remarks, setRemarks] = useState<string>('');
+  const [actionRequired, setActionRequired] = useState<'' | 'AVAILABLE_FOR_DISPATCH' | 'SEND_TO_WASHING' | 'SEND_TO_REPAIR' | 'HOLD_FOR_SURVEYOR_REVIEW'>('');
 
   // Quick Damage Entry in Modal
-  const [dmgLocation, setDmgLocation] = useState<string>('RIGHT_W');
-  const [dmgCode, setDmgCode] = useState<string>('DENT');
+  const [dmgLocation, setDmgLocation] = useState<string>('');
+  const [dmgCode, setDmgCode] = useState<string>('');
   // Mã 'RP_STR_PANEL' (Straighten Corrugation) — 'RP_STRAIGHT' không tồn tại trong INITIAL_REPAIR_CODES
   // nên dropdown "Phương Án Sửa Chữa" hiển thị lệch với state ngay từ lần render đầu tiên.
-  const [dmgRepair, setDmgRepair] = useState<string>('RP_STR_PANEL');
+  const [dmgRepair, setDmgRepair] = useState<string>('');
   const [dmgSeverity, setDmgSeverity] = useState<'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'>('MEDIUM');
-  const [dmgLength, setDmgLength] = useState<string>('120');
-  const [dmgWidth, setDmgWidth] = useState<string>('50');
-  const [dmgQty, setDmgQty] = useState<string>('1');
+  const [dmgLength, setDmgLength] = useState<string>('');
+  const [dmgWidth, setDmgWidth] = useState<string>('');
+  const [dmgQty] = useState<string>('1');
   const [dmgNote, setDmgNote] = useState<string>('');
 
   // Validation feedback
@@ -208,127 +213,32 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
   // Synchronize when sizeType changes
   const handleSizeTypeChange = (selectedSize: string) => {
     setSizeType(selectedSize);
-    const preset = CONTAINER_TYPE_PRESETS[selectedSize];
-    if (preset) {
-      setIsoCode(preset.isoCode);
-      setContainerTypeName(preset.type);
-      setIsReefer(preset.isReefer);
-      setTareWeightKg(preset.tareWeightKg);
-      setMaxGrossWeightKg(preset.maxGrossWeightKg);
-      setPayloadKg(preset.payloadKg);
-      setFloorType(preset.floorType);
-      setMaterial(preset.material);
+    const type = containerTypeOptions.find((t) => t.typeCode === selectedSize);
+    if (type) {
+      setIsoCode(type.isoCode);
+      setContainerTypeName(type.name || type.vietnameseName);
+      setIsReefer(type.isReefer);
+      setTareWeightKg(type.tareWeightKg);
+      setPayloadKg(type.maxPayloadKg);
+      setFloorType(type.floorType);
+      setMaterial(type.material);
     }
   };
 
-  // Sync owner based on carrier
-  const handleShippingLineChange = (line: string) => {
-    setShippingLine(line);
-    const ownerMap: Record<string, string> = {
-      MAERSK: 'MAERSK A/S Denmark',
-      MSC: 'Mediterranean Shipping Company S.A.',
-      ONE: 'Ocean Network Express Pte. Ltd.',
-      'CMA-CGM': 'CMA CGM Group France',
-      COSCO: 'COSCO Shipping Lines Co., Ltd.',
-      EVERGREEN: 'Evergreen Marine Corp.',
-      'YANG-MING': 'Yang Ming Marine Transport',
-      'HAPAG-LLOYD': 'Hapag-Lloyd AG Germany',
-      'WAN-HAI': 'Wan Hai Lines Ltd.',
-      ZIM: 'ZIM Integrated Shipping',
-      SITC: 'SITC Container Lines',
-      KMTC: 'Korea Marine Transport Co.'
-    };
-    if (ownerMap[line]) {
-      setOwner(ownerMap[line]);
-    }
-    if (line === 'COSCO') {
-      setStandard('MCIC');
-    }
-  };
 
-  // Auto calculate payload when Gross or Tare changes
-  const handleTareChange = (val: number) => {
-    setTareWeightKg(val);
-    setPayloadKg(Math.max(0, maxGrossWeightKg - val));
-  };
-  const handleGrossChange = (val: number) => {
-    setMaxGrossWeightKg(val);
-    setPayloadKg(Math.max(0, val - tareWeightKg));
-  };
-
-  // Preset autofills for quick testing
-  const handleApplyPreset = (presetType: 'AV_FOOD' | 'CL_OIL' | 'DM_CUT' | 'RF_REEFER') => {
-    if (presetType === 'AV_FOOD') {
-      setContainerNo('MAEU1238904');
-      setShippingLine('MAERSK');
-      setOwner('MAERSK A/S Denmark');
-      handleSizeTypeChange('40HC');
-      setCondition('AV');
-      setQualityGrade('FOOD_GRADE');
-      setRemarks('Vỏ đạt tiêu chuẩn xuất xưởng Grade Food, sàn khô ráo sạch mùi, sẵn sàng cấp phát đóng hàng nông sản.');
-      setActionRequired('AVAILABLE_FOR_DISPATCH');
-      setDamages([]);
-    } else if (presetType === 'CL_OIL') {
-      setContainerNo('MSCU5566778');
-      setShippingLine('MSC');
-      setOwner('Mediterranean Shipping Company');
-      handleSizeTypeChange('20DC');
-      setCondition('CL');
-      setCleaningReasons(['OIL_GREASE', 'CHEMICAL_SMELL']);
-      setCleaningMethod('CHEMICAL_WASH');
-      setCleaningRemarks('Sàn dính vệt dầu nhớt xe nâng diện tích 1.2m x 0.8m, mùi hôi nồng cần tẩy hóa chất.');
-      setCleaningEstimatedCost(250000);
-      setRemarks('Chuyển khu vực bồn rửa áp lực cao để xử lý tẩy dầu hóa chất trước khi hạ bãi AV.');
-      setActionRequired('SEND_TO_WASHING');
-      setDamages([]);
-    } else if (presetType === 'DM_CUT') {
-      setContainerNo('ONEY9081234');
-      setShippingLine('ONE');
-      setOwner('Ocean Network Express');
-      handleSizeTypeChange('40HC');
-      setCondition('DM');
-      setRemarks('Phát hiện rách tôn vách hông phải và cong vênh xà nóc do va quẹt cẩu giàn. Cần lập báo giá sửa chữa.');
-      setActionRequired('SEND_TO_REPAIR');
-      
-      const newDmg: DamageRecord = {
-        id: 'DMG-' + Math.random().toString(36).substring(2, 6).toUpperCase(),
-        locationCode: 'RIGHT_W',
-        locationName: 'Vách hông phải (Right Side Wall)',
-        damageCode: 'CUT',
-        damageName: 'Rách / Thủng tôn (Cut/Tear)',
-        repairCode: 'RP_PATCH_S', // Mã đúng trong INITIAL_REPAIR_CODES — 'RP_PATCH' không tồn tại, sẽ khiến báo giá EMR không tra được đơn giá nhân công/vật tư của mã sửa chữa này.
-        repairName: 'Vá tôn theo chuẩn IICL (Patch)',
-        description: 'Vết rách dài 180mm trên sóng tôn thứ 4 vách phải',
-        severity: 'HIGH',
-        lengthMm: 180,
-        widthMm: 45,
-        quantity: 1,
-        createdBy: surveyor,
-        createdAt: new Date().toISOString().substring(0, 16).replace('T', ' ')
-      };
-      setDamages([newDmg]);
-    } else if (presetType === 'RF_REEFER') {
-      setContainerNo('CMAU7788990');
-      setShippingLine('CMA-CGM');
-      setOwner('CMA CGM Group France');
-      handleSizeTypeChange('40HR');
-      setIsReefer(true);
-      setReeferBrand('CARRIER');
-      setSetTemperature(-20);
-      setPtiStatus('PASSED');
-      setCondition('AV');
-      setQualityGrade('GRADE_A');
-      setRemarks('Container lạnh 40HR đạt test PTI lạnh sâu -20°C, máy nén Carrier vận hành êm ái, gioăng cửa kín khít.');
-      setActionRequired('AVAILABLE_FOR_DISPATCH');
-      setDamages([]);
-    }
-  };
 
   // Add Damage Record
   const handleAddInlineDamage = () => {
     const locItem = locations.find((l) => l.code === dmgLocation);
     const codeItem = damageCodes.find((d) => d.code === dmgCode);
     const repItem = repairCodes.find((r) => r.repairCode === dmgRepair);
+    // Chỉ nhận mã có trong danh mục DB — trước đây chọn sẵn mã gõ cứng (RIGHT_W/DENT/RP_STR_PANEL) nên vẫn thêm
+    // được hư hỏng với mã không tồn tại trong DM Vị Trí / Mã Hư Hỏng / Phương Án Sửa Chữa.
+    if (!locItem || !codeItem || !repItem) {
+      setValidationError('Chọn đủ Vị Trí Cấu Kiện, Mã Hư Hỏng và Phương Án Sửa Chữa từ danh mục trước khi thêm tổn thất.');
+      return;
+    }
+    setValidationError(null);
 
     const newRecord: DamageRecord = {
       id: 'DMG-' + Math.random().toString(36).substring(2, 6).toUpperCase(),
@@ -358,63 +268,6 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
     setDamages((prev) => prev.filter((d) => d.id !== id));
   };
 
-  // Add photo sample
-  const handleAddSamplePhoto = (type: 'OVERVIEW' | 'DETAIL' | 'DOOR_SEAL' | 'INTERIOR_FLOOR' | 'REEFER_PANEL') => {
-    const sampleUrls: Record<string, string> = {
-      OVERVIEW: 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=600&auto=format&fit=crop&q=60',
-      DETAIL: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=600&auto=format&fit=crop&q=60',
-      DOOR_SEAL: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?w=600&auto=format&fit=crop&q=60',
-      INTERIOR_FLOOR: 'https://images.unsplash.com/photo-1587293852726-70cdb56c2866?w=600&auto=format&fit=crop&q=60',
-      REEFER_PANEL: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=600&auto=format&fit=crop&q=60'
-    };
-
-    const captions: Record<string, string> = {
-      OVERVIEW: `Ảnh toàn cảnh góc 45° vỏ ${containerNo || 'Container'}`,
-      DETAIL: 'Ảnh cận cảnh chi tiết tổn thất hiện trường',
-      DOOR_SEAL: 'Ảnh kiểm tra gioăng cao su cánh cửa và khóa camlock',
-      INTERIOR_FLOOR: 'Ảnh kiểm tra sàn gỗ và vách trong',
-      REEFER_PANEL: 'Ảnh màn hình hiển thị nhiệt độ cụm máy lạnh'
-    };
-
-    const newPhoto: SurveyPhoto = {
-      id: 'PH-' + Math.random().toString(36).substring(2, 6).toUpperCase(),
-      url: sampleUrls[type] || sampleUrls.OVERVIEW,
-      type,
-      caption: captions[type] || 'Ảnh chụp hiện trường',
-      surveyor,
-      uploadedAt: new Date().toISOString().substring(0, 16).replace('T', ' '),
-      fileSizeKb: Math.floor(750 + Math.random() * 850)
-    };
-
-    setPhotos((prev) => [...prev, newPhoto]);
-  };
-
-  // Add standard minimum photo set (1 Overview + 1 Detail + Timestamp)
-  const handleAddStandardPhotoSet = () => {
-    const timestamp = new Date().toISOString().substring(0, 16).replace('T', ' ');
-    const overviewPhoto: SurveyPhoto = {
-      id: 'PH-' + Math.random().toString(36).substring(2, 6).toUpperCase(),
-      url: 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=600&auto=format&fit=crop&q=60',
-      type: 'OVERVIEW',
-      caption: `[01/02] Ảnh toàn cảnh góc 45° vỏ ${containerNo || 'Container'}`,
-      surveyor,
-      uploadedAt: timestamp,
-      fileSizeKb: 890
-    };
-
-    const detailPhoto: SurveyPhoto = {
-      id: 'PH-' + Math.random().toString(36).substring(2, 6).toUpperCase(),
-      url: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=600&auto=format&fit=crop&q=60',
-      type: 'DETAIL',
-      caption: `[02/02] Ảnh cận cảnh vị trí ${condition === 'CL' ? 'cần vệ sinh' : 'hư hỏng'}`,
-      surveyor,
-      uploadedAt: timestamp,
-      fileSizeKb: 920
-    };
-
-    setPhotos((prev) => [...prev, overviewPhoto, detailPhoto]);
-  };
-
   // Toggle checklist status
   const handleToggleChecklist = (zoneKey: InspectionZoneKey, status: ZoneCheckStatus) => {
     setChecklist((prev) =>
@@ -423,10 +276,39 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
   };
 
   // Save submission
-  const handleSave = (targetStatus: SurveyStatus, openImmediately = false) => {
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async (targetStatus: SurveyStatus, openImmediately = false) => {
+    if (isSaving) return;
     if (!containerNo.trim()) {
       setValidationError('Vui lòng nhập Số Container!');
       setActiveTab('CONTAINER');
+      return;
+    }
+    // Container được Tiếp Nhận Cổng ngay khi lưu — kiểm tra đủ dữ liệu Gate-In trước, thay vì để backend
+    // từ chối rồi mất công nhập lại.
+    const missing =
+      !(validationResult.isValidFormat && validationResult.isCheckDigitCorrect) ? ['CONTAINER', validationResult.message || 'Số container không hợp lệ (ISO 6346).'] :
+      !shippingLine ? ['CONTAINER', 'Chọn Hãng Tàu.'] :
+      !sizeType ? ['CONTAINER', 'Chọn Kích Cỡ / Quy Cách container.'] :
+      !(tareWeightKg > 0) ? ['CONTAINER', 'Nhập Tare Weight (kg) — loại container này chưa khai báo trọng lượng trong DM Loại Container.'] :
+      !(payloadKg > 0) ? ['CONTAINER', 'Nhập Max Payload (kg) — loại container này chưa khai báo trọng lượng trong DM Loại Container.'] :
+      !truckPlate.trim() ? ['OPERATION', 'Nhập Biển Số Xe đầu kéo.'] :
+      !driverName.trim() ? ['OPERATION', 'Nhập Họ Tên Tài Xế.'] :
+      !driverPhone.trim() ? ['OPERATION', 'Nhập Số Điện Thoại Tài Xế.'] : null;
+    if (missing) {
+      setValidationError(missing[1]);
+      setActiveTab(missing[0] as typeof activeTab);
+      return;
+    }
+    if (!standard) {
+      setValidationError('Chọn Tiêu Chuẩn Giám Định Áp Dụng.');
+      setActiveTab('GRADING');
+      return;
+    }
+    if (!condition) {
+      setValidationError('Chọn Đánh Giá Phân Loại Tình Trạng Ban Đầu (AV / CL / DM).');
+      setActiveTab('GRADING');
       return;
     }
 
@@ -434,17 +316,16 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
 
     const newRecord: SurveyItemRecord = {
       id: 'SURV-' + Math.random().toString(36).substring(2, 7).toUpperCase(),
-      surveyNo: surveyNo.trim() || `SRV-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+      surveyNo: `SRV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
       containerNo: cleanCont,
       isoCode,
       size: sizeType,
       type: containerTypeName,
-      owner,
+      // Chủ vỏ = hãng tàu quản lý (form không còn ô nhập riêng, giống Tiếp Nhận Cổng).
+      owner: shippingLineOptions.find((l) => l.code === shippingLine)?.name || '',
       shippingLine,
       isReefer,
-      isPreSurveyBeforeGateIn: isPreSurvey,
-      surveyType,
-      gateInTime: isPreSurvey ? 'Chưa Gate-In (Đang chờ ngoài cổng)' : gateInTime,
+      gateInTime: surveyDate,
       surveyDate,
       surveyor,
       shift,
@@ -454,13 +335,11 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
       condition,
 
       // Physical specs
-      manufactureMonthYear: manufactureYearMonth,
       tareWeightKg,
-      maxGrossWeightKg,
+      maxGrossWeightKg: tareWeightKg + payloadKg,
       payloadKg,
       material,
       floorType,
-      cscPlateNo,
 
       // Operations
       truckPlate,
@@ -468,7 +347,6 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
       driverName,
       driverPhone,
       driverLicense,
-      yardLocation,
       sealNo,
       customsSealNo,
       cargoStatus,
@@ -487,7 +365,8 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
         : {}),
 
       // Grading details
-      ...(condition === 'AV' ? { qualityGrade } : {}),
+      // Hạng lưu theo lựa chọn thật (trước chỉ gửi khi AV nên chọn hạng C/D cho cont hư hỏng bị mất).
+      ...(qualityGrade ? { qualityGrade } : {}),
       ...(condition === 'CL'
         ? {
             cleaningReason: cleaningReasons,
@@ -497,7 +376,7 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
             cleaningTotalCost: cleaningEstimatedCost,
             cleaningItems: selectedCleaningCodes.map((code) => {
               const tariff = cleaningTariffs.find((t) => t.cleaningCode === code);
-              const unitPrice = tariff ? getTariffCost(tariff) : 250000;
+              const unitPrice = tariff ? getTariffCost(tariff) : 0;
               return {
                 id: 'CLN-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
                 cleaningCode: code,
@@ -521,11 +400,21 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
       checklist,
       photos,
       remarks,
-      actionRequired
+      ...(actionRequired ? { actionRequired } : {})
     };
 
-    onSaveSurvey(newRecord, openImmediately);
-    onClose();
+    setIsSaving(true);
+    setValidationError(null);
+    try {
+      const ok = await onSaveSurvey(newRecord, openImmediately);
+      if (ok === false) {
+        setValidationError('Chưa lưu được — xem thông báo lỗi, sửa lại rồi bấm lưu lần nữa.');
+        return;
+      }
+      onClose();
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -544,14 +433,6 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
                 <h3 className="text-lg font-bold text-slate-900 tracking-wide">
                   Thêm Mới Phiếu Giám Định Container
                 </h3>
-                <span className="px-2.5 py-0.5 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-mono font-bold rounded-lg">
-                  {surveyNo}
-                </span>
-                {isPreSurvey && (
-                  <span className="px-2 py-0.5 bg-blue-500/20 text-blue-700 border border-blue-500/30 text-[11px] font-bold rounded-md">
-                    Pre-Survey (Trước Gate-in)
-                  </span>
-                )}
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
                 Nhập đầy đủ thông số vỏ, phương tiện giao nhận, tiêu chuẩn IICL, phân loại AV/CL/DM, tổn thất và ảnh hiện trường.
@@ -565,44 +446,6 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
           >
             <X className="w-5 h-5" />
           </button>
-        </div>
-
-        {/* Preset Quick Fill Bar */}
-        <div className="px-5 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-2 overflow-x-auto text-xs">
-          <span className="text-slate-500 flex items-center gap-1.5 whitespace-nowrap font-medium">
-            <Sparkle className="w-3.5 h-3.5 text-amber-400" />
-            <span>Mẫu Điền Nhanh:</span>
-          </span>
-          <div className="flex items-center gap-2 flex-nowrap">
-            <button
-              type="button"
-              onClick={() => handleApplyPreset('AV_FOOD')}
-              className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 border border-emerald-500/30 rounded-lg whitespace-nowrap transition cursor-pointer text-[11px] font-semibold"
-            >
-              ✓ Cont Khô Đạt Chuẩn (Grade A Food)
-            </button>
-            <button
-              type="button"
-              onClick={() => handleApplyPreset('CL_OIL')}
-              className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 border border-amber-500/30 rounded-lg whitespace-nowrap transition cursor-pointer text-[11px] font-semibold"
-            >
-              🚿 Cont Cần Vệ Sinh (Tẩy dầu sàn)
-            </button>
-            <button
-              type="button"
-              onClick={() => handleApplyPreset('DM_CUT')}
-              className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 border border-rose-500/30 rounded-lg whitespace-nowrap transition cursor-pointer text-[11px] font-semibold"
-            >
-              ⚠ Cont Hư Hỏng (Rách vách IICL)
-            </button>
-            <button
-              type="button"
-              onClick={() => handleApplyPreset('RF_REEFER')}
-              className="px-2.5 py-1 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-700 border border-cyan-500/30 rounded-lg whitespace-nowrap transition cursor-pointer text-[11px] font-semibold"
-            >
-              ❄ Cont Lạnh 40HR (Carrier PTI Đạt)
-            </button>
-          </div>
         </div>
 
         {/* Tab Navigation */}
@@ -648,17 +491,24 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
 
           {/* TAB 1: CONTAINER SPECS */}
           {activeTab === 'CONTAINER' && (
+            // Cùng bộ ô với "1. Thông Tin Vỏ Container" ở Tiếp Nhận Cổng — lưu là tạo luôn hồ sơ Gate-In.
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Container Number & ISO Check */}
-                <div className="space-y-1.5 md:col-span-2">
-                  <div className="flex items-center justify-between">
-                    <label className="font-bold text-slate-700 flex items-center gap-1.5">
-                      <Boxes className="w-4 h-4 text-amber-400" />
-                      <span>Số Container (4 chữ cái + 7 chữ số)*</span>
-                    </label>
-                    <span className="text-[11px] font-mono text-slate-500">Chuẩn ISO 6346</span>
-                  </div>
+              {/* Số container + nhãn ISO + kiểm tra check digit */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <span>Số Container (ISO 6346)*</span>
+                    <span className="text-[10px] text-rose-400 font-mono">Bắt buộc</span>
+                  </label>
+                  {containerNo.trim().length === 11 && (
+                    validationResult.isCheckDigitCorrect ? (
+                      <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 font-bold">✓ Check Digit Valid</span>
+                    ) : (
+                      <span className="text-[10px] font-mono text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 font-bold">✗ Sai Check Digit</span>
+                    )
+                  )}
+                </div>
+                <div className="relative">
                   <input
                     type="text"
                     required
@@ -668,186 +518,92 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
                       setContainerNo(e.target.value.toUpperCase());
                       setValidationError(null);
                     }}
-                    placeholder="VD: MSCU1234567, MAEU8899001..."
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-amber-400 font-mono font-bold text-base tracking-wider uppercase focus:outline-none focus:border-amber-500 shadow-inner"
+                    placeholder="VD: MSCU7729104"
+                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-base sm:text-lg font-mono font-black text-slate-900 focus:outline-none focus:border-blue-500 tracking-widest uppercase shadow-sm"
                   />
-                  {/* Realtime Check Digit Validation Helper */}
-                  {containerNo.length >= 4 && (
-                    <div className="flex items-center gap-2 pt-1">
-                      {validationResult.isCheckDigitCorrect ? (
-                        <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-700 border border-emerald-500/30 rounded text-[11px] font-semibold flex items-center gap-1">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                          <span>{validationResult.message}</span>
-                        </span>
-                      ) : validationResult.isValidFormat ? (
-                        <span className="px-2 py-0.5 bg-rose-500/20 text-rose-700 border border-rose-500/30 rounded text-[11px] font-semibold flex items-center gap-1">
-                          <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
-                          <span>{validationResult.message}</span>
-                        </span>
-                      ) : (
-                        <span className="text-[11px] text-slate-500">
-                          {validationResult.message}
-                        </span>
-                      )}
+                  {isoCode && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <span className="px-2 py-0.5 text-[11px] font-bold font-mono bg-blue-50 text-blue-700 rounded border border-blue-200">
+                        {isoCode}
+                      </span>
                     </div>
                   )}
                 </div>
+                {containerNo.length >= 4 && !validationResult.isValidFormat && (
+                  <p className="mt-1.5 text-[11px] text-slate-500">{validationResult.message}</p>
+                )}
+              </div>
 
-                {/* Shipping Line Selection */}
-                <div className="space-y-1.5">
-                  <label className="font-bold text-slate-700 flex items-center gap-1.5">
-                    <Ship className="w-4 h-4 text-sky-400" />
-                    <span>Hãng Tàu (Shipping Line)*</span>
-                  </label>
+              {/* Loại container — nút chọn nhanh từ DM Loại Container */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Kích Thước &amp; Loại Container*</label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
+                  {containerTypeOptions.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      title={`${t.typeCode} • ISO ${t.isoCode} • ${t.name || t.vietnameseName}`}
+                      onClick={() => handleSizeTypeChange(t.typeCode)}
+                      className={`py-2 px-2.5 rounded-xl text-xs font-bold transition text-left cursor-pointer border ${
+                        sizeType === t.typeCode
+                          ? 'bg-blue-600 text-white border-blue-400 shadow-sm'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="font-black text-sm">{t.typeCode}</div>
+                      <div className="text-[10px] opacity-80 truncate">{t.name || t.vietnameseName}</div>
+                    </button>
+                  ))}
+                </div>
+                {/* Trọng lượng vỏ: điền sẵn theo DM Loại Container, sửa được theo số in trên cửa container. */}
+                <div className="grid grid-cols-2 gap-3 mt-2">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Tare Weight (kg)*</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={tareWeightKg || ''}
+                      onChange={(e) => setTareWeightKg(Number(e.target.value) || 0)}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 text-xs font-mono text-slate-900 rounded-xl focus:outline-none focus:border-sky-500 min-h-[40px] shadow-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Max Payload (kg)*</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={payloadKg || ''}
+                      onChange={(e) => setPayloadKg(Number(e.target.value) || 0)}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 text-xs font-mono text-slate-900 rounded-xl focus:outline-none focus:border-sky-500 min-h-[40px] shadow-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Hãng tàu + Số seal */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">Hãng Tàu Quản Lý (Shipping Line)*</label>
                   <select
                     value={shippingLine}
-                    onChange={(e) => handleShippingLineChange(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold focus:outline-none focus:border-amber-500 cursor-pointer"
+                    onChange={(e) => setShippingLine(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 text-xs text-slate-900 rounded-xl font-bold focus:outline-none focus:border-blue-500 min-h-[42px] shadow-sm"
                   >
-                    <option value="MAERSK">MAERSK Line</option>
-                    <option value="MSC">MSC Shipping</option>
-                    <option value="ONE">ONE Network Express</option>
-                    <option value="CMA-CGM">CMA CGM Group</option>
-                    <option value="COSCO">COSCO Shipping</option>
-                    <option value="EVERGREEN">EVERGREEN Marine</option>
-                    <option value="YANG-MING">YANG MING Line</option>
-                    <option value="HAPAG-LLOYD">HAPAG-LLOYD</option>
-                    <option value="WAN-HAI">WAN HAI Lines</option>
-                    <option value="ZIM">ZIM Integrated</option>
-                    <option value="SITC">SITC Container Lines</option>
-                    <option value="KMTC">KMTC Korea</option>
+                    <option value="">-- Chọn hãng tàu --</option>
+                    {shippingLineOptions.map((l) => (
+                      <option key={l.code} value={l.code}>{l.code} - {l.name}</option>
+                    ))}
                   </select>
                 </div>
-              </div>
-
-              {/* Size & Type Selection with Auto Specs */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-1.5">
-                  <label className="font-bold text-slate-700">Kích Cỡ / Quy Cách*</label>
-                  <select
-                    value={sizeType}
-                    onChange={(e) => handleSizeTypeChange(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-amber-400 font-bold focus:outline-none focus:border-amber-500 cursor-pointer"
-                  >
-                    <option value="20DC">20DC - 20' Dry Standard (22G1)</option>
-                    <option value="40DC">40DC - 40' Dry Standard (42G1)</option>
-                    <option value="40HC">40HC - 40' High Cube Dry (45G1)</option>
-                    <option value="45HC">45HC - 45' High Cube Dry (L5G1)</option>
-                    <option value="20RF">20RF - 20' Reefer Lạnh (22R1)</option>
-                    <option value="40HR">40HR - 40' Reefer High Cube (45R1)</option>
-                    <option value="20OT">20OT - 20' Open Top Mở nóc (22U1)</option>
-                    <option value="40OT">40OT - 40' Open Top High Cube (45U1)</option>
-                    <option value="20FR">20FR - 20' Flat Rack Mặt bằng (22P1)</option>
-                    <option value="40FR">40FR - 40' Flat Rack High Cube (45P1)</option>
-                    <option value="20TK">20TK - 20' ISO Tank Bồn lỏng (22T1)</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="font-bold text-slate-700">Mã ISO 6346</label>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">Số Niêm Phong Lúc Hạ (Seal No.)</label>
                   <input
                     type="text"
-                    value={isoCode}
-                    onChange={(e) => setIsoCode(e.target.value.toUpperCase())}
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sky-400 font-mono font-bold focus:outline-none focus:border-amber-500 uppercase"
+                    value={sealNo}
+                    onChange={(e) => setSealNo(e.target.value)}
+                    placeholder="ML-SEAL-88912"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 text-xs text-slate-900 rounded-xl font-mono focus:border-blue-500 focus:outline-none min-h-[42px] shadow-sm"
                   />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="font-bold text-slate-700">Chủ Vỏ / Đơn Vị Cho Thuê</label>
-                  <input
-                    type="text"
-                    value={owner}
-                    onChange={(e) => setOwner(e.target.value)}
-                    placeholder="VD: MAERSK A/S, TRITON, TEXTAINER..."
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-              </div>
-
-              {/* Physical Weight & Construction Parameters */}
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                  <h4 className="font-bold text-slate-700 flex items-center gap-2">
-                    <Info className="w-4 h-4 text-amber-400" />
-                    <span>Thông Số Kỹ Thuật &amp; Tải Trọng Vỏ (Weight &amp; Material)</span>
-                  </h4>
-                  <span className="text-[11px] text-slate-500">Tự động tính toán theo quy cách ISO</span>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div>
-                    <label className="block text-[11px] text-slate-500 mb-1">Năm/Tháng Sản Xuất</label>
-                    <input
-                      type="text"
-                      value={manufactureYearMonth}
-                      onChange={(e) => setManufactureYearMonth(e.target.value)}
-                      placeholder="MM/YYYY"
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-900 font-mono text-center"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] text-slate-500 mb-1">Trọng Lượng Bì (Tare Kg)</label>
-                    <input
-                      type="number"
-                      value={tareWeightKg}
-                      onChange={(e) => handleTareChange(Number(e.target.value))}
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-amber-400 font-mono font-bold"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] text-slate-500 mb-1">Max Gross Weight (Kg)</label>
-                    <input
-                      type="number"
-                      value={maxGrossWeightKg}
-                      onChange={(e) => handleGrossChange(Number(e.target.value))}
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-emerald-400 font-mono font-bold"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] text-slate-500 mb-1">Tải Trọng Hàng (Payload)</label>
-                    <input
-                      type="number"
-                      readOnly
-                      value={payloadKg}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-500 font-mono font-bold cursor-not-allowed"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-                  <div>
-                    <label className="block text-[11px] text-slate-500 mb-1">Vật Liệu Cấu Trúc Vỏ</label>
-                    <input
-                      type="text"
-                      value={material}
-                      onChange={(e) => setMaterial(e.target.value)}
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-700"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] text-slate-500 mb-1">Loại Sàn Lót (Floor Type)</label>
-                    <input
-                      type="text"
-                      value={floorType}
-                      onChange={(e) => setFloorType(e.target.value)}
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-700"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] text-slate-500 mb-1">Số Bảng Đồng CSC Safety Plate</label>
-                    <input
-                      type="text"
-                      value={cscPlateNo}
-                      onChange={(e) => setCscPlateNo(e.target.value)}
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-700 font-mono"
-                    />
-                  </div>
                 </div>
               </div>
             </div>
@@ -856,97 +612,12 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
           {/* TAB 2: OPERATION & LOGISTICS */}
           {activeTab === 'OPERATION' && (
             <div className="space-y-4">
-              {/* Survey Type & Mode */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Các ô Loại nghiệp vụ / Số phiếu / Thời gian giám định / Thời gian Gate-In / Giám định viên trước đây
+                  đều không được lưu: backend tự ghi giờ Gate-In + giờ giám định, lấy giám định viên theo tài khoản đăng nhập. */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="font-bold text-slate-700">Loại Nghiệp Vụ Giám Định*</label>
-                  <select
-                    value={surveyType}
-                    onChange={(e) => {
-                      const st = e.target.value as SurveyType;
-                      setSurveyType(st);
-                      if (st === 'PRE_SURVEY') {
-                        setIsPreSurvey(true);
-                      } else {
-                        setIsPreSurvey(false);
-                      }
-                    }}
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-amber-400 font-bold focus:outline-none cursor-pointer"
-                  >
-                    <option value="GATE_IN">Giám Định Cổng Vào (Gate-In Survey)</option>
-                    <option value="PRE_SURVEY">Giám Định Tiền Trạm (Pre-Survey Ngoài Cổng)</option>
-                    <option value="GATE_OUT">Giám Định Xuất Bãi (Gate-Out Survey)</option>
-                    <option value="YARD_PERIODIC">Giám Định Định Kỳ Bãi (Yard Periodic)</option>
-                    <option value="POST_REPAIR">Giám Định Sau Sửa Chữa (Post-Repair QA)</option>
-                    <option value="ON_HIRE">Giám Định Thuê Vỏ (On-Hire Survey)</option>
-                    <option value="OFF_HIRE">Giám Định Trả Vỏ (Off-Hire Survey)</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="font-bold text-slate-700">Số Phiếu Giám Định (Survey No)</label>
-                  <input
-                    type="text"
-                    value={surveyNo}
-                    onChange={(e) => setSurveyNo(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono font-bold"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="font-bold text-slate-700">Thời Gian Giám Định</label>
-                  <input
-                    type="text"
-                    value={surveyDate}
-                    onChange={(e) => setSurveyDate(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono"
-                  />
-                </div>
-              </div>
-
-              {/* Gate In Status & Surveyor */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="font-bold text-slate-700">Thời Gian Gate-In</label>
-                    <label className="flex items-center gap-1 text-[11px] text-amber-400 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={isPreSurvey}
-                        onChange={(e) => {
-                          setIsPreSurvey(e.target.checked);
-                          if (e.target.checked) {
-                            setGateInTime('Chưa Gate-In (Đang chờ ngoài cổng)');
-                          } else {
-                            setGateInTime(new Date().toISOString().substring(0, 16).replace('T', ' '));
-                          }
-                        }}
-                        className="rounded accent-amber-500"
-                      />
-                      <span>Chưa Gate-In</span>
-                    </label>
-                  </div>
-                  <input
-                    type="text"
-                    disabled={isPreSurvey}
-                    value={gateInTime}
-                    onChange={(e) => setGateInTime(e.target.value)}
-                    className={`w-full px-3 py-2.5 rounded-xl font-mono ${
-                      isPreSurvey
-                        ? 'bg-slate-50 text-blue-700 border border-blue-500/30'
-                        : 'bg-slate-50 border border-slate-200 text-slate-900'
-                    }`}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="font-bold text-slate-700">Giám Định Viên Tiếp Nhận</label>
-                  <input
-                    type="text"
-                    value={surveyor}
-                    onChange={(e) => setSurveyor(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900"
-                  />
+                  <label className="font-bold text-slate-700">Giám Định Viên</label>
+                  <div className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 min-h-[42px]">{surveyor || '—'}</div>
                 </div>
 
                 <div className="space-y-1.5">
@@ -1005,7 +676,7 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-[11px] text-slate-500 mb-1">SĐT Tài Xế / GPLX</label>
+                    <label className="block text-[11px] text-slate-500 mb-1">SĐT Tài Xế</label>
                     <input
                       type="text"
                       value={driverPhone}
@@ -1016,18 +687,9 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-1">
-                  <div>
-                    <label className="block text-[11px] text-slate-500 mb-1">Vị Trí Bãi Hạ (Yard Slot)</label>
-                    <input
-                      type="text"
-                      value={yardLocation}
-                      onChange={(e) => setYardLocation(e.target.value.toUpperCase())}
-                      placeholder="Block-Bay-Row-Tier (B02-08-03-2)"
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-amber-400 font-mono font-bold"
-                    />
-                  </div>
-
+                {/* Không có ô vị trí bãi: lúc giám định container đang đậu ở khu giám định, vị trí bãi do xe nâng
+                    ghi nhận khi hạ bãi sau giám định. */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                   <div>
                     <label className="block text-[11px] text-slate-500 mb-1">Trạng Thái Hàng Hóa</label>
                     <select
@@ -1040,17 +702,6 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
                       <option value="FULL_EXPORT">Hàng Xuất Khẩu (Full Export)</option>
                       <option value="LCL">Hàng Ghép LCL</option>
                     </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] text-slate-500 mb-1">Số Seal Hãng Tàu</label>
-                    <input
-                      type="text"
-                      value={sealNo}
-                      onChange={(e) => setSealNo(e.target.value)}
-                      placeholder="MSK-982104"
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-700 font-mono"
-                    />
                   </div>
 
                   <div>
@@ -1077,13 +728,15 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
                   <label className="font-bold text-slate-700">Tiêu Chuẩn Giám Định Áp Dụng*</label>
                   <select
                     value={standard}
-                    onChange={(e) => setStandard(e.target.value as any)}
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-amber-400 font-bold focus:outline-none cursor-pointer"
+                    onChange={(e) => setStandard(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-bold focus:outline-none cursor-pointer"
                   >
-                    <option value="IICL-6">IICL-6 (Tiêu chuẩn quốc tế cao nhất - Viện IICL)</option>
-                    <option value="MCIC">MCIC (Tiêu chuẩn giám định hãng COSCO / OOCL)</option>
-                    <option value="MRIC">MRIC (Tiêu chuẩn bảo trì &amp; sửa chữa container)</option>
-                    <option value="CARRIER_CUSTOM">Tiêu Chuẩn Đặc Thù Của Hãng Tàu (Carrier Custom)</option>
+                    <option value="">-- Chọn tiêu chuẩn --</option>
+                    {activeStandards.map((st) => (
+                      <option key={st.id} value={st.standardCode}>
+                        {st.standardName}{!st.standardName.includes(st.standardCode) ? ` (${st.standardCode})` : ''}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -1093,74 +746,78 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
                     type="text"
                     value={standardNotes}
                     onChange={(e) => setStandardNotes(e.target.value)}
-                    placeholder="Áp dụng hạn mức dung sai IICL-6..."
+                    placeholder="Ghi chú dung sai / hạn mức áp dụng..."
                     className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700"
                   />
                 </div>
               </div>
 
-              {/* Primary Condition Selector: AV / CL / DM */}
+              {/* Phân loại tình trạng: 3 giá trị cố định mà backend nhận (AV→A, CL→B, DM→C) */}
               <div className="space-y-2">
                 <label className="font-bold text-slate-700 block">
                   Đánh Giá Phân Loại Tình Trạng Ban Đầu (Condition)*
                 </label>
-                {/* Chỉ hiện tên + nút chọn nhỏ (chip) — bỏ mô tả dài và thẻ to trước đây theo yêu cầu. */}
                 <div className="flex flex-wrap gap-2">
-                  {activeGrades.map((grade, index) => {
-                    const bucket = gradeBucket(index, activeGrades.length);
-                    const isAv = bucket === 'AV';
-                    const isSelected = condition === bucket && qualityGrade === (grade.gradeCode as any);
-                    return (
-                      <button
-                        key={grade.id}
-                        type="button"
-                        onClick={() => {
-                          setCondition(bucket);
-                          setQualityGrade(grade.gradeCode as any);
-                          setActionRequired(isAv ? 'AVAILABLE_FOR_DISPATCH' : 'SEND_TO_REPAIR');
-                        }}
-                        className={`px-3 py-1.5 rounded-full border text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
-                          isSelected
-                            ? isAv
-                              ? 'bg-emerald-500 border-emerald-400 text-slate-950'
-                              : 'bg-rose-500 border-rose-400 text-white'
-                            : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-slate-200'
-                        }`}
-                      >
-                        <span className={`w-2 h-2 rounded-full ${isSelected ? (isAv ? 'bg-slate-50' : 'bg-white') : 'bg-slate-300'}`} />
-                        {grade.gradeName}
-                      </button>
-                    );
-                  })}
-
-                  {/* Nút CL cố định — "Cần vệ sinh" là 1 trục nghiệp vụ khác (tình trạng vệ sinh vật lý),
-                      không phải hạng chất lượng nên không có Grade thật nào tương ứng để lấy động. */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCondition('CL');
-                      setActionRequired('SEND_TO_WASHING');
-                    }}
-                    className={`px-3 py-1.5 rounded-full border text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
-                      condition === 'CL'
-                        ? 'bg-amber-500 border-amber-400 text-slate-950'
-                        : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-slate-200'
-                    }`}
-                  >
-                    <span className={`w-2 h-2 rounded-full ${condition === 'CL' ? 'bg-slate-50' : 'bg-slate-300'}`} />
-                    Cleaning
-                  </button>
+                  {([
+                    { id: 'AV', label: 'AV · Đạt chuẩn', action: 'AVAILABLE_FOR_DISPATCH', on: 'bg-emerald-600 border-emerald-600 text-white' },
+                    { id: 'CL', label: 'CL · Cần vệ sinh', action: 'SEND_TO_WASHING', on: 'bg-amber-500 border-amber-500 text-white' },
+                    { id: 'DM', label: 'DM · Hư hỏng', action: 'SEND_TO_REPAIR', on: 'bg-rose-600 border-rose-600 text-white' }
+                  ] as const).map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => {
+                        setCondition(opt.id);
+                        setActionRequired(opt.action);
+                        setValidationError(null);
+                      }}
+                      className={`px-3 py-1.5 rounded-full border text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
+                        condition === opt.id ? opt.on : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300'
+                      }`}
+                    >
+                      <span className={`w-2 h-2 rounded-full ${condition === opt.id ? 'bg-white' : 'bg-slate-300'}`} />
+                      {opt.label}
+                    </button>
+                  ))}
                 </div>
+              </div>
+
+              {/* Hạng chất lượng — lấy từ DM Hạng (Grade), chọn thêm nếu cần */}
+              <div className="space-y-2">
+                <label className="font-bold text-slate-700 block">Hạng Chất Lượng (Grade)</label>
+                {activeGrades.length === 0 ? (
+                  <p className="text-xs text-slate-500">Chưa có hạng nào trong DM Hạng.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {activeGrades.map((grade) => {
+                      const isSelected = qualityGrade === grade.gradeCode;
+                      return (
+                        <button
+                          key={grade.id}
+                          type="button"
+                          title={grade.description || grade.gradeCode}
+                          onClick={() => setQualityGrade(isSelected ? '' : grade.gradeCode)}
+                          className={`px-3 py-1.5 rounded-full border text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
+                            isSelected ? 'bg-blue-600 border-blue-600 text-white' : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300'
+                          }`}
+                        >
+                          <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-white' : 'bg-slate-300'}`} />
+                          {grade.gradeName}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Conditional Sub-panels */}
 
               {/* IF CL: Cleaning Reasons & Master Tariffs with Direct Pricing */}
               {condition === 'CL' && (
-                <div className="p-4 bg-amber-950/20 border border-amber-200 rounded-2xl space-y-4">
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-200 pb-2">
                     <h4 className="font-bold text-amber-700 flex items-center gap-2 text-sm">
-                      <Droplets className="w-4 h-4 text-cyan-400" />
+                      <Droplets className="w-4 h-4 text-cyan-700" />
                       <span>Chọn Danh Mục Vệ Sinh &amp; Bảng Giá Tự Động (Cleaning Master Tariff)</span>
                     </h4>
                     <span className="text-[11px] text-amber-800/80">
@@ -1188,7 +845,7 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
                             key={item.id}
                             className={`p-2 rounded-lg border flex items-center gap-2 cursor-pointer text-xs transition ${
                               isSelected
-                                ? 'bg-amber-900/40 border-amber-500 text-amber-800 font-bold'
+                                ? 'bg-amber-100 border-amber-500 text-amber-800 font-bold'
                                 : 'bg-white border-slate-200 text-slate-500 hover:border-slate-200'
                             }`}
                           >
@@ -1217,7 +874,7 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
                       <label className="block text-[11px] text-slate-700 font-bold">
                         2. Chọn Các Hạng Mục Dịch Vụ Vệ Sinh (Kèm Đơn Giá Master Data)
                       </label>
-                      <span className="text-[11px] text-cyan-400 font-mono font-semibold">
+                      <span className="text-[11px] text-cyan-700 font-mono font-semibold">
                         Đã chọn: {selectedCleaningCodes.length} dịch vụ
                       </span>
                     </div>
@@ -1238,21 +895,21 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
                             }}
                             className={`p-3 rounded-xl border cursor-pointer transition flex items-start justify-between gap-2.5 ${
                               isSelected
-                                ? 'bg-amber-950/50 border-amber-500 shadow-md ring-1 ring-amber-500/30'
+                                ? 'bg-amber-100 border-amber-500 shadow-md ring-1 ring-amber-500/30'
                                 : 'bg-slate-50 border-slate-200 hover:border-slate-200'
                             }`}
                           >
                             <div className="flex items-start gap-2 min-w-0">
                               <div className="mt-0.5">
                                 {isSelected ? (
-                                  <CheckSquare className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                                  <CheckSquare className="w-4 h-4 text-amber-700 flex-shrink-0" />
                                 ) : (
                                   <Square className="w-4 h-4 text-slate-600 flex-shrink-0" />
                                 )}
                               </div>
                               <div className="min-w-0">
                                 <div className="flex items-center gap-1.5">
-                                  <span className="font-mono font-bold text-[11px] text-cyan-400">
+                                  <span className="font-mono font-bold text-[11px] text-cyan-700">
                                     {tariff.cleaningCode}
                                   </span>
                                   {tariff.chemicalRequired && (
@@ -1271,7 +928,7 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
                             </div>
 
                             <div className="text-right flex-shrink-0">
-                              <div className="text-xs font-mono font-bold text-amber-400">
+                              <div className="text-xs font-mono font-bold text-amber-700">
                                 {price.toLocaleString('vi-VN')} đ
                               </div>
                               <span className="text-[10px] text-slate-500 font-mono">
@@ -1321,16 +978,18 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
                           type="number"
                           value={cleaningEstimatedCost}
                           onChange={(e) => setCleaningEstimatedCost(Number(e.target.value))}
-                          className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-amber-400 font-mono font-bold text-xs"
+                          className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-amber-700 font-mono font-bold text-xs"
                         />
                         <span className="text-xs text-slate-500 font-semibold">VNĐ</span>
                       </div>
                     </div>
 
                     <div className="text-right sm:border-l sm:border-slate-200 sm:pl-4">
-                      <div className="text-[11px] text-slate-500">Tổng thanh toán (VAT 8%):</div>
-                      <div className="text-base font-mono font-black text-emerald-400">
-                        {Math.round(cleaningEstimatedCost * 1.08).toLocaleString('vi-VN')} đ
+                      <div className="text-[11px] text-slate-500">
+                        Tổng thanh toán (VAT {Math.round(cleaningVatRate * 1000) / 10}% theo biểu phí):
+                      </div>
+                      <div className="text-base font-mono font-black text-emerald-700">
+                        {Math.round(cleaningEstimatedCost * (1 + cleaningVatRate)).toLocaleString('vi-VN')} đ
                       </div>
                     </div>
                   </div>
@@ -1350,7 +1009,7 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
 
               {/* IF REEFER: Machinery specs */}
               {isReefer && (
-                <div className="p-4 bg-cyan-950/20 border border-cyan-800/40 rounded-2xl space-y-3">
+                <div className="p-4 bg-cyan-50 border border-cyan-200 rounded-2xl space-y-3">
                   <h4 className="font-bold text-cyan-700 flex items-center gap-2">
                     <Thermometer className="w-4 h-4" />
                     <span>Thông Số Kiểm Tra Cụm Máy Lạnh (Reefer Machinery Inspection)</span>
@@ -1377,7 +1036,7 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
                         type="number"
                         value={setTemperature}
                         onChange={(e) => setSetTemperature(Number(e.target.value))}
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-cyan-400 font-mono font-bold"
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-cyan-700 font-mono font-bold"
                       />
                     </div>
 
@@ -1414,8 +1073,9 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
                 <select
                   value={actionRequired}
                   onChange={(e) => setActionRequired(e.target.value as any)}
-                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-amber-400 font-bold focus:outline-none cursor-pointer"
+                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-bold focus:outline-none cursor-pointer"
                 >
+                  <option value="">-- Tự theo phân loại tình trạng --</option>
                   <option value="AVAILABLE_FOR_DISPATCH">Sẵn Sàng Cấp Phát Đóng Hàng (Available for Dispatch)</option>
                   <option value="SEND_TO_WASHING">Chuyển Khu Vực Rửa &amp; Vệ Sinh (Send to Washing)</option>
                   <option value="SEND_TO_REPAIR">Chuyển Xưởng Sửa Chữa M&amp;R (Send to Repair Shop)</option>
@@ -1448,6 +1108,7 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
                       onChange={(e) => setDmgLocation(e.target.value)}
                       className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 text-xs"
                     >
+                      <option value="">-- Chọn vị trí --</option>
                       {locations.map((loc) => (
                         <option key={loc.id} value={loc.code}>
                           {loc.code} - {loc.vietnameseName}
@@ -1463,6 +1124,7 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
                       onChange={(e) => setDmgCode(e.target.value)}
                       className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 text-xs"
                     >
+                      <option value="">-- Chọn mã hư hỏng --</option>
                       {damageCodes.map((code) => (
                         <option key={code.id} value={code.code}>
                           {code.code} - {code.vietnameseName}
@@ -1478,6 +1140,7 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
                       onChange={(e) => setDmgRepair(e.target.value)}
                       className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 text-xs"
                     >
+                      <option value="">-- Chọn phương án --</option>
                       {repairCodes.map((rep) => (
                         <option key={rep.id} value={rep.repairCode}>
                           {rep.repairCode} - {rep.vietnameseName}
@@ -1538,7 +1201,7 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
                         className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg transition flex items-center gap-1 cursor-pointer whitespace-nowrap text-xs"
                       >
                         <Plus className="w-3.5 h-3.5" />
-                        <span>+ Thêm Hư Hỏng</span>
+                        <span>Thêm Hư Hỏng</span>
                       </button>
                     </div>
                   </div>
@@ -1652,54 +1315,6 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
                       Quy chuẩn IICL: Tối thiểu 01 ảnh toàn cảnh + 01 ảnh chi tiết vị trí hư hỏng/bẩn kèm thời gian ghi nhận (Timestamp).
                     </p>
                   </div>
-
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <button
-                      type="button"
-                      onClick={handleAddStandardPhotoSet}
-                      className="px-2.5 py-1 bg-emerald-600/30 hover:bg-emerald-600/40 text-emerald-700 border border-emerald-500/40 rounded-lg text-[10px] font-bold transition cursor-pointer flex items-center gap-1"
-                    >
-                      <Sparkles className="w-3 h-3 text-emerald-400" />
-                      <span>+ Bộ Ảnh Chuẩn (Toàn cảnh + Cận cảnh)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleAddSamplePhoto('OVERVIEW')}
-                      className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-semibold transition cursor-pointer"
-                    >
-                      + Toàn cảnh
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleAddSamplePhoto('DETAIL')}
-                      className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-semibold transition cursor-pointer"
-                    >
-                      + Cận cảnh
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleAddSamplePhoto('DOOR_SEAL')}
-                      className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-semibold transition cursor-pointer"
-                    >
-                      + Ron cửa
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleAddSamplePhoto('INTERIOR_FLOOR')}
-                      className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-semibold transition cursor-pointer"
-                    >
-                      + Sàn gỗ
-                    </button>
-                    {isReefer && (
-                      <button
-                        type="button"
-                        onClick={() => handleAddSamplePhoto('REEFER_PANEL')}
-                        className="px-2 py-1 bg-cyan-900/60 hover:bg-cyan-800 text-cyan-800 rounded-lg text-[10px] font-semibold transition cursor-pointer"
-                      >
-                        + Máy lạnh
-                      </button>
-                    )}
-                  </div>
                 </div>
 
                 {photos.length === 0 ? (
@@ -1707,7 +1322,7 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
                     <Camera className="w-8 h-8 mx-auto text-slate-600" />
                     <p className="text-xs font-semibold">Chưa có ảnh đính kèm</p>
                     <p className="text-[11px] text-slate-500">
-                      Bấm nút "+ Bộ Ảnh Chuẩn" hoặc các nút phía trên để chụp/thêm ảnh hiện trường có timestamp
+                      Ảnh hiện trường được chụp & tải lên thật ở bước Giám Định chi tiết sau khi tạo phiếu (cần có hồ sơ container thật để lưu ảnh).
                     </p>
                   </div>
                 ) : (
@@ -1763,10 +1378,18 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
         <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="text-xs text-slate-500 flex items-center gap-2">
             <span className="font-bold text-slate-900">{containerNo || '(Chưa nhập số vỏ)'}</span>
-            <span>•</span>
-            <span className="text-amber-700 font-semibold">{shippingLine}</span>
-            <span>•</span>
-            <span className="text-sky-700 font-semibold">{sizeType}</span>
+            {shippingLine && (
+              <>
+                <span>•</span>
+                <span className="text-amber-700 font-semibold">{shippingLine}</span>
+              </>
+            )}
+            {sizeType && (
+              <>
+                <span>•</span>
+                <span className="text-sky-700 font-semibold">{sizeType}</span>
+              </>
+            )}
             <span>•</span>
             <span
               className={`font-bold px-1.5 py-0.5 rounded text-[10px] ${
@@ -1774,10 +1397,12 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
                   ? 'bg-emerald-500/20 text-emerald-700'
                   : condition === 'CL'
                   ? 'bg-amber-500/20 text-amber-700'
-                  : 'bg-rose-500/20 text-rose-700'
+                  : condition === 'DM'
+                  ? 'bg-rose-500/20 text-rose-700'
+                  : 'bg-slate-100 text-slate-500'
               }`}
             >
-              {condition}
+              {condition || 'Chưa phân loại'}
             </span>
           </div>
 
@@ -1793,7 +1418,8 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
             <button
               type="button"
               onClick={() => handleSave('NEW', false)}
-              className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-amber-400 text-xs font-bold rounded-xl transition cursor-pointer"
+              disabled={isSaving}
+              className="disabled:opacity-50 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-amber-400 text-xs font-bold rounded-xl transition cursor-pointer"
             >
               Lưu Chờ Giám Định
             </button>
@@ -1801,7 +1427,8 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
             <button
               type="button"
               onClick={() => handleSave('IN_PROGRESS', true)}
-              className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl shadow-lg shadow-amber-500/20 transition flex items-center gap-1.5 cursor-pointer"
+              disabled={isSaving}
+              className="disabled:opacity-50 px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl shadow-lg shadow-amber-500/20 transition flex items-center gap-1.5 cursor-pointer"
             >
               <Zap className="w-4 h-4" />
               <span>Lưu &amp; Mở Giám Định Ngay</span>

@@ -1,21 +1,22 @@
 import React, { useState, useMemo } from 'react';
 import { ContainerRecord } from '../../../services/mockDataStore';
-import { formatVND } from '../../../utils/format';
-import { 
-  CheckSquare, 
-  Check, 
-  X, 
-  AlertCircle, 
-  Eye, 
-  Image as ImageIcon, 
-  Search, 
-  Filter, 
-  FileText, 
-  CheckCircle2, 
-  XCircle, 
-  Clock, 
-  Wrench, 
-  ArrowRight, 
+import { formatVND, formatDateTime } from '../../../utils/format';
+import type { CarrierApprovalInput } from '../../../api/estimate.api';
+import {
+  CheckSquare,
+  Check,
+  X,
+  AlertCircle,
+  Eye,
+  Image as ImageIcon,
+  Search,
+  Filter,
+  FileText,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Wrench,
+  ArrowRight,
   ShieldCheck,
   Building2,
   Calendar,
@@ -26,15 +27,13 @@ import {
 
 interface ApprovalPageProps {
   containers: ContainerRecord[];
-  onApproveEstimate: (
-    containerId: string, 
-    authData?: { authCode: string; approvedAmount: number; notes?: string }
-  ) => void;
+  /** Trả về thông báo lỗi (null = thành công). */
+  onApproveEstimate: (containerId: string, approval: CarrierApprovalInput) => Promise<string | null>;
   onRejectEstimate: (
-    containerId: string, 
-    reason: string, 
+    containerId: string,
+    reason: string,
     rejectCode?: string
-  ) => void;
+  ) => Promise<string | null>;
   onNavigateTab: (tabId: string) => void;
 }
 
@@ -44,28 +43,14 @@ export const ApprovalPage: React.FC<ApprovalPageProps> = ({
   onRejectEstimate,
   onNavigateTab
 }) => {
-  // Sync with localStorage estimates list for extra details
-  const localEstimates = useMemo(() => {
-    try {
-      const saved = localStorage.getItem('DEPOT_ESTIMATES_LIST');
-      if (saved) return JSON.parse(saved);
-    } catch {
-      // ignore
-    }
-    return [];
-  }, []);
+  // Không còn đọc danh sách báo giá trong localStorage — mọi số liệu lấy từ báo giá thật (estimateDetails).
+  const localEstimates: any[] = [];
 
   // Containers with estimate or waiting approval or already approved/rejected
   const approvalContainers = useMemo(() => {
-    return containers.filter(
-      (c) =>
-        c.estimateDetails ||
-        c.status === 'WAITING_APPROVAL' ||
-        c.status === 'APPROVED' ||
-        c.status === 'REPAIRING' ||
-        c.status === 'WAITING_ESTIMATE' ||
-        c.condition === 'DM'
-    );
+    // Chỉ báo giá đã được người báo giá XÁC NHẬN (chờ duyệt) hoặc đã có quyết định hãng tàu. Trước đây lấy cả
+    // mọi container DM / trạng thái bịa nên container mới ở bước báo giá (chưa có báo giá) cũng hiện ở đây.
+    return containers.filter((c) => !!c.estimateDetails && c.estimateDetails.approvalStatus !== 'DRAFT');
   }, [containers]);
 
   // Tab & Filters state
@@ -81,6 +66,11 @@ export const ApprovalPage: React.FC<ApprovalPageProps> = ({
   const [authCode, setAuthCode] = useState('');
   const [approvedAmount, setApprovedAmount] = useState<number>(0);
   const [approvalNotes, setApprovalNotes] = useState('');
+  // Lệnh duyệt hãng tàu nhập tay: số WO hãng tàu, người duyệt, thời điểm, kênh nhận.
+  const [carrierWorkOrderNo, setCarrierWorkOrderNo] = useState('');
+  const [carrierApproverName, setCarrierApproverName] = useState('');
+  const [approvedAtLocal, setApprovedAtLocal] = useState('');
+  const [approvalChannel, setApprovalChannel] = useState('EMAIL');
 
   // Rejection Form State
   const [rejectReasonType, setRejectReasonType] = useState('CEDEX_PRICE_EXCEEDED');
@@ -107,7 +97,7 @@ export const ApprovalPage: React.FC<ApprovalPageProps> = ({
 
   // Determine Approval status of container
   const getContainerApprovalStatus = (c: ContainerRecord): 'PENDING' | 'APPROVED' | 'REJECTED' => {
-    if (c.estimateDetails?.approvalStatus === 'APPROVED' || c.status === 'APPROVED' || c.status === 'REPAIRING' || c.status === 'READY_FOR_USE') {
+    if (c.estimateDetails?.approvalStatus === 'APPROVED') {
       return 'APPROVED';
     }
     if (c.estimateDetails?.approvalStatus === 'REJECTED') {
@@ -157,11 +147,18 @@ export const ApprovalPage: React.FC<ApprovalPageProps> = ({
   // Open Approval Modal
   const handleOpenApproveModal = (c: ContainerRecord) => {
     setSelectedContForAction(c);
-    const estCost = c.estimateDetails?.totalCost || 2440000;
+    const estCost = c.estimateDetails?.totalCost || 0;
     setApprovedAmount(estCost);
     const linePrefix = (c.shippingLine || 'CARRIER').substring(0, 4).toUpperCase();
-    setAuthCode(`${linePrefix}-AUTH-${Math.floor(100000 + Math.random() * 900000)}`);
-    setApprovalNotes(`Phê duyệt 100% hạng mục sửa chữa EMR theo báo giá ${c.estimateDetails?.estimateNo || ''}`);
+    // Mã phê duyệt do hãng tàu cấp — người dùng nhập, không tự sinh mã ngẫu nhiên như trước.
+    setAuthCode('');
+    setApprovalNotes('');
+    setCarrierWorkOrderNo('');
+    setCarrierApproverName('');
+    setApprovalChannel('EMAIL');
+    // Mặc định = lúc nhập (giờ địa phương, định dạng ô datetime-local); người dùng sửa theo email / AEMS.
+    const now = new Date();
+    setApprovedAtLocal(new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16));
     setActionType('APPROVE');
   };
 
@@ -169,7 +166,8 @@ export const ApprovalPage: React.FC<ApprovalPageProps> = ({
   const handleOpenRejectModal = (c: ContainerRecord) => {
     setSelectedContForAction(c);
     setRejectReasonType('CEDEX_PRICE_EXCEEDED');
-    setCustomRejectReason('Đơn giá vật tư thép lá và sàn gỗ cao hơn hợp đồng khung năm 2026. Đề xuất điều chỉnh giảm 15% hoặc chuyển sang phương pháp nắn vá.');
+    // Lý do do hãng tàu đưa ra — người dùng nhập, không điền sẵn câu mẫu.
+    setCustomRejectReason('');
     setActionType('REJECT');
   };
 
@@ -179,85 +177,33 @@ export const ApprovalPage: React.FC<ApprovalPageProps> = ({
     setActionType('VIEW');
   };
 
-  // Execute Approval
-  const handleConfirmApproval = () => {
+  // Execute Approval — chỉ báo thành công khi backend ghi nhận được.
+  const handleConfirmApproval = async () => {
     if (!selectedContForAction) return;
-
-    onApproveEstimate(selectedContForAction.id, {
-      authCode,
-      approvedAmount,
-      notes: approvalNotes
+    const c = selectedContForAction;
+    const err = await onApproveEstimate(c.id, {
+      carrierWorkOrderNo: carrierWorkOrderNo.trim() || null,
+      carrierAuthCode: authCode.trim() || null,
+      carrierApproverName: carrierApproverName.trim() || null,
+      approvedAt: approvedAtLocal ? new Date(approvedAtLocal).toISOString() : null,
+      approvedAmount: Number.isFinite(approvedAmount) ? approvedAmount : null,
+      approvalChannel,
+      notes: approvalNotes.trim() || null
     });
-
-    // Also update DEPOT_ESTIMATES_LIST in localStorage if matching container
-    try {
-      const saved = localStorage.getItem('DEPOT_ESTIMATES_LIST');
-      if (saved) {
-        const estList = JSON.parse(saved);
-        const updatedEstList = estList.map((est: any) => {
-          if (est.containerNo === selectedContForAction.containerNo || est.containerId === selectedContForAction.id) {
-            return {
-              ...est,
-              status: 'APPROVED',
-              carrierApproval: {
-                status: 'APPROVED',
-                authCode,
-                approvedAmount,
-                approvedAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
-                approvedBy: `Đại diện Hãng tàu ${selectedContForAction.shippingLine}`,
-                comments: approvalNotes
-              }
-            };
-          }
-          return est;
-        });
-        localStorage.setItem('DEPOT_ESTIMATES_LIST', JSON.stringify(updatedEstList));
-      }
-    } catch {
-      // ignore
-    }
-
-    showToast(`Hãng tàu ${selectedContForAction.shippingLine} đã PHÊ DUYỆT Báo giá cho Container ${selectedContForAction.containerNo}! Mã ủy quyền: ${authCode}`, 'success');
+    if (err) { showToast(err, 'error'); return; }
+    showToast(`Đã ghi nhận hãng tàu ${c.shippingLine} DUYỆT báo giá container ${c.containerNo}${authCode ? ` — mã duyệt ${authCode}` : ''}. Container chuyển sang Sửa chữa.`, 'success');
     setActionType(null);
     setSelectedContForAction(null);
   };
 
   // Execute Rejection
-  const handleConfirmRejection = () => {
+  const handleConfirmRejection = async () => {
     if (!selectedContForAction) return;
-
-    onRejectEstimate(selectedContForAction.id, customRejectReason, rejectReasonType);
-
-    // Also update DEPOT_ESTIMATES_LIST in localStorage if matching container
-    try {
-      const saved = localStorage.getItem('DEPOT_ESTIMATES_LIST');
-      if (saved) {
-        const estList = JSON.parse(saved);
-        const updatedEstList = estList.map((est: any) => {
-          if (est.containerNo === selectedContForAction.containerNo || est.containerId === selectedContForAction.id) {
-            return {
-              ...est,
-              status: 'REJECTED',
-              carrierApproval: {
-                status: 'REJECTED',
-                rejectCode: rejectReasonType,
-                rejectReason: customRejectReason,
-                approvedAmount: 0,
-                approvedAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
-                approvedBy: `Đại diện Hãng tàu ${selectedContForAction.shippingLine}`,
-                comments: customRejectReason
-              }
-            };
-          }
-          return est;
-        });
-        localStorage.setItem('DEPOT_ESTIMATES_LIST', JSON.stringify(updatedEstList));
-      }
-    } catch {
-      // ignore
-    }
-
-    showToast(`Hãng tàu ${selectedContForAction.shippingLine} ĐÃ TỪ CHỐI Báo giá cho Container ${selectedContForAction.containerNo}!`, 'error');
+    const c = selectedContForAction;
+    if (!customRejectReason.trim()) { showToast('Nhập lý do hãng tàu từ chối.', 'error'); return; }
+    const err = await onRejectEstimate(c.id, customRejectReason.trim(), rejectReasonType);
+    if (err) { showToast(err, 'error'); return; }
+    showToast(`Đã ghi nhận hãng tàu ${c.shippingLine} TỪ CHỐI báo giá container ${c.containerNo} — người báo giá cần sửa lại.`, 'info');
     setActionType(null);
     setSelectedContForAction(null);
   };
@@ -331,7 +277,7 @@ export const ApprovalPage: React.FC<ApprovalPageProps> = ({
           <div className="text-xl font-mono font-bold text-[#1F2937] mt-1">{stats.total}</div>
         </div>
 
-        <div 
+        <div
           onClick={() => setActiveTab('PENDING')}
           className={`p-4 bg-white rounded-2xl border transition cursor-pointer shadow-sm ${
             activeTab === 'PENDING' ? 'border-[#FAAD14] ring-1 ring-[#FAAD14]/30' : 'border-[#E2E8F0] hover:border-[#FAAD14]/50'
@@ -344,7 +290,7 @@ export const ApprovalPage: React.FC<ApprovalPageProps> = ({
           <div className="text-xl font-mono font-bold text-[#FAAD14] mt-1">{stats.pending}</div>
         </div>
 
-        <div 
+        <div
           onClick={() => setActiveTab('APPROVED')}
           className={`p-4 bg-white rounded-2xl border transition cursor-pointer shadow-sm ${
             activeTab === 'APPROVED' ? 'border-[#16A34A] ring-1 ring-[#16A34A]/30' : 'border-[#E2E8F0] hover:border-[#16A34A]/50'
@@ -357,7 +303,7 @@ export const ApprovalPage: React.FC<ApprovalPageProps> = ({
           <div className="text-xl font-mono font-bold text-[#16A34A] mt-1">{stats.approved}</div>
         </div>
 
-        <div 
+        <div
           onClick={() => setActiveTab('REJECTED')}
           className={`p-4 bg-white rounded-2xl border transition cursor-pointer shadow-sm ${
             activeTab === 'REJECTED' ? 'border-[#DC2626] ring-1 ring-[#DC2626]/30' : 'border-[#E2E8F0] hover:border-[#DC2626]/50'
@@ -496,15 +442,13 @@ export const ApprovalPage: React.FC<ApprovalPageProps> = ({
                   const matchedLocal = localEstimates.find((item: any) =>
                     item.containerNo === c.containerNo || item.containerId === c.id
                   );
-                  const estNo = c.estimateDetails?.estimateNo || matchedLocal?.estimateNo || `EST-${c.containerNo}`;
+                  const estNo = c.estimateDetails?.estimateNo || '—';
                   const estCost = c.estimateDetails?.totalCost || matchedLocal?.totalCost || 0;
                   const authCodeDisplay =
-                    matchedLocal?.carrierApproval?.authCode ||
-                    (status === 'APPROVED' ? 'APPROVED-OK' : status === 'REJECTED' ? 'REJECTED-CEDEX' : 'PENDING-AUTH');
-                  const rejectReasonDisplay =
-                    c.estimateDetails?.rejectReason ||
-                    matchedLocal?.carrierApproval?.rejectReason ||
-                    (status === 'REJECTED' ? 'Đơn giá vật tư vượt hợp đồng khung' : null);
+                    status === 'APPROVED'
+                      ? [c.estimateDetails?.carrierWorkOrderNo && `WO ${c.estimateDetails.carrierWorkOrderNo}`, c.estimateDetails?.carrierAuthCode].filter(Boolean).join(' · ') || 'Đã duyệt'
+                    : status === 'PENDING' ? `Xác nhận: ${c.estimateDetails?.confirmedBy || '—'}` : '—';
+                  const rejectReasonDisplay = c.estimateDetails?.rejectReason || null;
 
                   return (
                     <tr key={c.id} className="hover:bg-[#F4F7FA] transition">
@@ -528,7 +472,7 @@ export const ApprovalPage: React.FC<ApprovalPageProps> = ({
                         <div className="font-mono font-bold text-[#1F2937]">{estNo}</div>
                         <div className="text-[11px] text-[#64748B] flex items-center gap-1 mt-0.5">
                           <Calendar className="w-3 h-3 text-[#64748B]" />
-                          <span>{c.estimateDetails?.createdAt || c.gateInDate}</span>
+                          <span>{formatDateTime(c.estimateDetails?.createdAt || c.gateInDate)}</span>
                         </div>
                       </td>
 
@@ -538,7 +482,7 @@ export const ApprovalPage: React.FC<ApprovalPageProps> = ({
                           {formatVND(estCost)}
                         </div>
                         <div className="text-[10px] text-[#64748B] font-mono">
-                          {c.estimateDetails?.labourHours || 3.5}h công + Vật tư
+                          {Math.round((c.estimateDetails?.labourHours || 0) * 100) / 100}h công + Vật tư
                         </div>
                       </td>
 
@@ -570,7 +514,7 @@ export const ApprovalPage: React.FC<ApprovalPageProps> = ({
                               Mã duyệt: {authCodeDisplay}
                             </div>
                             <div className="text-[11px] text-[#64748B]">
-                              Duyệt 100% &bull; Đã cấp phép thi công
+                              Duyệt {formatVND(c.estimateDetails?.approvedAmount ?? c.estimateDetails?.totalCost ?? 0)} &bull; Đã cấp phép thi công
                             </div>
                             <button
                               onClick={() => onNavigateTab('repair')}
@@ -690,21 +634,52 @@ export const ApprovalPage: React.FC<ApprovalPageProps> = ({
                 <div>
                   <span className="text-[10px] text-[#64748B] uppercase font-semibold block">Mã Báo Giá EMR</span>
                   <span className="font-mono font-bold text-[#1F2937] text-sm">
-                    {selectedContForAction.estimateDetails?.estimateNo || 'EST-20260816-00001'}
+                    {selectedContForAction.estimateDetails?.estimateNo || '—'}
                   </span>
                 </div>
                 <div className="text-right">
                   <span className="text-[10px] text-[#64748B] uppercase font-semibold block">Chi Phí Đề Xuất</span>
                   <span className="font-mono font-black text-[#16A34A] text-base">
-                    {formatVND(selectedContForAction.estimateDetails?.totalCost || 2440000)}
+                    {formatVND(selectedContForAction.estimateDetails?.totalCost || 0)}
                   </span>
+                </div>
+              </div>
+
+              {/* Lệnh duyệt hãng tàu: số WO, người duyệt, thời điểm, kênh nhận */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-[#1F2937] mb-1">Số Work Order / lệnh duyệt hãng tàu:</label>
+                  <input type="text" value={carrierWorkOrderNo} onChange={(e) => setCarrierWorkOrderNo(e.target.value)}
+                    placeholder="vd 511183390 (AEMS)"
+                    className="w-full px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl font-mono text-sm font-bold text-[#1F2937] focus:outline-none focus:border-[#1677FF]" />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-[#1F2937] mb-1">Người duyệt (phía hãng tàu):</label>
+                  <input type="text" value={carrierApproverName} onChange={(e) => setCarrierApproverName(e.target.value)}
+                    placeholder="Tên / email người duyệt"
+                    className="w-full px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs text-[#1F2937] focus:outline-none focus:border-[#1677FF]" />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-[#1F2937] mb-1">Thời điểm hãng tàu duyệt:</label>
+                  <input type="datetime-local" value={approvedAtLocal} onChange={(e) => setApprovedAtLocal(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-white border border-[#E2E8F0] rounded-xl text-xs text-[#1F2937] focus:outline-none focus:border-[#1677FF]" />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-[#1F2937] mb-1">Nhận duyệt qua:</label>
+                  <select value={approvalChannel} onChange={(e) => setApprovalChannel(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-xs text-[#1F2937] focus:outline-none focus:border-[#1677FF]">
+                    <option value="EMAIL">Email</option>
+                    <option value="AEMS">Cổng AEMS / portal hãng tàu</option>
+                    <option value="PHONE">Điện thoại</option>
+                    <option value="DOCUMENT">Văn bản / giấy tờ</option>
+                  </select>
                 </div>
               </div>
 
               {/* Input Authorization Code */}
               <div>
                 <label className="block text-[11px] font-semibold text-[#1F2937] mb-1">
-                  Mã Phê Duyệt Hãng Tàu (Carrier Authorization Code)*:
+                  Mã Phê Duyệt Hãng Tàu (nếu hãng tàu cấp):
                 </label>
                 <input
                   type="text"
@@ -742,7 +717,7 @@ export const ApprovalPage: React.FC<ApprovalPageProps> = ({
               </div>
 
               <div className="p-3 bg-[#16A34A]/5 border border-[#16A34A]/20 rounded-xl text-[#16A34A] text-[11px] leading-relaxed">
-                &bull; Sau khi xác nhận phê duyệt, hệ thống sẽ tự động chuyển hồ sơ sang trạng thái <strong>APPROVED</strong> và kích hoạt phát hành <strong>Lệnh Sửa Chữa Work Order</strong> cho tổ kỹ thuật Depot.
+                &bull; Ghi nhận lệnh duyệt hãng tàu (nhập tay) → báo giá chuyển <strong>Đã duyệt</strong>, container sang <strong>Lệnh Sửa Chữa</strong> với đúng các dòng báo giá. Người ghi nhận được lưu tự động.
               </div>
             </div>
 
@@ -756,7 +731,6 @@ export const ApprovalPage: React.FC<ApprovalPageProps> = ({
 
               <button
                 onClick={handleConfirmApproval}
-                disabled={!authCode}
                 className="px-5 py-2 bg-[#1677FF] hover:bg-[#0958D9] text-white rounded-xl font-bold shadow-sm transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 <Check className="w-4 h-4" />
@@ -903,7 +877,7 @@ export const ApprovalPage: React.FC<ApprovalPageProps> = ({
                 <div className="text-right">
                   <span className="text-[10px] text-[#64748B] uppercase font-semibold block">Tổng Chi Phí Đề Xuất</span>
                   <span className="font-mono font-black text-[#16A34A] text-lg">
-                    {formatVND(selectedContForAction.estimateDetails?.totalCost || 2440000)}
+                    {formatVND(selectedContForAction.estimateDetails?.totalCost || 0)}
                   </span>
                 </div>
               </div>

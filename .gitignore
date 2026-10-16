@@ -6,3 +6,15 @@ coverage/
 *.log
 .env*
 !.env.example
+# IDE / Editor configs
+.vs/
+.vscode/
+# .claude/ .cursor/ .agents/ chứa lệnh /opsx (OpenSpec) dùng chung — chỉ bỏ file cục bộ của từng máy
+.claude/settings.local.json
+.claude/*.lock
+
+# Build results
+[Bb]in/
+[Oo]bj/
+node_modules/
+*.user

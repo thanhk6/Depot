@@ -9,7 +9,6 @@ namespace Depot.Data.Entities.Depot
     public class DamageItem : FullAuditedEntity<long>
     {
         public long SurveyId { get; set; }
-        public virtual Survey? Survey { get; set; }
 
         public string Component { get; set; } = string.Empty;
         public string DamageCode { get; set; } = string.Empty;

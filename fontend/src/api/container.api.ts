@@ -14,6 +14,8 @@ export interface CreateGateInRequest {
   driverPhone: string;
   trailerPlate?: string;
   sealNo?: string;
+  driverLicense?: string;
+  customsSealNo?: string;
   bookingNo?: string;
   truckingCompany?: string;
   remarks?: string;

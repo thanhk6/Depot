@@ -17,18 +17,20 @@ export interface UserAccountProfile {
   roleDescription: string;
 }
 
+// Chỉ là CẤU HÌNH HIỂN THỊ THEO VAI TRÒ (chức danh, badge, menu mặc định) — không còn người mẫu
+// (họ tên/email/username/mật khẩu mẫu đã xoá). Thông tin người dùng thật lấy từ backend lúc đăng nhập.
 export const USER_ACCOUNT_PROFILES: UserAccountProfile[] = [
   {
     id: 'USR-001',
     role: 'DEPOT_MANAGER',
-    username: 'admin',
-    passwordHash: '123456',
-    fullName: 'Nguyễn Văn Hùng',
+    username: '',
+    passwordHash: '',
+    fullName: '',
     jobTitle: 'Giám Đốc Quản Lý Bãi Depot',
     department: 'Ban Giám Đốc',
-    email: 'hung.nguyen@depotcontainer.vn',
+    email: '',
     avatarBg: 'bg-slate-700',
-    avatarText: 'NVH',
+    avatarText: '',
     badgeBg: 'bg-slate-800 text-slate-100 border-slate-700',
     badgeText: 'Quản Lý Tổng (Admin)',
     allowedTabs: ['dashboard', 'jobs', 'survey', 'cleaning', 'operation', 'payment', 'estimate', 'repair', 'qc', 'yard', 'forklift', 'inventory', 'categories', 'quality_grades', 'masterdata', 'master_tariffs', 'report', 'permissions', 'portal_users', 'dotnet', 'ai'],
@@ -37,14 +39,14 @@ export const USER_ACCOUNT_PROFILES: UserAccountProfile[] = [
   {
     id: 'USR-002',
     role: 'SURVEYOR',
-    username: 'surveyor',
-    passwordHash: '123456',
-    fullName: 'Trần Văn Bình',
+    username: '',
+    passwordHash: '',
+    fullName: '',
     jobTitle: 'Kỹ Sư Giám Định Container',
     department: 'Phòng Khảo Sát & Giám Định',
-    email: 'binh.survey@depotcontainer.vn',
+    email: '',
     avatarBg: 'bg-amber-600',
-    avatarText: 'TVB',
+    avatarText: '',
     badgeBg: 'bg-amber-950/80 text-amber-300 border-amber-800/60',
     badgeText: 'Giám Định Viên (Survey)',
     allowedTabs: ['jobs', 'survey', 'cleaning', 'yard', 'categories', 'masterdata'],
@@ -53,14 +55,14 @@ export const USER_ACCOUNT_PROFILES: UserAccountProfile[] = [
   {
     id: 'USR-003',
     role: 'OPERATOR',
-    username: 'operator',
-    passwordHash: '123456',
-    fullName: 'Lê Hoàng Nam',
+    username: '',
+    passwordHash: '',
+    fullName: '',
     jobTitle: 'Chuyên Viên Điều Độ Khai Thác',
     department: 'Phòng Điều Độ Cổng Gate-In',
-    email: 'nam.operator@depotcontainer.vn',
+    email: '',
     avatarBg: 'bg-blue-600',
-    avatarText: 'LHN',
+    avatarText: '',
     badgeBg: 'bg-blue-950/80 text-blue-300 border-blue-800/60',
     badgeText: 'Khai Thác Cổng (Operation)',
     allowedTabs: ['jobs', 'operation', 'cleaning', 'payment', 'categories', 'masterdata', 'master_tariffs'],
@@ -69,14 +71,14 @@ export const USER_ACCOUNT_PROFILES: UserAccountProfile[] = [
   {
     id: 'USR-004',
     role: 'ACCOUNTANT',
-    username: 'accountant',
-    passwordHash: '123456',
-    fullName: 'Phạm Thị Thu',
+    username: '',
+    passwordHash: '',
+    fullName: '',
     jobTitle: 'Kế Toán Trưởng & Thu Ngân',
     department: 'Phòng Tài Chính Kế Toán',
-    email: 'thu.accountant@depotcontainer.vn',
+    email: '',
     avatarBg: 'bg-emerald-600',
-    avatarText: 'PTT',
+    avatarText: '',
     badgeBg: 'bg-emerald-950/80 text-emerald-300 border-emerald-800/60',
     badgeText: 'Kế Toán / Thu Ngân (VietQR)',
     allowedTabs: ['dashboard', 'jobs', 'payment', 'inventory', 'categories', 'masterdata', 'master_tariffs', 'report'],
@@ -85,14 +87,14 @@ export const USER_ACCOUNT_PROFILES: UserAccountProfile[] = [
   {
     id: 'USR-005',
     role: 'ESTIMATOR',
-    username: 'estimator',
-    passwordHash: '123456',
-    fullName: 'Đặng Văn Khoa',
+    username: '',
+    passwordHash: '',
+    fullName: '',
     jobTitle: 'Chuyên Viên Lập Báo Giá',
     department: 'Phòng Kế Hoạch & Báo Giá',
-    email: 'khoa.estimate@depotcontainer.vn',
+    email: '',
     avatarBg: 'bg-indigo-600',
-    avatarText: 'DVK',
+    avatarText: '',
     badgeBg: 'bg-indigo-950/80 text-indigo-300 border-indigo-800/60',
     badgeText: 'Chuyên Viên Báo Giá (Estimator)',
     allowedTabs: ['jobs', 'estimate', 'survey', 'categories', 'masterdata'],
@@ -101,14 +103,14 @@ export const USER_ACCOUNT_PROFILES: UserAccountProfile[] = [
   {
     id: 'USR-006',
     role: 'SHIPPING_LINE',
-    username: 'maersk',
-    passwordHash: '123456',
-    fullName: 'Mr. Hans Nielsen',
+    username: '',
+    passwordHash: '',
+    fullName: '',
     jobTitle: 'Đại Diện Hãng Tàu (Maersk / COSCO)',
     department: 'Đại Lý Hãng Tàu Đối Tác',
-    email: 'hans.nielsen@maersk.com',
+    email: '',
     avatarBg: 'bg-purple-600',
-    avatarText: 'HNS',
+    avatarText: '',
     badgeBg: 'bg-purple-950/80 text-purple-300 border-purple-800/60',
     badgeText: 'Đại Diện Hãng Tàu (Shipping Line)',
     allowedTabs: ['jobs', 'estimate', 'categories'],
@@ -117,14 +119,14 @@ export const USER_ACCOUNT_PROFILES: UserAccountProfile[] = [
   {
     id: 'USR-007',
     role: 'REPAIR_TECH',
-    username: 'repair',
-    passwordHash: '123456',
-    fullName: 'Vũ Quốc Việt',
+    username: '',
+    passwordHash: '',
+    fullName: '',
     jobTitle: 'Đội Trưởng Kỹ Thuật Sửa Chữa',
     department: 'Xưởng Sửa Chữa & Cơ Điện',
-    email: 'viet.repair@depotcontainer.vn',
+    email: '',
     avatarBg: 'bg-orange-600',
-    avatarText: 'VQV',
+    avatarText: '',
     badgeBg: 'bg-orange-950/80 text-orange-300 border-orange-800/60',
     badgeText: 'Tổ Sửa Chữa (Repair Tech)',
     allowedTabs: ['jobs', 'repair', 'yard', 'categories'],
@@ -133,14 +135,14 @@ export const USER_ACCOUNT_PROFILES: UserAccountProfile[] = [
   {
     id: 'USR-008',
     role: 'QC_INSPECTOR',
-    username: 'qc',
-    passwordHash: '123456',
-    fullName: 'Nguyễn Văn Hải',
+    username: '',
+    passwordHash: '',
+    fullName: '',
     jobTitle: 'Kỹ Sư Kiểm Định Chất Lượng QC',
     department: 'Phòng Kỹ Thuật & QC',
-    email: 'hai.qc@depotcontainer.vn',
+    email: '',
     avatarBg: 'bg-teal-600',
-    avatarText: 'NVH',
+    avatarText: '',
     badgeBg: 'bg-teal-950/80 text-teal-300 border-teal-800/60',
     badgeText: 'Kỹ Sư QC (Inspection)',
     allowedTabs: ['jobs', 'qc', 'repair', 'survey', 'categories'],
@@ -149,14 +151,14 @@ export const USER_ACCOUNT_PROFILES: UserAccountProfile[] = [
   {
     id: 'USR-009',
     role: 'FORKLIFT_DRIVER',
-    username: 'forklift',
-    passwordHash: '123456',
-    fullName: 'Nguyễn Đức Tâm',
+    username: '',
+    passwordHash: '',
+    fullName: '',
     jobTitle: 'Tài Xế Xe Nâng Trực Bãi',
     department: 'Đội Xe Nâng & Điều Độ Bãi',
-    email: 'tam.forklift@depotcontainer.vn',
+    email: '',
     avatarBg: 'bg-rose-600',
-    avatarText: 'NDT',
+    avatarText: '',
     badgeBg: 'bg-rose-950/80 text-rose-300 border-rose-800/60',
     badgeText: 'Tài Xế Xe Nâng (Forklift)',
     allowedTabs: ['jobs', 'forklift', 'yard', 'categories'],
@@ -165,14 +167,14 @@ export const USER_ACCOUNT_PROFILES: UserAccountProfile[] = [
   {
     id: 'USR-010',
     role: 'CLEANING_STAFF',
-    username: 'cleaning',
-    passwordHash: '123456',
-    fullName: 'Nguyễn Văn Hùng',
+    username: '',
+    passwordHash: '',
+    fullName: '',
     jobTitle: 'Đội Trưởng Tổ Vệ Sinh Bãi',
     department: 'Tổ Vệ Sinh & Rửa Vỏ Container',
-    email: 'hung.cleaning@depotcontainer.vn',
+    email: '',
     avatarBg: 'bg-cyan-600',
-    avatarText: 'NVH',
+    avatarText: '',
     badgeBg: 'bg-cyan-950/80 text-cyan-300 border-cyan-800/60',
     badgeText: 'Tổ Vệ Sinh (Cleaning Staff)',
     allowedTabs: ['cleaning', 'cleaning_history', 'master_cleaning', 'container', 'yard_map'],
@@ -182,21 +184,4 @@ export const USER_ACCOUNT_PROFILES: UserAccountProfile[] = [
 
 export const getProfileByRole = (role: RoleType): UserAccountProfile => {
   return USER_ACCOUNT_PROFILES.find((p) => p.role === role) || USER_ACCOUNT_PROFILES[0];
-};
-
-export const authenticateUser = (
-  usernameOrEmail: string,
-  pass: string
-): UserAccountProfile | null => {
-  const cleanInput = usernameOrEmail.trim().toLowerCase();
-  const profile = USER_ACCOUNT_PROFILES.find(
-    (p) =>
-      p.username.toLowerCase() === cleanInput ||
-      p.email.toLowerCase() === cleanInput
-  );
-
-  if (profile && (pass === profile.passwordHash || pass === '123456' || pass === 'admin123')) {
-    return profile;
-  }
-  return null;
 };

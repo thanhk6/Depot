@@ -190,3 +190,44 @@ các màn khác (Master Data, Survey...).
 - [ ] Chưa mở rộng thêm `ShippingLine`/`Material`/`Supplier`/`CustomerCompany` (không thuộc bảng
       `MasterCatalogItem`, nằm ở entity riêng) — ngoài phạm vi yêu cầu lần này, có thể làm thêm nếu người
       dùng muốn nhiều dữ liệu mẫu hơn cho các bảng đó.
+
+## Rà lại "DM Loại Container (ISO)" — 4 bug thật (2026-09-29)
+
+Quy ước lưu catalog `CONTAINER_TYPE` (DbSeeder + GateInPage cùng dựa vào): `Code` = mã ISO 6346
+(22G1, 45R1…), `Name` = mã loại nội bộ (20GP, 40HC…). Tên tiếng Anh nằm trong `jsonData.name`.
+
+1. **Map ngược Code/Name** (`MasterDataPage.tsx`): UI đọc `typeCode = Code` nên cột "Mã Loại" hiện mã
+   ISO, "Tên tiếng Anh" hiện 20HC; lưu thì `code = typeCode`, `name = tên tiếng Anh` → tạo mới/sửa tên
+   tiếng Anh làm dòng đó biến mất khỏi Gate-In (GateInPage dò theo `Name`). Sửa: load `typeCode = Name`,
+   `isoCode = Code`; `persistCatalog(..., 'isoCode', setItems, 'typeCode')` (thêm tham số `nameKey`).
+   DB dev thật: dòng Id=1 (vốn là seed gốc 22G1/20GP) đã bị ghi đè thành `20FR / "20ft Flat Rack…;;;;"`
+   → Gate-In mất lựa chọn 20GP.
+2. **"Tạm ngưng" = biến mất sau F5**: xóa và tạm ngưng cùng ghi `IsActive=false`, `GET catalog` chỉ trả
+   dòng active. Sửa backend: xóa = xóa mềm `IsDeleted`; `GET catalog/{type}?includeInactive=true` (chỉ
+   màn quản trị Master Data dùng) trả cả dòng tạm ngưng; tạo lại mã đã xóa mềm thì hồi sinh dòng cũ thay vì
+   báo "đã tồn tại". 20BK/20IC hiện đang `IsActive=false` trên DB dev sẽ hiện lại dạng "Tạm ngưng".
+3. **Dòng vừa tạo giữ id tạm** ("CT-05"): xóa/tạm ngưng ngay trong phiên không tới DB. `persistCatalog`
+   giờ thay id tạm bằng id thật trả về.
+4. **Mất dải nhiệt độ Reefer** (`tempRangeMin/Max` không đọc lại từ jsonData; `|| -30` chặn nhập 0°C).
+   Kèm: chặn trùng mã loại/mã ISO khi lưu (trùng ISO trước đây ghi đè dòng khác), "Tạo bản sao" sinh mã
+   không trùng, 2 header modal còn gradient tối + ô nhiệt độ `text-teal-200` chuyển sang nền sáng.
+
+Verify: `tsc` 0 lỗi ở masterdata; `dotnet build` ra thư mục tạm thành công; chạy backend vá trên cổng
+50299 với Postgres thật: default 18 dòng / includeInactive 20; tạo→xóa→ẩn→tạo lại (cùng id)→tạo trùng 400.
+Còn lại mã test `ZZ01` ở trạng thái `IsDeleted` trong DB dev (vô hại, không hiện ở đâu).
+
+## Rà lại "Cước Nâng Hạ" (LoloTariffMaster, bảng ServiceTariffs) — 4 bug (2026-09-29)
+
+1. **"Tạm Ngưng" = biến mất** (cùng lỗi với DM Loại Container): xóa và tạm ngưng đều ghi `IsActive=false`,
+   `GET service-tariffs` chỉ trả dòng active. Sửa: xóa = `IsDeleted`; `GET service-tariffs?includeInactive=true`
+   cho màn quản trị; tạo lại mã đã xóa thì hồi sinh dòng cũ. Calculator/Operation vẫn chỉ nhận dòng đang áp dụng.
+2. **Sửa 1 hạng mục là SortOrder về 0** — frontend không gửi `sortOrder`, backend gán thẳng. DB dev: `LOLO_EMPTY`
+   đã bị về 0. Giờ load + gửi lại `sortOrder`, tạo mới = max+1.
+3. **Phụ phí ca đêm tạo từ UI không bao giờ được dùng** — Calculator tìm `applicableShift === 'NIGHT_SURCHARGE'`,
+   form không có ô chọn ca nên luôn lưu `ALL`. Giờ suy ra từ Phân loại.
+4. VAT `|| 8` không cho nhập 0%; form tạo mới điền sẵn giá mẫu (280.000…) + mã ngẫu nhiên → bỏ, để 0/trống.
+
+DB dev lúc rà: chỉ `LOLO_EMPTY`, `CUSTOMS_SUPERVISION` còn active; `LOLO_MT_NORMAL`, `LOLO_NIGHT_EXTRA`,
+`LOLO_YARD_SHIFT`, `LOLO_LADEN`, `PTI_REEFER`, `WEIGHING`, `TEST_NEW_TABLE` đang `IsActive=false` (bị ẩn) —
+sau bản vá sẽ hiện lại dạng "Tạm Dừng". Verify API trên cổng 50299: tạm ngưng → ẩn khỏi mặc định nhưng còn ở
+includeInactive; xóa → mất hẳn; tạo lại cùng mã → cùng id; tạo trùng → 400; các dòng khác không đổi.

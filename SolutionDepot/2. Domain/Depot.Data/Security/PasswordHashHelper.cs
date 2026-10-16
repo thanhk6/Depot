@@ -8,6 +8,22 @@ namespace Depot.Data.Security
         private const int Iterations = 100_000;
         private const int SaltSize = 16;
         private const int KeySize = 32;
+        private const string TempPasswordChars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+
+        /// <summary>Sinh mật khẩu tạm ngẫu nhiên (không phải hằng số đoán được) cho tài khoản mới tạo —
+        /// trước đây mọi user mới đều được gán cứng "123456", ai biết username cũng đăng nhập được ngay
+        /// mà không cần biết mật khẩu thật. Bỏ hẳn ký tự dễ nhầm (0/O, 1/l/I) để nhân viên đọc/gõ lại
+        /// không lỗi.</summary>
+        public static string GenerateTemporaryPassword(int length = 10)
+        {
+            var bytes = RandomNumberGenerator.GetBytes(length);
+            var chars = new char[length];
+            for (var i = 0; i < length; i++)
+            {
+                chars[i] = TempPasswordChars[bytes[i] % TempPasswordChars.Length];
+            }
+            return new string(chars);
+        }
 
         public static string HashPassword(string password)
         {

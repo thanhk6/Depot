@@ -39,6 +39,7 @@ import {
   VehicleRecord,
   PortalRole
 } from '../types/customerPortal';
+import { generateTempPassword } from '../utils/tempPassword';
 
 interface CustomerAccountsTabProps {
   currentCustomer: CustomerCompany;
@@ -79,7 +80,7 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
   const [formFullName, setFormFullName] = useState('');
   const [formEmail, setFormEmail] = useState('');
   const [formPhone, setFormPhone] = useState('');
-  const [formPassword, setFormPassword] = useState('Password@123');
+  const [formPassword, setFormPassword] = useState(() => generateTempPassword());
   const [formAllowGateIn, setFormAllowGateIn] = useState(true);
   const [formSelectedDriverId, setFormSelectedDriverId] = useState<string>('');
   const [formAssignedVehicle, setFormAssignedVehicle] = useState<string>('');
@@ -149,7 +150,7 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
     setFormFullName('');
     setFormEmail('');
     setFormPhone('');
-    setFormPassword('Password@123');
+    setFormPassword(generateTempPassword());
     setFormAllowGateIn(true);
     setFormSelectedDriverId('');
     setFormAssignedVehicle('');
@@ -266,7 +267,7 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
           customerId: currentCustomer.id,
           customerName: currentCustomer.name,
           username: generatedUsername,
-          password: 'Password@123',
+          password: generateTempPassword(),
           fullName: `${drv.fullName} (Tài Xế)`,
           phone: drv.phone,
           email: drv.email || `${drv.phone}@tancang.vn`,
@@ -303,25 +304,25 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
         return {
           label: 'DOANH NGHIỆP / TẬP ĐOÀN',
           desc: 'Quản lý đa phòng ban, điều độ và toàn bộ tài xế',
-          badgeClass: 'bg-blue-950 text-blue-300 border-blue-800'
+          badgeClass: 'bg-blue-50 text-blue-700 border-blue-200'
         };
       case 'CONG_TY':
         return {
           label: 'CÔNG TY VẬN TẢI / FWD',
           desc: 'Quản lý đội xe vận tải và tài khoản tài xế',
-          badgeClass: 'bg-purple-950 text-purple-300 border-purple-800'
+          badgeClass: 'bg-purple-50 text-purple-700 border-purple-200'
         };
       case 'KHACH_LE':
         return {
           label: 'KHÁCH LẺ / CHỦ XE CÁ NHÂN',
           desc: 'Chủ xe kiêm tài xế tự đăng ký và Gate-In Online',
-          badgeClass: 'bg-emerald-950 text-emerald-300 border-emerald-800'
+          badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200'
         };
       default:
         return {
           label: 'DOANH NGHIỆP VẬN TẢI',
           desc: 'Khách hàng đối tác Depot',
-          badgeClass: 'bg-slate-800 text-slate-300 border-slate-700'
+          badgeClass: 'bg-slate-100 text-slate-700 border-slate-200'
         };
     }
   };
@@ -332,8 +333,8 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
     <div className="space-y-6 animate-fade-in pb-12">
       {/* Toast Alert */}
       {toastMessage && (
-        <div className="fixed top-4 right-4 z-50 p-4 rounded-2xl bg-emerald-950/95 border border-emerald-500 text-emerald-200 shadow-2xl flex items-center gap-3 animate-fade-in">
-          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+        <div className="fixed top-4 right-4 z-50 p-4 rounded-2xl bg-emerald-50 border border-emerald-500 text-emerald-200 shadow-2xl flex items-center gap-3 animate-fade-in">
+          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
           <span className="text-xs font-semibold">{toastMessage}</span>
         </div>
       )}
@@ -341,10 +342,10 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
       {/* ========================================================================= */}
       {/* SECTION 1: CUSTOMER OVERVIEW & PROVISIONING ARCHITECTURE */}
       {/* ========================================================================= */}
-      <div className="p-6 bg-slate-900 border border-slate-800 rounded-3xl space-y-4 shadow-xl">
+      <div className="p-6 bg-white border border-slate-200 rounded-3xl space-y-4 shadow-xl">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
-            <div className="p-3.5 bg-blue-600/20 border border-blue-500/30 text-blue-400 rounded-2xl">
+            <div className="p-3.5 bg-blue-50 border border-blue-200 text-blue-600 rounded-2xl">
               <Users className="w-7 h-7" />
             </div>
             <div>
@@ -352,17 +353,17 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
                 <span className={`px-2.5 py-0.5 rounded-md border text-[11px] font-bold font-mono ${catInfo.badgeClass}`}>
                   {catInfo.label}
                 </span>
-                <span className="text-xs text-slate-400 font-mono">
-                  Mã KH: <strong className="text-white">{currentCustomer.code}</strong>
+                <span className="text-xs text-slate-500 font-mono">
+                  Mã KH: <strong className="text-slate-900">{currentCustomer.code}</strong>
                 </span>
                 <span className="text-xs text-slate-500 font-mono">
-                  MST/CCCD: <strong className="text-slate-300">{currentCustomer.taxCode}</strong>
+                  MST/CCCD: <strong className="text-slate-700">{currentCustomer.taxCode}</strong>
                 </span>
               </div>
-              <h2 className="text-xl font-bold text-white mt-0.5">
+              <h2 className="text-xl font-bold text-slate-900 mt-0.5">
                 Quản Lý Đa Tài Khoản &amp; Phân Quyền Tài Xế Tự Gate-In Online
               </h2>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-xs text-slate-500 mt-0.5">
                 {catInfo.desc}. Tài khoản Admin do Depot cấp ban đầu; Admin có quyền tự tạo và cấp phát tài khoản cho Tài xế, Điều độ và Kế toán.
               </p>
             </div>
@@ -373,16 +374,16 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
             {driversWithoutAccount.length > 0 && (
               <button
                 onClick={() => setIsQuickProvisionOpen(true)}
-                className="px-3.5 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 font-bold text-xs rounded-xl border border-emerald-500/40 transition flex items-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-950/30"
+                className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-50 text-emerald-700 font-bold text-xs rounded-xl border border-emerald-200 transition flex items-center gap-1.5 cursor-pointer shadow-lg "
               >
-                <Zap className="w-4 h-4 text-emerald-400" />
+                <Zap className="w-4 h-4 text-emerald-600" />
                 <span>Cấp Nhanh Cho {driversWithoutAccount.length} Bác Tài</span>
               </button>
             )}
 
             <button
               onClick={handleOpenAddModal}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-600/25 transition flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-lg  transition flex items-center gap-2 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>+ Thêm Tài Khoản Mới</span>
@@ -394,28 +395,28 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
         {/* SECTION 2: DEPOT PROVISIONED ADMIN MASTER CARD */}
         {/* ========================================================================= */}
         {masterAdminUser && (
-          <div className="p-4 bg-slate-950 rounded-2xl border border-amber-500/30 shadow-inner flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="p-4 bg-slate-50 rounded-2xl border border-amber-200 shadow-inner flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-400 shrink-0">
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-600 shrink-0">
                 <ShieldCheck className="w-6 h-6" />
               </div>
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800 text-[10px] font-bold font-mono">
+                  <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold font-mono">
                     [TÀI KHOẢN ADMIN ĐƯỢC DEPOT CẤP]
                   </span>
-                  <span className="text-xs font-black text-white font-mono">
+                  <span className="text-xs font-black text-slate-900 font-mono">
                     Username: {masterAdminUser.username}
                   </span>
-                  <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1">
+                  <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-emerald-400" />
                     Đang hoạt động
                   </span>
                 </div>
-                <div className="text-xs text-slate-300 font-semibold mt-1">
+                <div className="text-xs text-slate-700 font-semibold mt-1">
                   Đại diện: {masterAdminUser.fullName} &bull; SĐT: {masterAdminUser.phone} &bull; Email: {masterAdminUser.email}
                 </div>
-                <div className="text-[11px] text-slate-400 mt-0.5">
+                <div className="text-[11px] text-slate-500 mt-0.5">
                   Quyền hạn: Toàn quyền quản trị cổng thông tin khách hàng, tự thêm/sửa/xóa tài khoản con và cấp quyền tự Gate-In cho đội xe.
                 </div>
               </div>
@@ -424,16 +425,16 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
             <div className="flex items-center gap-2 flex-wrap shrink-0">
               <button
                 onClick={() => handleCopyCredentials(`Username: ${masterAdminUser.username}\nMật khẩu: ${currentCustomer.adminPasswordDefault || 'TanCang@2026'}\nĐăng nhập: https://depot-portal.com`, 'Admin Credentials')}
-                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-lg border border-slate-700 transition flex items-center gap-1.5 cursor-pointer"
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg border border-slate-200 transition flex items-center gap-1.5 cursor-pointer"
               >
                 {copiedNotification === 'Admin Credentials' ? (
                   <>
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="text-emerald-400">Đã sao chép</span>
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    <span className="text-emerald-600">Đã sao chép</span>
                   </>
                 ) : (
                   <>
-                    <Copy className="w-3.5 h-3.5 text-slate-400" />
+                    <Copy className="w-3.5 h-3.5 text-slate-500" />
                     <span>Sao Chép Đăng Nhập</span>
                   </>
                 )}
@@ -444,9 +445,9 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
                   setResetPassUser(masterAdminUser);
                   setNewPasswordValue('');
                 }}
-                className="px-3 py-1.5 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 text-xs font-bold rounded-lg border border-amber-500/30 transition flex items-center gap-1.5 cursor-pointer"
+                className="px-3 py-1.5 bg-amber-50 hover:bg-amber-50 text-amber-700 text-xs font-bold rounded-lg border border-amber-200 transition flex items-center gap-1.5 cursor-pointer"
               >
-                <KeyRound className="w-3.5 h-3.5 text-amber-400" />
+                <KeyRound className="w-3.5 h-3.5 text-amber-600" />
                 <span>Đổi Mật Khẩu Admin</span>
               </button>
             </div>
@@ -458,62 +459,62 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
       {/* SECTION 3: SUMMARY METRICS */}
       {/* ========================================================================= */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-between">
+        <div className="p-4 bg-white border border-slate-200 rounded-2xl flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
               Tổng Tài Khoản
             </span>
-            <div className="text-2xl font-black font-mono text-white mt-1">
+            <div className="text-2xl font-black font-mono text-slate-900 mt-1">
               {customerUsers.length}
             </div>
             <span className="text-[10px] text-slate-500">Thuộc {currentCustomer.code || currentCustomer.name?.split(' ')?.[0] || ''}</span>
           </div>
-          <div className="p-3 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-xl font-bold">
+          <div className="p-3 bg-blue-50 border border-blue-200 text-blue-600 rounded-xl font-bold">
             <Users className="w-5 h-5" />
           </div>
         </div>
 
-        <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-between">
+        <div className="p-4 bg-white border border-slate-200 rounded-2xl flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">
+            <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">
               Tài Xế Tự Gate-In
             </span>
-            <div className="text-2xl font-black font-mono text-emerald-400 mt-1">
+            <div className="text-2xl font-black font-mono text-emerald-600 mt-1">
               {customerUsers.filter((u) => u.allowOnlineGateIn && u.role === 'DRIVER').length}
             </div>
             <span className="text-[10px] text-slate-500">Được cấp quyền tự tạo lệnh</span>
           </div>
-          <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl font-bold">
+          <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-600 rounded-xl font-bold">
             <Truck className="w-5 h-5" />
           </div>
         </div>
 
-        <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-between">
+        <div className="p-4 bg-white border border-slate-200 rounded-2xl flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider">
+            <span className="text-[11px] font-bold text-cyan-600 uppercase tracking-wider">
               Điều Độ &amp; Kế Toán
             </span>
-            <div className="text-2xl font-black font-mono text-cyan-400 mt-1">
+            <div className="text-2xl font-black font-mono text-cyan-600 mt-1">
               {customerUsers.filter((u) => u.role === 'DISPATCHER' || u.role === 'ACCOUNTANT').length}
             </div>
             <span className="text-[10px] text-slate-500">Nhân sự văn phòng</span>
           </div>
-          <div className="p-3 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-xl font-bold">
+          <div className="p-3 bg-cyan-50 border border-cyan-200 text-cyan-600 rounded-xl font-bold">
             <UserCheck className="w-5 h-5" />
           </div>
         </div>
 
-        <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-between">
+        <div className="p-4 bg-white border border-slate-200 rounded-2xl flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-bold text-purple-400 uppercase tracking-wider">
+            <span className="text-[11px] font-bold text-purple-600 uppercase tracking-wider">
               Chưa Có Tài Khoản
             </span>
-            <div className="text-2xl font-black font-mono text-purple-400 mt-1">
+            <div className="text-2xl font-black font-mono text-purple-600 mt-1">
               {driversWithoutAccount.length}
             </div>
             <span className="text-[10px] text-slate-500">Bác tài trong danh sách</span>
           </div>
-          <div className="p-3 bg-purple-500/10 border border-purple-500/20 text-purple-400 rounded-xl font-bold">
+          <div className="p-3 bg-purple-50 border border-purple-200 text-purple-600 rounded-xl font-bold">
             <Smartphone className="w-5 h-5" />
           </div>
         </div>
@@ -522,16 +523,16 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
       {/* ========================================================================= */}
       {/* SECTION 4: FILTER & SEARCH TOOLBAR */}
       {/* ========================================================================= */}
-      <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="p-4 bg-white border border-slate-200 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         {/* Search */}
         <div className="relative flex-1 max-w-md">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             placeholder="Tìm theo Username, Họ tên, SĐT, Biển số xe..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-500 focus:outline-none focus:border-blue-500"
           />
         </div>
 
@@ -541,7 +542,7 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
           <select
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value)}
-            className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs font-semibold text-slate-300 focus:outline-none focus:border-blue-500"
+            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:border-blue-500"
           >
             <option value="ALL">Tất cả Vai Trò ({customerUsers.length})</option>
             <option value="CUSTOMER_ADMIN">Admin Doanh Nghiệp</option>
@@ -554,15 +555,15 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs font-semibold text-slate-300 focus:outline-none focus:border-blue-500"
+            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:border-blue-500"
           >
             <option value="ALL">Tất cả Trạng Thái</option>
             <option value="ACTIVE">Đang hoạt động</option>
             <option value="LOCKED">Tạm khóa</option>
           </select>
 
-          <span className="text-xs text-slate-400 font-mono pl-2">
-            Hiển thị: <strong className="text-white">{filteredUsers.length}</strong> tài khoản
+          <span className="text-xs text-slate-500 font-mono pl-2">
+            Hiển thị: <strong className="text-slate-900">{filteredUsers.length}</strong> tài khoản
           </span>
         </div>
       </div>
@@ -570,10 +571,10 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
       {/* ========================================================================= */}
       {/* SECTION 5: SUB-ACCOUNTS DATA TABLE */}
       {/* ========================================================================= */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
+      <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-slate-950/80 text-slate-400 uppercase text-[10px] font-bold tracking-wider border-b border-slate-800">
+            <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold tracking-wider border-b border-slate-200">
               <tr>
                 <th className="py-3.5 px-4">Tài Khoản / Người Dùng</th>
                 <th className="py-3.5 px-4">Vai Trò (Role)</th>
@@ -584,7 +585,7 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
                 <th className="py-3.5 px-4 text-right">Thao Tác</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60 font-sans text-slate-300">
+            <tbody className="divide-y divide-slate-200/60 font-sans text-slate-700">
               {filteredUsers.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-10 text-center text-slate-500">
@@ -603,28 +604,28 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
                         <div className="flex items-center gap-3">
                           <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold font-mono text-xs ${
                             u.role === 'CUSTOMER_ADMIN'
-                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
                               : u.role === 'DISPATCHER'
-                              ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                              ? 'bg-blue-50 text-blue-700 border border-blue-200'
                               : u.role === 'DRIVER'
-                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                              : 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-purple-50 text-purple-700 border border-purple-200'
                           }`}>
                             {u.role === 'CUSTOMER_ADMIN' ? 'AD' : u.role === 'DISPATCHER' ? 'DP' : u.role === 'DRIVER' ? 'TX' : 'KT'}
                           </div>
                           <div>
-                            <div className="font-bold text-white flex items-center gap-1.5">
+                            <div className="font-bold text-slate-900 flex items-center gap-1.5">
                               <span>{u.fullName}</span>
                               {u.isDepotProvisioned && (
-                                <span className="px-1.5 py-0.2 rounded bg-amber-950 text-amber-400 border border-amber-800 text-[9px] font-mono">
+                                <span className="px-1.5 py-0.2 rounded bg-amber-50 text-amber-600 border border-amber-200 text-[9px] font-mono">
                                   DEPOT CẤP
                                 </span>
                               )}
                             </div>
-                            <div className="font-mono text-xs text-slate-400 flex items-center gap-2">
+                            <div className="font-mono text-xs text-slate-500 flex items-center gap-2">
                               <span>@{u.username}</span>
                               {u.status === 'LOCKED' && (
-                                <span className="text-[10px] text-rose-400 font-bold">[TẠM KHÓA]</span>
+                                <span className="text-[10px] text-rose-600 font-bold">[TẠM KHÓA]</span>
                               )}
                             </div>
                           </div>
@@ -634,22 +635,22 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
                       {/* Role Badge */}
                       <td className="py-3.5 px-4 font-sans">
                         {u.role === 'CUSTOMER_ADMIN' && (
-                          <span className="px-2.5 py-1 rounded-lg bg-amber-950 text-amber-300 border border-amber-800 text-[11px] font-bold">
+                          <span className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-bold">
                             Admin Doanh Nghiệp
                           </span>
                         )}
                         {u.role === 'DISPATCHER' && (
-                          <span className="px-2.5 py-1 rounded-lg bg-blue-950 text-blue-300 border border-blue-800 text-[11px] font-bold">
+                          <span className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-[11px] font-bold">
                             Điều Độ (Dispatcher)
                           </span>
                         )}
                         {u.role === 'DRIVER' && (
-                          <span className="px-2.5 py-1 rounded-lg bg-emerald-950 text-emerald-300 border border-emerald-800 text-[11px] font-bold">
+                          <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold">
                             Tài Xế (Driver)
                           </span>
                         )}
                         {u.role === 'ACCOUNTANT' && (
-                          <span className="px-2.5 py-1 rounded-lg bg-purple-950 text-purple-300 border border-purple-800 text-[11px] font-bold">
+                          <span className="px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 text-[11px] font-bold">
                             Kế Toán / Đối Soát
                           </span>
                         )}
@@ -661,14 +662,14 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
                           onClick={() => handleToggleAllowGateIn(u)}
                           className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer ${
                             u.allowOnlineGateIn
-                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30'
-                              : 'bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-50'
+                              : 'bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200'
                           }`}
                           title="Bật/Tắt quyền cho tài khoản này tự thực hiện Gate-In Online"
                         >
                           {u.allowOnlineGateIn ? (
                             <>
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                               <span>Cho Phép Tự Gate-In</span>
                             </>
                           ) : (
@@ -684,24 +685,24 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
                       <td className="py-3.5 px-4 font-mono text-xs">
                         {u.assignedVehiclePlate ? (
                           <div>
-                            <div className="font-bold text-cyan-300 flex items-center gap-1">
-                              <Truck className="w-3 h-3 text-cyan-400" />
+                            <div className="font-bold text-cyan-700 flex items-center gap-1">
+                              <Truck className="w-3 h-3 text-cyan-600" />
                               <span>{u.assignedVehiclePlate}</span>
                             </div>
                             {u.assignedMoocPlate && (
-                              <div className="text-[11px] text-slate-400">
+                              <div className="text-[11px] text-slate-500">
                                 Moóc: {u.assignedMoocPlate}
                               </div>
                             )}
                           </div>
                         ) : isDriver && linkedDriver?.assignedVehiclePlate ? (
                           <div>
-                            <div className="font-bold text-cyan-300 flex items-center gap-1">
-                              <Truck className="w-3 h-3 text-cyan-400" />
+                            <div className="font-bold text-cyan-700 flex items-center gap-1">
+                              <Truck className="w-3 h-3 text-cyan-600" />
                               <span>{linkedDriver.assignedVehiclePlate}</span>
                             </div>
                             {linkedDriver.assignedMoocPlate && (
-                              <div className="text-[11px] text-slate-400">
+                              <div className="text-[11px] text-slate-500">
                                 Moóc: {linkedDriver.assignedMoocPlate}
                               </div>
                             )}
@@ -713,12 +714,12 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
 
                       {/* Contact */}
                       <td className="py-3.5 px-4 font-mono text-xs">
-                        <div className="text-slate-200 font-semibold">{u.phone}</div>
-                        <div className="text-[11px] text-slate-400 font-sans truncate max-w-xs">{u.email}</div>
+                        <div className="text-slate-700 font-semibold">{u.phone}</div>
+                        <div className="text-[11px] text-slate-500 font-sans truncate max-w-xs">{u.email}</div>
                       </td>
 
                       {/* Last Login */}
-                      <td className="py-3.5 px-4 text-xs font-mono text-slate-400">
+                      <td className="py-3.5 px-4 text-xs font-mono text-slate-500">
                         {u.lastLogin || 'Chưa đăng nhập'}
                       </td>
 
@@ -731,7 +732,7 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
                               setResetPassUser(u);
                               setNewPasswordValue('');
                             }}
-                            className="p-1.5 text-slate-400 hover:text-amber-300 hover:bg-slate-800 rounded-lg transition cursor-pointer"
+                            className="p-1.5 text-slate-500 hover:text-amber-700 hover:bg-slate-100 rounded-lg transition cursor-pointer"
                             title="Đổi mật khẩu"
                           >
                             <KeyRound className="w-4 h-4" />
@@ -752,7 +753,7 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
                               setFormAssignedMooc(u.assignedMoocPlate || '');
                               setIsAddModalOpen(true);
                             }}
-                            className="p-1.5 text-slate-400 hover:text-blue-300 hover:bg-slate-800 rounded-lg transition cursor-pointer"
+                            className="p-1.5 text-slate-500 hover:text-blue-700 hover:bg-slate-100 rounded-lg transition cursor-pointer"
                             title="Chỉnh sửa thông tin"
                           >
                             <Edit2 className="w-4 h-4" />
@@ -763,8 +764,8 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
                             onClick={() => handleToggleStatus(u)}
                             className={`p-1.5 rounded-lg transition cursor-pointer ${
                               u.status === 'ACTIVE'
-                                ? 'text-slate-400 hover:text-rose-400 hover:bg-slate-800'
-                                : 'text-rose-400 hover:text-emerald-400 hover:bg-slate-800'
+                                ? 'text-slate-500 hover:text-rose-600 hover:bg-slate-100'
+                                : 'text-rose-600 hover:text-emerald-600 hover:bg-slate-100'
                             }`}
                             title={u.status === 'ACTIVE' ? 'Khóa tài khoản' : 'Mở khóa'}
                           >
@@ -784,7 +785,7 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
                                   showToast(`Đã xóa tài khoản "${u.username}"`);
                                 }
                               }}
-                              className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition cursor-pointer"
+                              className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-slate-100 rounded-lg transition cursor-pointer"
                               title="Xóa tài khoản con"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -805,25 +806,25 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
       {/* MODAL 1: ADD / EDIT ACCOUNT */}
       {/* ========================================================================= */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full p-6 shadow-2xl space-y-5">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div className="fixed inset-0 bg-slate-50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-2xl w-full p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-4">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-blue-600/20 border border-blue-500/30 text-blue-400 rounded-xl">
+                <div className="p-2.5 bg-blue-50 border border-blue-200 text-blue-600 rounded-xl">
                   {editingUser ? <Edit2 className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white">
+                  <h3 className="text-base font-bold text-slate-900">
                     {editingUser ? 'Chỉnh Sửa Tài Khoản' : 'Thêm Mới Tài Khoản Cho Khách Hàng'}
                   </h3>
-                  <p className="text-xs text-slate-400 font-mono">
+                  <p className="text-xs text-slate-500 font-mono">
                     Khách hàng: {currentCustomer.name} ({currentCustomer.code})
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setIsAddModalOpen(false)}
-                className="p-2 text-slate-400 hover:text-white rounded-lg transition"
+                className="p-2 text-slate-500 hover:text-slate-900 rounded-lg transition"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -832,8 +833,8 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
             <form onSubmit={handleSaveUser} className="space-y-4">
               {/* Role Selection */}
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Vai Trò Tài Khoản (Role) <span className="text-rose-400">*</span>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Vai Trò Tài Khoản (Role) <span className="text-rose-600">*</span>
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <button
@@ -841,11 +842,11 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
                     onClick={() => setFormRole('DRIVER')}
                     className={`p-3 rounded-xl border text-left transition cursor-pointer ${
                       formRole === 'DRIVER'
-                        ? 'bg-emerald-950/60 border-emerald-500 text-emerald-200'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                        ? 'bg-emerald-50 border-emerald-500 text-emerald-200'
+                        : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-slate-200'
                     }`}
                   >
-                    <Truck className="w-4 h-4 mb-1 text-emerald-400" />
+                    <Truck className="w-4 h-4 mb-1 text-emerald-600" />
                     <div className="text-xs font-bold">Tài Xế</div>
                     <div className="text-[10px] text-slate-500">Tự Gate-In Online</div>
                   </button>
@@ -855,11 +856,11 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
                     onClick={() => setFormRole('DISPATCHER')}
                     className={`p-3 rounded-xl border text-left transition cursor-pointer ${
                       formRole === 'DISPATCHER'
-                        ? 'bg-blue-950/60 border-blue-500 text-blue-200'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                        ? 'bg-blue-50 border-blue-500 text-blue-200'
+                        : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-slate-200'
                     }`}
                   >
-                    <UserCheck className="w-4 h-4 mb-1 text-blue-400" />
+                    <UserCheck className="w-4 h-4 mb-1 text-blue-600" />
                     <div className="text-xs font-bold">Điều Độ</div>
                     <div className="text-[10px] text-slate-500">Quản lý đội xe</div>
                   </button>
@@ -869,11 +870,11 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
                     onClick={() => setFormRole('ACCOUNTANT')}
                     className={`p-3 rounded-xl border text-left transition cursor-pointer ${
                       formRole === 'ACCOUNTANT'
-                        ? 'bg-purple-950/60 border-purple-500 text-purple-200'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                        ? 'bg-purple-50 border-purple-500 text-purple-200'
+                        : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-slate-200'
                     }`}
                   >
-                    <Building2 className="w-4 h-4 mb-1 text-purple-400" />
+                    <Building2 className="w-4 h-4 mb-1 text-purple-600" />
                     <div className="text-xs font-bold">Kế Toán</div>
                     <div className="text-[10px] text-slate-500">Đối soát công nợ</div>
                   </button>
@@ -883,11 +884,11 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
                     onClick={() => setFormRole('CUSTOMER_ADMIN')}
                     className={`p-3 rounded-xl border text-left transition cursor-pointer ${
                       formRole === 'CUSTOMER_ADMIN'
-                        ? 'bg-amber-950/60 border-amber-500 text-amber-200'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                        ? 'bg-amber-50 border-amber-500 text-amber-200'
+                        : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-slate-200'
                     }`}
                   >
-                    <ShieldCheck className="w-4 h-4 mb-1 text-amber-400" />
+                    <ShieldCheck className="w-4 h-4 mb-1 text-amber-600" />
                     <div className="text-xs font-bold">Admin Phụ</div>
                     <div className="text-[10px] text-slate-500">Quản trị viên</div>
                   </button>
@@ -896,9 +897,9 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
 
               {/* If Driver: option to select existing driver */}
               {formRole === 'DRIVER' && driversWithoutAccount.length > 0 && !editingUser && (
-                <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-2xl space-y-2">
+                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                    <label className="text-xs font-bold text-emerald-600 flex items-center gap-1.5">
                       <Sparkles className="w-3.5 h-3.5" />
                       <span>Chọn nhanh từ danh sách Bác Tài trong đội xe:</span>
                     </label>
@@ -906,7 +907,7 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
                   <select
                     value={formSelectedDriverId}
                     onChange={(e) => handleSelectDriverInForm(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-700 text-xs font-semibold text-white rounded-xl focus:outline-none"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 text-xs font-semibold text-slate-900 rounded-xl focus:outline-none"
                   >
                     <option value="">-- Nhập thông tin tài xế mới --</option>
                     {driversWithoutAccount.map((d) => (
@@ -921,8 +922,8 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
               {/* Basic Fields */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Tên Đăng Nhập (Username) <span className="text-rose-400">*</span>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Tên Đăng Nhập (Username) <span className="text-rose-600">*</span>
                   </label>
                   <input
                     type="text"
@@ -931,13 +932,13 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
                     value={formUsername}
                     onChange={(e) => setFormUsername(e.target.value.toLowerCase().replace(/\s+/g, '_'))}
                     disabled={!!editingUser}
-                    className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 disabled:opacity-60"
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-900 placeholder-slate-500 focus:outline-none focus:border-blue-500 disabled:opacity-60"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Họ và Tên <span className="text-rose-400">*</span>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Họ và Tên <span className="text-rose-600">*</span>
                   </label>
                   <input
                     type="text"
@@ -945,13 +946,13 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
                     placeholder="ví dụ: Nguyễn Văn Hùng"
                     value={formFullName}
                     onChange={(e) => setFormFullName(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-500 focus:outline-none focus:border-blue-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Số Điện Thoại <span className="text-rose-400">*</span>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Số Điện Thoại <span className="text-rose-600">*</span>
                   </label>
                   <input
                     type="text"
@@ -959,12 +960,12 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
                     placeholder="0903.xxx.xxx"
                     value={formPhone}
                     onChange={(e) => setFormPhone(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-900 placeholder-slate-500 focus:outline-none focus:border-blue-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Email Liên Hệ
                   </label>
                   <input
@@ -972,16 +973,16 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
                     placeholder="email@company.vn"
                     value={formEmail}
                     onChange={(e) => setFormEmail(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-500 focus:outline-none focus:border-blue-500"
                   />
                 </div>
               </div>
 
               {/* Driver Vehicle Assignment */}
               {formRole === 'DRIVER' && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-950/60 border border-slate-800 rounded-2xl">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 border border-slate-200 rounded-2xl">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                       Biển Số Đầu Kéo Mặc Định
                     </label>
                     <input
@@ -989,12 +990,12 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
                       placeholder="ví dụ: 51C-889.90"
                       value={formAssignedVehicle}
                       onChange={(e) => setFormAssignedVehicle(e.target.value.toUpperCase())}
-                      className="w-full px-3.5 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs font-mono text-cyan-300 uppercase focus:outline-none focus:border-blue-500"
+                      className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono text-cyan-700 uppercase focus:outline-none focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                       Biển Số Rơ-Moóc (Chassis)
                     </label>
                     <input
@@ -1002,7 +1003,7 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
                       placeholder="ví dụ: 51R-023.45"
                       value={formAssignedMooc}
                       onChange={(e) => setFormAssignedMooc(e.target.value.toUpperCase())}
-                      className="w-full px-3.5 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs font-mono text-cyan-300 uppercase focus:outline-none focus:border-blue-500"
+                      className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-mono text-cyan-700 uppercase focus:outline-none focus:border-blue-500"
                     />
                   </div>
                 </div>
@@ -1011,28 +1012,28 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
               {/* Password for new user */}
               {!editingUser && (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Mật Khẩu Khởi Tạo <span className="text-rose-400">*</span>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Mật Khẩu Khởi Tạo <span className="text-rose-600">*</span>
                   </label>
                   <input
                     type="text"
                     required
                     value={formPassword}
                     onChange={(e) => setFormPassword(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs font-mono text-amber-300 focus:outline-none focus:border-blue-500"
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-amber-700 focus:outline-none focus:border-blue-500"
                   />
                   <span className="text-[11px] text-slate-500">Mật khẩu mặc định có thể đổi sau khi đăng nhập lần đầu.</span>
                 </div>
               )}
 
               {/* Permission Checkbox: Allow online gate-in */}
-              <div className="p-3.5 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-between">
+              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between">
                 <div>
-                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                     <span>Cho phép tài khoản này tự Đăng Ký Gate-In Online</span>
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
+                  <p className="text-[11px] text-slate-500 mt-0.5">
                     Tài xế có thể dùng điện thoại tự tạo lệnh Gate-In, sinh mã QR e-Pass vào cổng depot.
                   </p>
                 </div>
@@ -1040,22 +1041,22 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
                   type="checkbox"
                   checked={formAllowGateIn}
                   onChange={(e) => setFormAllowGateIn(e.target.checked)}
-                  className="w-5 h-5 text-emerald-600 rounded bg-slate-900 border-slate-700 focus:ring-emerald-500 cursor-pointer"
+                  className="w-5 h-5 text-emerald-600 rounded bg-white border-slate-200 focus:ring-emerald-500 cursor-pointer"
                 />
               </div>
 
               {/* Buttons */}
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition cursor-pointer"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer"
                 >
                   Hủy Bỏ
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-lg shadow-blue-600/30"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-lg "
                 >
                   {editingUser ? 'Lưu Thay Đổi' : 'Tạo Tài Khoản'}
                 </button>
@@ -1069,30 +1070,30 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
       {/* MODAL 2: RESET PASSWORD */}
       {/* ========================================================================= */}
       {resetPassUser && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2 text-amber-400">
+        <div className="fixed inset-0 bg-slate-50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2 text-amber-600">
                 <KeyRound className="w-5 h-5" />
-                <h3 className="font-bold text-sm text-white">Đổi Mật Khẩu Tài Khoản</h3>
+                <h3 className="font-bold text-sm text-slate-900">Đổi Mật Khẩu Tài Khoản</h3>
               </div>
               <button
                 onClick={() => setResetPassUser(null)}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg transition"
+                className="p-1.5 text-slate-500 hover:text-slate-900 rounded-lg transition"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <div>
-              <p className="text-xs text-slate-300">
-                Đang cấp lại mật khẩu cho tài khoản: <strong className="text-white font-mono">{resetPassUser.username}</strong> ({resetPassUser.fullName})
+              <p className="text-xs text-slate-700">
+                Đang cấp lại mật khẩu cho tài khoản: <strong className="text-slate-900 font-mono">{resetPassUser.username}</strong> ({resetPassUser.fullName})
               </p>
             </div>
 
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Mật Khẩu Mới
                 </label>
                 <input
@@ -1100,32 +1101,25 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
                   placeholder="Nhập mật khẩu mới..."
                   value={newPasswordValue}
                   onChange={(e) => setNewPasswordValue(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs font-mono text-amber-300 focus:outline-none focus:border-amber-500"
+                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-amber-700 focus:outline-none focus:border-amber-500"
                 />
               </div>
 
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setNewPasswordValue(`Pass@${Math.floor(1000 + Math.random() * 9000)}`)}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-bold rounded-lg transition cursor-pointer"
+                  onClick={() => setNewPasswordValue(generateTempPassword())}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-lg transition cursor-pointer"
                 >
                   Sinh Ngẫu Nhiên
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setNewPasswordValue('Password@123')}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-bold rounded-lg transition cursor-pointer"
-                >
-                  Mặc Định (Password@123)
                 </button>
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
               <button
                 onClick={() => setResetPassUser(null)}
-                className="px-3.5 py-1.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl"
+                className="px-3.5 py-1.5 bg-slate-100 text-slate-700 text-xs font-bold rounded-xl"
               >
                 Hủy
               </button>
@@ -1151,58 +1145,58 @@ export const CustomerAccountsTab: React.FC<CustomerAccountsTabProps> = ({
       {/* MODAL 3: QUICK PROVISION FOR ALL DRIVERS */}
       {/* ========================================================================= */}
       {isQuickProvisionOpen && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2.5 text-emerald-400">
+        <div className="fixed inset-0 bg-slate-50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-xl w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2.5 text-emerald-600">
                 <Zap className="w-5 h-5" />
-                <h3 className="font-bold text-sm text-white">
+                <h3 className="font-bold text-sm text-slate-900">
                   Cấp Nhanh Tài Khoản Cho Toàn Bộ Bác Tài Trong Đội Xe
                 </h3>
               </div>
               <button
                 onClick={() => setIsQuickProvisionOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg transition"
+                className="p-1.5 text-slate-500 hover:text-slate-900 rounded-lg transition"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-xs text-slate-300">
+            <p className="text-xs text-slate-700">
               Hệ thống sẽ tự động tạo tài khoản đăng nhập và phân quyền <strong>Tự Gate-In Online</strong> cho{' '}
-              <strong className="text-emerald-400">{driversWithoutAccount.length} bác tài</strong> chưa có tài khoản:
+              <strong className="text-emerald-600">{driversWithoutAccount.length} bác tài</strong> chưa có tài khoản:
             </p>
 
-            <div className="max-h-48 overflow-y-auto space-y-2 p-3 bg-slate-950 rounded-2xl border border-slate-800">
+            <div className="max-h-48 overflow-y-auto space-y-2 p-3 bg-slate-50 rounded-2xl border border-slate-200">
               {driversWithoutAccount.map((drv) => (
                 <div key={drv.id} className="flex items-center justify-between text-xs py-1 border-b border-slate-900 last:border-0">
                   <div>
-                    <span className="font-bold text-white">{drv.fullName}</span>
-                    <span className="text-[11px] text-slate-400 ml-2 font-mono">({drv.phone})</span>
+                    <span className="font-bold text-slate-900">{drv.fullName}</span>
+                    <span className="text-[11px] text-slate-500 ml-2 font-mono">({drv.phone})</span>
                   </div>
-                  <div className="text-[11px] font-mono text-cyan-400">
-                    Username: <strong className="text-emerald-300">tx_{drv.phone}</strong>
+                  <div className="text-[11px] font-mono text-cyan-600">
+                    Username: <strong className="text-emerald-700">tx_{drv.phone}</strong>
                   </div>
                 </div>
               ))}
             </div>
 
-            <div className="p-3 bg-emerald-950/40 border border-emerald-800/40 rounded-2xl text-[11px] text-emerald-300">
-              ✓ Mật khẩu mặc định: <code className="font-bold font-mono">Password@123</code>
+            <div className="p-3 bg-emerald-50 border border-emerald-200/40 rounded-2xl text-[11px] text-emerald-700">
+              ✓ Mỗi tài khoản được sinh 1 mật khẩu tạm ngẫu nhiên riêng.
               <br />
               ✓ Tự động liên kết Biển số xe &amp; Bật quyền Tự Gate-In Online.
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
               <button
                 onClick={() => setIsQuickProvisionOpen(false)}
-                className="px-4 py-2 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl cursor-pointer"
+                className="px-4 py-2 bg-slate-100 text-slate-700 text-xs font-bold rounded-xl cursor-pointer"
               >
                 Hủy Bỏ
               </button>
               <button
                 onClick={handleExecuteQuickProvision}
-                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/30 cursor-pointer"
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg  cursor-pointer"
               >
                 Cấp Tài Khoản Ngay
               </button>

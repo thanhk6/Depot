@@ -1,0 +1,313 @@
+openapi: 3.0.1
+info:
+  title: Uploads and Attachments API
+  description: |
+    Enables uploading and downloading of various file types (images, PDFs, etc.), which can be attached to orders as supporting documentation or evidence.  
+  version: v1.0.0
+  contact:
+    name: AMStrong Team
+    email: AEMS@maersk.com
+    url: https://www.maersk.com/contactus
+  license:
+    url: https://terms.maersk.com/api-license-terms
+    name: Maersk 1.0
+servers:
+  - url: https://api-stage.maersk.com/aems/blob-manager
+    description: Pre-Production Environment
+  - url: https://api.maersk.com/aems/blob-manager
+    description: Production Environment
+tags:
+  - name: Management
+    description: |
+      Enables uploading and downloading of various file types (images, PDFs, etc.), which can be attached to orders as supporting documentation or evidence.  
+paths:
+  /api/manage/{maintenanceShopCode}/upload:
+    post:
+      operationId: upload-blob-file
+      tags:
+        - Management
+      summary: Upload blob file
+      description: "Uploads a single blob file to the specified shop container in Azure Blob Storage.<br />\r\nA container will automatically be created in Azure Blob Storage, named with the requested shop code."
+      parameters:
+        - name: maintenanceShopCode
+          in: path
+          description: Unique 3 character code that identifies the shop or vendor.
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+            encoding:
+              file:
+                style: form
+      responses:
+        '200':
+          description: "<b>OK</b>\r\n<br />Request succeeded and the blob resource is successfully uploaded."
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: 4924e371-2c2e-4074-aaa2-f261ae83cd17.png
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/manage/{maintenanceShopCode}/download/{id}:
+    get:
+      tags:
+        - Management
+      summary: Download blob file
+      operationId: download-blob-file
+      description: "Downloads a single blob file from the specified shop container in Azure Blob Storage.<br />\r\nUploaded content will be available once AEMS virus scanning process completed successfully which might take a few minutes.<br />\r\nA container will automatically be created in Azure Blob Storage, named with the requested shop code."
+      parameters:
+        - name: maintenanceShopCode
+          in: path
+          description: Unique 3 character code that identifies the shop or vendor.
+          required: true
+          schema:
+            type: string
+        - name: id
+          in: path
+          description: Container unique name of the file, including extension name.
+          required: true
+          schema:
+            type: string
+          example: 6e59353f-3960-4226-a4dd-5bf41eafb294.csv
+      responses:
+        '200':
+          description: Success
+          content:
+            text/plain:
+              schema:
+                type: string
+                format: binary
+            application/json:
+              schema:
+                type: string
+                format: binary
+            text/json:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/manage/{maintenanceShopCode}/delete/{fileName}:
+    delete:
+      operationId: delete-blob-file
+      tags:
+        - Management
+      summary: Delete blob file
+      description: >-
+        Deletes a blob file from the specified shop container in Azure Blob
+        Storage.
+      parameters:
+        - name: maintenanceShopCode
+          in: path
+          description: Unique 3 character code that identifies the shop or vendor.
+          required: true
+          schema:
+            type: string
+        - name: fileName
+          in: path
+          description: Container unique name of the file, including extension name.
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: "<b>OK</b>\r\n<br />Request succeeded and the blob resource is successfully deleted"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+components:
+  responses:
+    Unauthorized:
+      description: >-
+        <b>Unauthorized</b> <br/> The request has not been applied because it
+        lacks valid authentication credentials for the target resource.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/responses/Forbidden/content/application~1json/schema'
+          example:
+            httpMethod: POST
+            requestUri: /api/manage/xyz/upload
+            statusCode: 401
+            statusText: Unauthorized
+            errorMessage: Failed authenticating using the parsed bearer token.
+            correlationIdentifier: 0HN749U0FM5K7:00000002
+            status: null
+            errorTimestamp: '2024-10-04T10:36:40.023753+02:00'
+            detailedErrors: null
+    Forbidden:
+      description: >-
+        <b>Forbidden</b> <br/> The server understood the request, but is
+        refusing to fulfill it.
+      content:
+        application/json:
+          schema:
+            required:
+              - correlationIdentifier
+              - errorTimestamp
+              - httpMethod
+              - statusCode
+              - statusText
+            type: object
+            properties:
+              httpMethod:
+                minLength: 1
+                type: string
+                description: The request method type e.g. GET, POST.
+              requestUri:
+                type: string
+                description: >-
+                  The request URI as it was sent by the consumer. May not always
+                  be available, depending on infrastructure.
+                nullable: true
+              statusCode:
+                type: integer
+                description: The HTTP status code e.g. 401
+                format: int32
+              statusText:
+                minLength: 1
+                type: string
+                description: The HTTP status text
+              errorMessage:
+                maxLength: 200
+                type: string
+                description: Other error information
+                nullable: true
+              correlationIdentifier:
+                minLength: 1
+                type: string
+                description: Correlation identifier, e.g. a UUID
+              status:
+                type: string
+                description: The textual representation of the response status.
+                nullable: true
+              errorTimestamp:
+                type: string
+                description: The date and time (in ISO 8601 UTC format) the error occurred.
+                format: date-time
+              detailedErrors:
+                type: array
+                items:
+                  required:
+                    - message
+                  type: object
+                  properties:
+                    errorCode:
+                      type: integer
+                      description: >-
+                        Standard error code, examples: 7003 – out or range
+                        value, 7004 - invalid type
+                      format: int32
+                      nullable: true
+                    field:
+                      type: string
+                      description: >-
+                        The field that caused the error, e.g. a failed
+                        validation.
+                      nullable: true
+                    value:
+                      type: string
+                      description: The value that of the field that caused the error.
+                      nullable: true
+                    message:
+                      minLength: 1
+                      type: string
+                      description: The reason and advice for why the error occured.
+                  additionalProperties: false
+                  description: Detailed error message of fields that caused errors to occur
+                description: >-
+                  List of detailed errors, e.g. fields that could not pass
+                  validation
+                nullable: true
+            additionalProperties: {}
+            description: >-
+              Default error model used to respond to requests that went in to
+              error. This error model is used for all HTTP code errors instead
+              of individually declaring HTTP responses for errors.
+          example:
+            httpMethod: POST
+            requestUri: /api/manage/xyz/upload
+            statusCode: 403
+            statusText: Forbidden
+            errorMessage: User 'osi022' does not have access to the shop 'XYZ'
+            correlationIdentifier: 0HN749INE7DQL:00000002
+            status: null
+            errorTimestamp: '2024-10-04T10:15:27.230916+02:00'
+            detailedErrors: null
+    InternalServerError:
+      description: <b>Internal Server Error</b> <br/> An unexpected error occurred.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/responses/Forbidden/content/application~1json/schema'
+          example:
+            httpMethod: POST
+            requestUri: /api/manage/xyz/upload
+            statusCode: 500
+            statusText: Internal Server Error
+            errorMessage: An unexpected error occurred.
+            correlationIdentifier: 0HN749EUK7OAF:00000004
+            status: Internal Server Error
+            errorTimestamp: '2024-10-04T10:08:41.094686+02:00'
+            detailedErrors: null
+    ServiceUnavailable:
+      description: >-
+        <b>Service Unavailable</b> <br/> The database server or external system
+        is currently unable to handle the request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/responses/Forbidden/content/application~1json/schema'
+          example:
+            httpMethod: GET
+            requestUri: /api/manage/xyz/download
+            statusCode: 503
+            statusText: Service Unavailable
+            errorMessage: Failed to upload file.
+            correlationIdentifier: 0HN6S555O4MA8:00000002
+            status: Azure blob container is unavailable
+            errorTimestamp: '2024-09-24T10:02:15+02:00'
+            detailedErrors: null
+  securitySchemes:
+    ConsumerKey:
+      description: Consumer key used for authorisation to the API
+      type: apiKey
+      in: header
+      name: Consumer-Key
+    Bearer:
+      type: apiKey
+      description: |-
+        JWT Authorization header using the Bearer scheme. 
+                              Enter 'Bearer' [space] and then your token in the text input below.
+                              Example: 'Bearer 12345abcdef'
+      name: Authorization
+      in: header
+security:
+  - ConsumerKey: []
+  - Bearer: []

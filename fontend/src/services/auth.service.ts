@@ -1,5 +1,6 @@
 import { authApi } from '../api';
 import { tokenService } from './token.service';
+import { sessionService } from './session.service';
 import { User } from '../types/auth';
 
 const normalizeRole = (roleName?: string): User['role'] => {
@@ -66,9 +67,13 @@ export const authService = {
     const apiUser: any = payload?.data ?? payload;
 
     if (apiUser && (apiUser.username || apiUser.fullName || apiUser.id !== undefined)) {
+      // Token JWT thật do backend ký khi đăng nhập (trước đây lưu chuỗi giả `token_${Date.now()}` và
+      // không gửi/kiểm tra ở đâu cả). Thiếu token nghĩa là server không cấp phiên — không được coi là đăng nhập.
+      if (!apiUser.accessToken) {
+        throw new Error('Máy chủ không cấp phiên đăng nhập. Vui lòng thử lại.');
+      }
       const normalizedUser = normalizeUser(apiUser);
-      tokenService.setAccessToken(`token_${Date.now()}`);
-      tokenService.setRefreshToken(`refresh_${Date.now()}`);
+      tokenService.setAccessToken(apiUser.accessToken);
       localStorage.setItem('depot_current_user', JSON.stringify(normalizedUser));
       return normalizedUser;
     }
@@ -77,8 +82,7 @@ export const authService = {
     throw new Error(errorMessage);
   },
   logout: () => {
-    tokenService.clearTokens();
-    localStorage.removeItem('depot_current_user');
+    sessionService.clear();
   },
   getCurrentUser: async (): Promise<User | null> => {
     const cachedUser = localStorage.getItem('depot_current_user');

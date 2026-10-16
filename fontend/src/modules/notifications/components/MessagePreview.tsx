@@ -29,22 +29,22 @@ export const MessagePreview: React.FC<MessagePreviewProps> = ({
   title,
   content,
   recipientName = 'Người nhận',
-  recipientPhone = '0903******',
+  recipientPhone = '',
   ctaText = 'Xem chi tiết trên Depot System',
   timeString = 'Vừa xong'
 }) => {
   return (
-    <div className="bg-[#070c1e] border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-2xl flex flex-col items-center justify-center">
+    <div className="bg-[#070c1e] border border-slate-200 rounded-3xl p-4 sm:p-5 shadow-2xl flex flex-col items-center justify-center">
       {/* Smartphone Frame Outer Mockup */}
-      <div className="w-full max-w-[340px] bg-[#0e1626] border-4 border-slate-700 rounded-[36px] shadow-2xl overflow-hidden flex flex-col relative text-slate-100">
+      <div className="w-full max-w-[340px] bg-[#0e1626] border-4 border-slate-200 rounded-[36px] shadow-2xl overflow-hidden flex flex-col relative text-slate-100">
         {/* Notch / Speaker bar */}
-        <div className="h-6 bg-slate-900 flex items-center justify-between px-6 text-[10px] text-slate-400 select-none">
-          <span className="font-semibold text-white">09:41</span>
+        <div className="h-6 bg-white flex items-center justify-between px-6 text-[10px] text-slate-500 select-none">
+          <span className="font-semibold text-slate-900">09:41</span>
           <div className="w-16 h-3.5 bg-black rounded-full mx-auto" />
           <div className="flex items-center gap-1.5">
-            <Signal className="w-3 h-3 text-slate-300" />
-            <Wifi className="w-3 h-3 text-slate-300" />
-            <Battery className="w-3.5 h-3.5 text-slate-300" />
+            <Signal className="w-3 h-3 text-slate-700" />
+            <Wifi className="w-3 h-3 text-slate-700" />
+            <Battery className="w-3.5 h-3.5 text-slate-700" />
           </div>
         </div>
 
@@ -56,21 +56,21 @@ export const MessagePreview: React.FC<MessagePreviewProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-1">
-                <span className="text-xs font-bold text-white">EMR Depot Official</span>
-                <CheckCircle2 className="w-3.5 h-3.5 text-yellow-300 fill-yellow-300" />
+                <span className="text-xs font-bold text-slate-900">EMR Depot Official</span>
+                <CheckCircle2 className="w-3.5 h-3.5 text-yellow-700 fill-yellow-300" />
               </div>
               <span className="text-[10px] text-blue-100 block -mt-0.5">Tài khoản Doanh Nghiệp Xác Thực</span>
             </div>
           </div>
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-700/80 text-white font-bold">
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-50 text-white font-bold">
             {channel === 'ZALO_ZNS' ? 'ZNS Template' : 'Zalo OA'}
           </span>
         </div>
 
         {/* Recipient info indicator bar */}
-        <div className="bg-slate-900/90 px-3 py-1.5 border-b border-slate-800 text-[10px] text-slate-300 flex items-center justify-between">
-          <span className="truncate">Gửi đến: <strong className="text-sky-300">{recipientName}</strong></span>
-          <span className="font-mono text-slate-400">{recipientPhone}</span>
+        <div className="bg-white px-3 py-1.5 border-b border-slate-200 text-[10px] text-slate-700 flex items-center justify-between">
+          <span className="truncate">Gửi đến: <strong className="text-sky-700">{recipientName}</strong></span>
+          <span className="font-mono text-slate-500">{recipientPhone}</span>
         </div>
 
         {/* Chat Body Mockup Area */}
@@ -93,7 +93,7 @@ export const MessagePreview: React.FC<MessagePreviewProps> = ({
                 <h4 className="text-xs font-black text-slate-900 leading-snug">
                   {title || '🔔 [THÔNG BÁO TỰ ĐỘNG EMR DEPOT]'}
                 </h4>
-                <span className="text-[9px] text-slate-400 block mt-0.5">Thông báo hệ thống quản lý Depot Container</span>
+                <span className="text-[9px] text-slate-500 block mt-0.5">Thông báo hệ thống quản lý Depot Container</span>
               </div>
             </div>
 
@@ -107,7 +107,7 @@ export const MessagePreview: React.FC<MessagePreviewProps> = ({
               <div className="pt-2 border-t border-slate-100">
                 <button
                   type="button"
-                  className="w-full py-2 px-3 bg-[#0068ff] hover:bg-[#0057d6] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition active:scale-98"
+                  className="w-full py-2 px-3 bg-[#0068ff] hover:bg-[#0057d6] text-slate-900 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition active:scale-98"
                 >
                   <span>{ctaText}</span>
                   <ExternalLink className="w-3 h-3" />
@@ -116,7 +116,7 @@ export const MessagePreview: React.FC<MessagePreviewProps> = ({
             )}
 
             {/* Footer timestamp & security note */}
-            <div className="flex items-center justify-between text-[9px] text-slate-400 pt-1">
+            <div className="flex items-center justify-between text-[9px] text-slate-500 pt-1">
               <span className="flex items-center gap-1">
                 <ShieldCheck className="w-3 h-3 text-emerald-600" />
                 Tin nhắn tự động bảo mật
@@ -127,7 +127,7 @@ export const MessagePreview: React.FC<MessagePreviewProps> = ({
         </div>
 
         {/* Phone Bottom Home Bar */}
-        <div className="h-6 bg-slate-900 flex items-center justify-center">
+        <div className="h-6 bg-white flex items-center justify-center">
           <div className="w-32 h-1 bg-slate-600 rounded-full" />
         </div>
       </div>

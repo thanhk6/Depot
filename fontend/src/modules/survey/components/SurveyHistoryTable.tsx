@@ -1,22 +1,20 @@
 import React, { useState } from 'react';
 import { SurveyItemRecord } from '../types';
+import { formatDateTime } from '../../../utils/format';
 import {
   History,
   Search,
-  Filter,
   Download,
-  Calendar,
   Eye,
   FileText,
-  Ship,
   Sparkles,
   AlertTriangle,
   Wrench,
   ChevronLeft,
   ChevronRight,
-  ShieldCheck,
   Send
 } from 'lucide-react';
+import { useShippingLineOptions } from '../../../hooks/useShippingLineOptions';
 
 interface SurveyHistoryTableProps {
   surveys: SurveyItemRecord[];
@@ -32,6 +30,7 @@ export const SurveyHistoryTable: React.FC<SurveyHistoryTableProps> = ({
   onOpenEEIR,
   onTransferToOperation
 }) => {
+  const shippingLineOptions = useShippingLineOptions();
   const [searchTerm, setSearchTerm] = useState('');
   const [shippingLineFilter, setShippingLineFilter] = useState('ALL');
   const [conditionFilter, setConditionFilter] = useState('ALL');
@@ -115,12 +114,9 @@ export const SurveyHistoryTable: React.FC<SurveyHistoryTableProps> = ({
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 text-slate-700 rounded-xl focus:outline-none"
             >
               <option value="ALL">Tất cả hãng tàu</option>
-              <option value="MAERSK">MAERSK Line</option>
-              <option value="MSC">MSC Shipping</option>
-              <option value="ONE">ONE</option>
-              <option value="CMA-CGM">CMA CGM</option>
-              <option value="COSCO">COSCO</option>
-              <option value="EVERGREEN">EVERGREEN</option>
+              {shippingLineOptions.map((l) => (
+                <option key={l.code} value={l.code}>{l.name} ({l.code})</option>
+              ))}
             </select>
           </div>
 
@@ -200,7 +196,7 @@ export const SurveyHistoryTable: React.FC<SurveyHistoryTableProps> = ({
                   </td>
 
                   <td className="py-3.5 px-4 font-mono text-slate-700">
-                    {survey.surveyDate || survey.gateInTime}
+                    {formatDateTime(survey.surveyDate || survey.gateInTime)}
                   </td>
 
                   <td className="py-3.5 px-4 text-center">

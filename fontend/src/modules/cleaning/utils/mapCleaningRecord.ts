@@ -1,4 +1,4 @@
-import { CleaningRecordDto, CleaningWorkItemDto } from '../../../api';
+import { CleaningRecordDto, CleaningWorkItemDto, toPublicFileUrl } from '../../../api';
 import { CleaningExecutionRecord, CleaningWorkItem } from '../types';
 
 export function mapCleaningWorkItemDto(dto: CleaningWorkItemDto): CleaningWorkItem {
@@ -44,9 +44,9 @@ export function mapCleaningRecordDto(dto: CleaningRecordDto): CleaningExecutionR
     chemicalVolumeLiters: dto.chemicalVolumeLiters || undefined,
     temperatureCelsius: dto.temperatureCelsius || undefined,
     targetQualityGrade: dto.targetQualityGrade as CleaningExecutionRecord['targetQualityGrade'],
-    beforeCleaningPhoto: dto.beforeCleaningPhotoUrl || '',
+    beforeCleaningPhoto: toPublicFileUrl(dto.beforeCleaningPhotoUrl),
     beforePhotoTimestamp: dto.beforePhotoTimestamp || '',
-    afterCleaningPhoto: dto.afterCleaningPhotoUrl || '',
+    afterCleaningPhoto: toPublicFileUrl(dto.afterCleaningPhotoUrl),
     afterPhotoTimestamp: dto.afterPhotoTimestamp || '',
     items: dto.items.map(mapCleaningWorkItemDto),
     totalCost: dto.totalCostVnd,

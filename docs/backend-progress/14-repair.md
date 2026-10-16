@@ -14,6 +14,15 @@ masterDataApi.getMaterials()                                    // trong Complet
 gọi ở đâu trong module `repair`** — backend endpoint tương ứng (`AssignRepair`) vẫn tồn tại đúng, chỉ là
 chưa có UI nào kích hoạt (không phải lỗi tích hợp, chỉ ghi nhận).
 
+**Cập nhật 2026-09-06:** gọi thẳng API xác nhận nếu endpoint chết này ĐƯỢC dùng trước `repair/start` (vd
+mai sau có ai nối dây UI cho nó) thì sẽ crash 500 không bắt lỗi — cả `AssignRepairAsync` và
+`StartRepairAsync` đều tự `_db.RepairOrders.Add(...)` tạo mới, nhưng chỉ `AssignRepairAsync` có check
+`existingRepair != null` chặn trùng; `StartRepairAsync` không check nên insert lần 2 vỡ unique constraint
+`IX_RepairOrders_JobNo` (`DbUpdateException`/`PostgresException 23505`), lộ nguyên stack trace ra response
+vì controller không bọc try/catch cho action này. Không sửa vì không tái hiện được qua UI thật hiện tại
+(chỉ `repair/start` được gọi trực tiếp, luồng đó vẫn đúng — xem "Bug đã sửa" bên dưới) — ghi nhận để nếu
+sau này có người nối dây nút "Phân Công" thật thì nhớ thêm guard tương tự vào `StartRepairAsync`.
+
 ## Đối chiếu backend
 
 - `POST /DepotJobs/{id}/repair/start` → `StartRepairAsync`: yêu cầu `Estimate.Status == "APPROVED"` và
@@ -52,3 +61,22 @@ lại toàn bộ chuỗi Start → Complete → QC Pass qua Postgres thật, th�
 - [x] `POST /DepotJobs/{id}/repair/complete` — khớp, không cần sửa, đã test thật thành công.
 - [x] Đã chạy thử thật (không chỉ static review): Gate-In → Survey → Estimate → Approve → Repair Start
       → Repair Complete → QC Pass → Billing sync-candidates → Gate-Out, toàn bộ chuỗi hoạt động đúng.
+
+## Ảnh sau sửa bị mất — đã lưu thật (2026-09-29)
+
+**Bug:** `CaptureAfterPhotoModal` đọc ảnh thành base64 trong trình duyệt, gửi kèm `POST /repair/complete`;
+`CompleteRepairAsync` bỏ ảnh đi, chỉ ghi "Đã đính kèm N ảnh." vào `QcNotes` → F5 là mất hết ảnh. Ngoài ra
+Work Order tự gán ảnh "sau sửa" mẫu Unsplash cho hạng mục đã hoàn thành, và modal có "kho ảnh mẫu".
+
+**Sửa:**
+- `POST /api/DepotJobs/{id}/repair/photos` (multipart `file` + `itemNo`) — chỉ khi job `REPAIRING`; lưu vật lý
+  qua Depot.FileServer, metadata `DepotFiles` với `TableName="RepairOrder"`, `IdTable=RepairOrder.Id`, tên file
+  `ITEM-{itemNo}__{tên gốc}` (DepotFiles không có cột phân nhóm con nên số hạng mục nằm trong tên).
+- `GET /api/DepotJobs/{id}/repair/photos` — mọi trạng thái (QC cũng xem được). Xóa dùng `DELETE /api/depot-files/{id}`.
+- `CompleteRepairAsync` đếm ảnh theo `DepotFiles` thay vì `request.Photos`.
+- Frontend: modal upload ngay từng ảnh (có trạng thái đang lưu/lỗi), xóa ảnh = xóa thật; bỏ kho ảnh mẫu và
+  ảnh AFTER giả trong `initialWorkOrders.ts`; `RepairPage` nạp ảnh thật khi mở 1 Work Order, gắn theo `itemNo`.
+
+**Verify:** backend vá chạy cổng 50299 + FileServer 50211, Postgres thật, job 70 (REPAIRING): upload 2 ảnh
+(item 1, 2) → 200; job 68 (ESTIMATING) → 400 đúng; list trả 2 ảnh đúng tên; tải lại ảnh từ FileServer đúng
+388536 byte; xóa → list rỗng, file vật lý 404. `tsc` 0 lỗi. Chưa test qua UI thật vì backend 50210 chạy bản cũ.

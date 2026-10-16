@@ -208,8 +208,21 @@ export const SystemPage: React.FC = () => {
           lastLoginIp: 'N/A'
         };
         setUsers((prev) => [newUser, ...prev]);
-        setToastMessage(`🎉 Đã tạo mới tài khoản "${userData.fullName}" (${userData.username}) thành công! Mật khẩu mặc định: 123456`);
+        // Backend giờ sinh mật khẩu tạm ngẫu nhiên (không còn cố định "123456") và chỉ trả về đúng 1 lần
+        // trong response tạo tài khoản — phải hiển thị ngay ở đây vì sau lần này không thể xem lại. Giữ
+        // toast lâu hơn hẳn mức mặc định (4s) để admin kịp copy mật khẩu trước khi tự ẩn.
+        const tempPassword = created.temporaryPassword as string | undefined;
+        setToastMessage(
+          tempPassword
+            ? `🎉 Đã tạo mới tài khoản "${userData.fullName}" (${userData.username}) thành công! Mật khẩu tạm: ${tempPassword} — hãy gửi cho nhân viên ngay, hệ thống sẽ không hiển thị lại.`
+            : `🎉 Đã tạo mới tài khoản "${userData.fullName}" (${userData.username}) thành công!`
+        );
         addAuditLog('CREATE_USER', 'Tạo Mới Tài Khoản', `Tài khoản ${userData.username}`, `Gán vai trò ${userData.roleName}`);
+
+        setIsUserModalOpen(false);
+        setEditingUser(null);
+        setTimeout(() => setToastMessage(null), tempPassword ? 20000 : 4000);
+        return;
       }
 
       setIsUserModalOpen(false);
@@ -364,22 +377,22 @@ export const SystemPage: React.FC = () => {
   return (
     <div className="space-y-6 max-w-7xl mx-auto animate-fade-in pb-16">
       {/* Top Banner */}
-      <div className="p-6 bg-slate-900 border border-slate-800 rounded-3xl flex items-center justify-between flex-wrap gap-4 shadow-xl">
+      <div className="p-6 bg-white border border-slate-200 rounded-3xl flex items-center justify-between flex-wrap gap-4 shadow-xl">
         <div className="flex items-center gap-3">
-          <div className="p-3.5 bg-purple-600/20 border border-purple-500/30 text-purple-400 rounded-2xl">
+          <div className="p-3.5 bg-purple-50 border border-purple-200 text-purple-600 rounded-2xl">
             <Lock className="w-7 h-7" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-xl font-bold text-white tracking-wide">
+              <h2 className="text-xl font-bold text-slate-900 tracking-wide">
                 PHÂN QUYỀN RBAC &amp; QUẢN LÝ NGƯỜI DÙNG (ROLE-BASED ACCESS CONTROL)
               </h2>
-              <span className="px-2.5 py-0.5 bg-purple-950 border border-purple-800 text-purple-300 text-xs font-mono font-bold rounded-lg flex items-center gap-1">
-                <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+              <span className="px-2.5 py-0.5 bg-purple-50 border border-purple-200 text-purple-700 text-xs font-mono font-bold rounded-lg flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />
                 <span>Enterprise Core</span>
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5 max-w-3xl leading-relaxed">
+            <p className="text-xs text-slate-500 mt-0.5 max-w-3xl leading-relaxed">
               Kiểm soát phân quyền truy cập đa cấp theo 10 Vai trò nghiệp vụ Depot &bull; Quản lý tài khoản nhân viên, ma trận quyền hạn chi tiết, chính sách mật khẩu và nhật ký truy vết Audit Trail.
             </p>
           </div>
@@ -391,7 +404,7 @@ export const SystemPage: React.FC = () => {
               setEditingUser(null);
               setIsUserModalOpen(true);
             }}
-            className="px-4 py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-lg shadow-purple-950"
+            className="px-4 py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-lg "
           >
             <Plus className="w-4 h-4" />
             <span>Thêm Mới Người Dùng</span>
@@ -401,12 +414,12 @@ export const SystemPage: React.FC = () => {
 
       {/* Toast message */}
       {toastMessage && (
-        <div className="p-4 bg-slate-900 border-2 border-purple-500 rounded-2xl flex items-center justify-between text-xs text-purple-200 shadow-2xl animate-fade-in">
+        <div className="p-4 bg-white border-2 border-purple-500 rounded-2xl flex items-center justify-between text-xs text-purple-200 shadow-2xl animate-fade-in">
           <div className="flex items-center gap-3">
-            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
             <span className="font-bold">{toastMessage}</span>
           </div>
-          <button onClick={() => setToastMessage(null)} className="text-slate-400 hover:text-white p-1">
+          <button onClick={() => setToastMessage(null)} className="text-slate-500 hover:text-slate-900 p-1">
             &times;
           </button>
         </div>
@@ -414,52 +427,52 @@ export const SystemPage: React.FC = () => {
 
       {/* KPI Stats Overview */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-        <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-1">
-          <div className="flex items-center justify-between text-xs font-bold text-slate-400">
+        <div className="p-4 bg-white border border-slate-200 rounded-2xl space-y-1">
+          <div className="flex items-center justify-between text-xs font-bold text-slate-500">
             <span>Tổng Số Tài Khoản</span>
-            <Users className="w-4 h-4 text-purple-400" />
+            <Users className="w-4 h-4 text-purple-600" />
           </div>
-          <div className="text-2xl font-black text-white font-mono">{totalUsers}</div>
+          <div className="text-2xl font-black text-slate-900 font-mono">{totalUsers}</div>
           <span className="text-[10px] text-slate-500">{departments.length} phòng ban nghiệp vụ</span>
         </div>
 
-        <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-1">
-          <div className="flex items-center justify-between text-xs font-bold text-slate-400">
+        <div className="p-4 bg-white border border-slate-200 rounded-2xl space-y-1">
+          <div className="flex items-center justify-between text-xs font-bold text-slate-500">
             <span>Đang Hoạt Động (Active)</span>
-            <UserCheck className="w-4 h-4 text-emerald-400" />
+            <UserCheck className="w-4 h-4 text-emerald-600" />
           </div>
-          <div className="text-2xl font-black text-emerald-400 font-mono">{activeUsers}</div>
-          <span className="text-[10px] text-slate-500">Tỷ lệ khả dụng: {Math.round((activeUsers / totalUsers) * 100)}%</span>
+          <div className="text-2xl font-black text-emerald-600 font-mono">{activeUsers}</div>
+          <span className="text-[10px] text-slate-500">Tỷ lệ khả dụng: {totalUsers > 0 ? `${Math.round((activeUsers / totalUsers) * 100)}%` : '—'}</span>
         </div>
 
-        <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-1">
-          <div className="flex items-center justify-between text-xs font-bold text-slate-400">
+        <div className="p-4 bg-white border border-slate-200 rounded-2xl space-y-1">
+          <div className="flex items-center justify-between text-xs font-bold text-slate-500">
             <span>Đã Bật Bảo Mật 2FA</span>
-            <Smartphone className="w-4 h-4 text-sky-400" />
+            <Smartphone className="w-4 h-4 text-sky-600" />
           </div>
-          <div className="text-2xl font-black text-sky-400 font-mono">{twoFactorCount}</div>
+          <div className="text-2xl font-black text-sky-600 font-mono">{twoFactorCount}</div>
           <span className="text-[10px] text-slate-500">Google Authenticator OTP</span>
         </div>
 
-        <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-1">
-          <div className="flex items-center justify-between text-xs font-bold text-slate-400">
+        <div className="p-4 bg-white border border-slate-200 rounded-2xl space-y-1">
+          <div className="flex items-center justify-between text-xs font-bold text-slate-500">
             <span>Tài Khoản Tạm Khóa</span>
-            <UserX className="w-4 h-4 text-rose-400" />
+            <UserX className="w-4 h-4 text-rose-600" />
           </div>
-          <div className="text-2xl font-black text-rose-400 font-mono">{lockedUsers}</div>
+          <div className="text-2xl font-black text-rose-600 font-mono">{lockedUsers}</div>
           <span className="text-[10px] text-slate-500">Bị vô hiệu hóa truy cập</span>
         </div>
       </div>
 
       {/* Main Tab Controls */}
-      <div className="p-4 bg-slate-900 border border-slate-800 rounded-3xl space-y-4">
+      <div className="p-4 bg-white border border-slate-200 rounded-3xl space-y-4">
         <div className="flex items-center gap-2 overflow-x-auto pb-1">
           <button
             onClick={() => setActiveSubTab('USERS')}
             className={`px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center gap-2 ${
               activeSubTab === 'USERS'
-                ? 'bg-purple-600 text-white shadow-md shadow-purple-950'
-                : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                ? 'bg-purple-600 text-white shadow-md '
+                : 'bg-slate-50 text-slate-500 hover:text-slate-900 border border-slate-200'
             }`}
           >
             <Users className="w-4 h-4" />
@@ -470,8 +483,8 @@ export const SystemPage: React.FC = () => {
             onClick={() => setActiveSubTab('MATRIX')}
             className={`px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center gap-2 ${
               activeSubTab === 'MATRIX'
-                ? 'bg-purple-600 text-white shadow-md shadow-purple-950'
-                : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                ? 'bg-purple-600 text-white shadow-md '
+                : 'bg-slate-50 text-slate-500 hover:text-slate-900 border border-slate-200'
             }`}
           >
             <ShieldCheck className="w-4 h-4" />
@@ -482,8 +495,8 @@ export const SystemPage: React.FC = () => {
             onClick={() => setActiveSubTab('AUDIT')}
             className={`px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center gap-2 ${
               activeSubTab === 'AUDIT'
-                ? 'bg-purple-600 text-white shadow-md shadow-purple-950'
-                : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                ? 'bg-purple-600 text-white shadow-md '
+                : 'bg-slate-50 text-slate-500 hover:text-slate-900 border border-slate-200'
             }`}
           >
             <ShieldAlert className="w-4 h-4" />
@@ -494,8 +507,8 @@ export const SystemPage: React.FC = () => {
             onClick={() => setActiveSubTab('SECURITY')}
             className={`px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center gap-2 ${
               activeSubTab === 'SECURITY'
-                ? 'bg-purple-600 text-white shadow-md shadow-purple-950'
-                : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                ? 'bg-purple-600 text-white shadow-md '
+                : 'bg-slate-50 text-slate-500 hover:text-slate-900 border border-slate-200'
             }`}
           >
             <Key className="w-4 h-4" />
@@ -513,7 +526,7 @@ export const SystemPage: React.FC = () => {
                 value={searchUser}
                 onChange={(e) => setSearchUser(e.target.value)}
                 placeholder="Tìm theo tên, username, email, mã NV..."
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 text-white text-xs rounded-xl focus:outline-none focus:border-purple-500"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 text-slate-900 text-xs rounded-xl focus:outline-none focus:border-purple-500"
               />
             </div>
 
@@ -521,7 +534,7 @@ export const SystemPage: React.FC = () => {
               <select
                 value={roleFilter}
                 onChange={(e) => setRoleFilter(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 text-white text-xs rounded-xl focus:outline-none"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 text-slate-900 text-xs rounded-xl focus:outline-none"
               >
                 <option value="ALL">Tất cả 10 Vai Trò</option>
                 {roles.map((r) => (
@@ -536,7 +549,7 @@ export const SystemPage: React.FC = () => {
               <select
                 value={departmentFilter}
                 onChange={(e) => setDepartmentFilter(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 text-white text-xs rounded-xl focus:outline-none"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 text-slate-900 text-xs rounded-xl focus:outline-none"
               >
                 <option value="ALL">Tất cả Phòng Ban</option>
                 {departments.map((dept) => (
@@ -551,7 +564,7 @@ export const SystemPage: React.FC = () => {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 text-white text-xs rounded-xl focus:outline-none"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 text-slate-900 text-xs rounded-xl focus:outline-none"
               >
                 <option value="ALL">Tất cả Trạng Thái</option>
                 <option value="ACTIVE">🟢 Đang hoạt động</option>
@@ -565,11 +578,11 @@ export const SystemPage: React.FC = () => {
 
       {/* TAB 1: USERS DIRECTORY TABLE */}
       {activeSubTab === 'USERS' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
+        <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-xl">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-slate-950/80 border-b border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   <th className="p-4">Nhân Viên &amp; Tài Khoản</th>
                   <th className="p-4">Vai Trò (Role)</th>
                   <th className="p-4">Phòng Ban Trực Thuộc</th>
@@ -579,7 +592,7 @@ export const SystemPage: React.FC = () => {
                   <th className="p-4 text-right">Thao Tác</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/80">
+              <tbody className="divide-y divide-slate-200/80">
                 {filteredUsers.map((user) => {
                   const isCurrent = user.id === currentUser.id;
 
@@ -587,20 +600,20 @@ export const SystemPage: React.FC = () => {
                     <tr key={user.id} className="hover:bg-slate-850 transition duration-150">
                       <td className="p-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-purple-600/20 text-purple-300 border border-purple-500/30 flex items-center justify-center font-bold font-mono text-sm shrink-0">
+                          <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-700 border border-purple-200 flex items-center justify-center font-bold font-mono text-sm shrink-0">
                             {user.fullName.slice(0, 2).toUpperCase()}
                           </div>
                           <div>
-                            <div className="font-bold text-white text-sm flex items-center gap-1.5">
+                            <div className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
                               <span>{user.fullName}</span>
                               {isCurrent && (
-                                <span className="px-1.5 py-0.2 bg-emerald-950 text-emerald-400 border border-emerald-800 text-[9px] font-mono rounded">
+                                <span className="px-1.5 py-0.2 bg-emerald-50 text-emerald-600 border border-emerald-200 text-[9px] font-mono rounded">
                                   BẠN
                                 </span>
                               )}
                             </div>
-                            <div className="text-[11px] text-slate-400 font-mono flex items-center gap-2 mt-0.5">
-                              <span className="text-purple-400">@{user.username}</span>
+                            <div className="text-[11px] text-slate-500 font-mono flex items-center gap-2 mt-0.5">
+                              <span className="text-purple-600">@{user.username}</span>
                               <span>&bull;</span>
                               <span>{user.email}</span>
                             </div>
@@ -609,49 +622,49 @@ export const SystemPage: React.FC = () => {
                       </td>
 
                       <td className="p-4">
-                        <span className="px-2.5 py-1 bg-purple-950/80 border border-purple-800 text-purple-300 rounded-lg font-mono font-bold text-[11px]">
+                        <span className="px-2.5 py-1 bg-purple-50 border border-purple-200 text-purple-700 rounded-lg font-mono font-bold text-[11px]">
                           {user.roleName}
                         </span>
                       </td>
 
-                      <td className="p-4 text-slate-300">
+                      <td className="p-4 text-slate-700">
                         <div className="font-medium">{user.department}</div>
                         <div className="text-[10px] text-slate-500 font-mono">{user.employeeCode}</div>
                       </td>
 
                       <td className="p-4">
                         {user.is2FAEnabled ? (
-                          <span className="px-2 py-0.5 bg-emerald-950 text-emerald-300 border border-emerald-800 rounded text-[10px] font-mono font-bold inline-flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                          <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded text-[10px] font-mono font-bold inline-flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                             <span>BẬT (2FA)</span>
                           </span>
                         ) : (
-                          <span className="px-2 py-0.5 bg-slate-950 text-slate-500 border border-slate-800 rounded text-[10px] font-mono">
+                          <span className="px-2 py-0.5 bg-slate-50 text-slate-500 border border-slate-200 rounded text-[10px] font-mono">
                             Tắt
                           </span>
                         )}
                       </td>
 
-                      <td className="p-4 font-mono text-[11px] text-slate-400">
+                      <td className="p-4 font-mono text-[11px] text-slate-500">
                         <div>{user.lastLoginAt || 'Chưa đăng nhập'}</div>
                         <div className="text-[10px] text-slate-500">{user.lastLoginIp}</div>
                       </td>
 
                       <td className="p-4">
                         {user.status === 'ACTIVE' && (
-                          <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 font-mono">
+                          <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 font-mono">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                             <span>Hoạt Động</span>
                           </span>
                         )}
                         {user.status === 'LOCKED' && (
-                          <span className="px-2.5 py-1 bg-rose-500/20 text-rose-300 border border-rose-500/40 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 font-mono">
+                          <span className="px-2.5 py-1 bg-rose-50 text-rose-700 border border-rose-200 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 font-mono">
                             <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
                             <span>Đang Khóa</span>
                           </span>
                         )}
                         {user.status === 'INACTIVE' && (
-                          <span className="px-2.5 py-1 bg-slate-800 text-slate-400 border border-slate-700 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 font-mono">
+                          <span className="px-2.5 py-1 bg-slate-100 text-slate-500 border border-slate-200 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 font-mono">
                             <span>Tạm Dừng</span>
                           </span>
                         )}
@@ -662,7 +675,7 @@ export const SystemPage: React.FC = () => {
                           <button
                             onClick={() => handleImpersonateUserRole(user)}
                             title="Chuyển sang góc nhìn vai trò này"
-                            className="p-1.5 bg-slate-800 hover:bg-purple-900/60 text-slate-300 hover:text-purple-300 rounded-xl transition cursor-pointer"
+                            className="p-1.5 bg-slate-100 hover:bg-purple-100 text-slate-700 hover:text-purple-700 rounded-xl transition cursor-pointer"
                           >
                             <Zap className="w-3.5 h-3.5" />
                           </button>
@@ -670,7 +683,7 @@ export const SystemPage: React.FC = () => {
                           <button
                             onClick={() => setResettingUser(user)}
                             title="Đặt lại mật khẩu"
-                            className="p-1.5 bg-slate-800 hover:bg-amber-900/60 text-slate-300 hover:text-amber-300 rounded-xl transition cursor-pointer"
+                            className="p-1.5 bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-700 rounded-xl transition cursor-pointer"
                           >
                             <Key className="w-3.5 h-3.5" />
                           </button>
@@ -681,7 +694,7 @@ export const SystemPage: React.FC = () => {
                               setIsUserModalOpen(true);
                             }}
                             title="Chỉnh sửa tài khoản"
-                            className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl transition cursor-pointer"
+                            className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-xl transition cursor-pointer"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
@@ -691,8 +704,8 @@ export const SystemPage: React.FC = () => {
                             title={user.status === 'LOCKED' ? 'Mở khóa tài khoản' : 'Khóa tài khoản'}
                             className={`p-1.5 rounded-xl transition cursor-pointer ${
                               user.status === 'LOCKED'
-                                ? 'bg-emerald-950 hover:bg-emerald-900 text-emerald-400'
-                                : 'bg-slate-800 hover:bg-rose-900/60 text-slate-300 hover:text-rose-400'
+                                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-600'
+                                : 'bg-slate-100 hover:bg-rose-100 text-slate-700 hover:text-rose-600'
                             }`}
                           >
                             {user.status === 'LOCKED' ? <UserCheck className="w-3.5 h-3.5" /> : <UserX className="w-3.5 h-3.5" />}
@@ -702,7 +715,7 @@ export const SystemPage: React.FC = () => {
                             <button
                               onClick={() => handleDeleteUser(user)}
                               title="Xóa tài khoản"
-                              className="p-1.5 bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 rounded-xl transition cursor-pointer"
+                              className="p-1.5 bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 rounded-xl transition cursor-pointer"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>

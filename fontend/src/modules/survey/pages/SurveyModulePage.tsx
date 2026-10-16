@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { containerApi, surveyApi, masterDataApi } from '../../../api';
+import React, { useState, useEffect } from 'react';
+import { containerApi, surveyApi, masterDataApi, toPublicFileUrl } from '../../../api';
 import { useDepot } from '../../../context/DepotContext';
 import {
   SurveyItemRecord,
@@ -8,10 +8,10 @@ import {
   RepairCodeMasterItem,
   GradeMasterItem,
   InspectionStandardMasterItem,
-  CleaningTariffMasterItem
+  CleaningTariffMasterItem,
+  ContainerTypeMasterItem
 } from '../types';
-import { INITIAL_CHECKLIST_TEMPLATE } from '../mockData';
-import { BACKEND_ISO_SIZE_MAP, BACKEND_SHIPPING_LINE_MAP, isReeferSizeCode } from '../utils/containerValidator';
+import { fetchSurveyChecklistTemplate } from '../../masterdata/utils/checklistCatalog';
 import { SurveyQueueTable } from '../components/SurveyQueueTable';
 import { SurveyDetailForm } from '../components/SurveyDetailForm';
 import { DamageLocationMaster } from '../components/DamageLocationMaster';
@@ -25,6 +25,7 @@ import { ContainerSearchModal } from '../components/ContainerSearchModal';
 import { EEIRModal } from '../components/EEIRModal';
 import { CreateSurveyModal } from '../components/CreateSurveyModal';
 import { CleaningMaster } from '../../masterdata/components/CleaningMaster';
+import { fetchContainerTypes } from '../../masterdata/utils/containerTypeCatalog';
 
 import {
   ClipboardCheck,
@@ -38,13 +39,10 @@ import {
   ShieldCheck,
   Image as ImageIcon,
   FileText,
-  Search,
-  PlusCircle,
-  Layers,
-  ChevronRight,
   Plus,
   Droplets
 } from 'lucide-react';
+import { getApiErrorMessage } from '../../../utils/apiError';
 
 interface SurveyModulePageProps {
   initialSubTab?: string;
@@ -64,6 +62,8 @@ export const SurveyModulePage: React.FC<SurveyModulePageProps> = ({
 }) => {
   // Global survey module state
   const [surveys, setSurveys] = useState<SurveyItemRecord[]>([]);
+  // Checklist mẫu (danh mục SURVEY_CHECKLIST trong DB) — nạp cùng lúc với danh sách hồ sơ ở refreshSurveys.
+  const surveyChecklistTemplateRef = React.useRef<SurveyItemRecord['checklist']>([]);
   const [surveyLoadError, setSurveyLoadError] = useState<string | null>(null);
   // 6 danh mục dưới đây trước đây seed bằng mock cục bộ (INITIAL_DAMAGE_LOCATIONS...) và không hề gọi
   // API — tách rời hoàn toàn khỏi trang "Danh Mục Hệ Thống & Master Data" (MasterDataPage) vốn đã lưu
@@ -75,6 +75,11 @@ export const SurveyModulePage: React.FC<SurveyModulePageProps> = ({
   const [grades, setGrades] = useState<GradeMasterItem[]>([]);
   const [standards, setStandards] = useState<InspectionStandardMasterItem[]>([]);
   const [cleaningTariffs, setCleaningTariffs] = useState<CleaningTariffMasterItem[]>([]);
+  // DM Loại Container thật cho tab Biểu Phí Vệ Sinh (cột giá theo loại container).
+  const [containerTypes, setContainerTypes] = useState<ContainerTypeMasterItem[]>([]);
+  useEffect(() => {
+    fetchContainerTypes().then(setContainerTypes).catch(() => setContainerTypes([]));
+  }, []);
   const [masterCatalogError, setMasterCatalogError] = useState<string | null>(null);
 
   // Fetch 6 danh mục dùng chung với MasterDataPage — cùng mapping JsonData -> field như bên đó (xem
@@ -168,21 +173,23 @@ export const SurveyModulePage: React.FC<SurveyModulePageProps> = ({
 
   const mapJobToSurvey = (job: any): SurveyItemRecord => ({
     id: String(job.id),
-    surveyNo: job.survey?.id || job.jobNo,
+    // SurveyNo giờ backend tự sinh thật (xem SubmitSurveyAsync) — trước đây tạm dùng survey.id
+    // (khóa nội bộ, không phải số phiếu nghiệp vụ) vì chưa có cột nào lưu số phiếu thật.
+    surveyNo: job.survey?.surveyNo || job.jobNo,
     containerNo: job.containerNo,
     isoCode: job.isoSize,
     size: job.isoSize,
-    type: job.isoSize?.includes('RF') || job.isoSize?.includes('RH') ? 'Reefer' : 'Dry High Cube',
-    owner: job.shippingLineCode,
+    type: job.survey?.containerTypeName || (job.isoSize?.includes('RF') || job.isoSize?.includes('RH') ? 'Reefer' : 'Dry High Cube'),
+    owner: job.survey?.owner || job.shippingLineCode,
     shippingLine: job.shippingLineCode,
     isReefer: job.isoSize?.includes('RF') || job.isoSize?.includes('RH'),
     gateInTime: job.gateInDate,
     surveyDate: job.survey?.surveyDate || new Date().toISOString(),
     surveyor: job.survey?.surveyorName || currentUser,
     status: job.status === 'SURVEYING' ? 'NEW' : 'IN_PROGRESS',
-    standard: 'IICL-6',
+    standard: job.survey?.standard || 'IICL-6',
     condition: job.survey ? conditionFromRating(job.survey.conditionRating) : 'AV',
-    qualityGrade: job.survey?.conditionRating === 'A' ? 'GRADE_A' : 'GENERAL_CARGO',
+    qualityGrade: job.survey?.qualityGrade || (job.survey?.conditionRating === 'A' ? 'GRADE_A' : 'GENERAL_CARGO'),
     damages: (job.survey?.damages || []).map((damage: any) => ({
       id: String(damage.id),
       locationCode: damage.locationCode,
@@ -235,10 +242,10 @@ export const SurveyModulePage: React.FC<SurveyModulePageProps> = ({
             notes: c.notes,
             damageCount: c.damageCount
           }))
-        : INITIAL_CHECKLIST_TEMPLATE.map((item) => ({ ...item })),
+        : surveyChecklistTemplateRef.current.map((item) => ({ ...item })),
     photos: (job.survey?.photos || []).map((p: any) => ({
       id: String(p.id),
-      url: p.url,
+      url: toPublicFileUrl(p.url),
       type: p.type,
       caption: p.caption,
       surveyor: p.surveyorName,
@@ -248,12 +255,40 @@ export const SurveyModulePage: React.FC<SurveyModulePageProps> = ({
     surveyClaimedByStaffId: job.surveyClaimedByStaffId ?? undefined,
     surveyClaimedByName: job.surveyClaimedByName ?? undefined,
     surveyClaimedAt: job.surveyClaimedAt ?? undefined,
-    remarks: job.survey?.overallNotes || `Job ${job.jobNo} từ Gate-In SQL Server`
+    // Không tự điền câu hệ thống làm ghi chú giám định (trước đây lưu ngược "Job ... từ Gate-In SQL Server" vào DB).
+    remarks: job.survey?.overallNotes || '',
+    // Round-trip đúng các field đã thêm cột lưu ở Survey/DepotJob — trước đây backend không trả lại
+    // field nào trong nhóm này nên F5 xong màn Chi Tiết luôn hiện trống dù đã nhập lúc tạo phiếu.
+    truckPlate: job.gateInTruckPlate,
+    trailerPlate: job.gateInTrailerPlate,
+    driverName: job.gateInDriverName,
+    driverPhone: job.gateInDriverPhone,
+    sealNo: job.gateInSealNo,
+    driverLicense: job.gateInDriverLicense,
+    customsSealNo: job.gateInCustomsSealNo,
+    manufactureMonthYear: job.survey?.manufactureMonthYear,
+    maxGrossWeightKg: job.survey?.maxGrossWeightKg,
+    material: job.survey?.material,
+    floorType: job.survey?.floorType,
+    cscPlateNo: job.survey?.cscPlateNo,
+    standardNotes: job.survey?.standardNotes,
+    actionRequired: job.survey?.actionRequired,
+    shift: job.survey?.shift,
+    yardLocation: job.survey?.yardLocationNote,
+    cargoStatus: job.survey?.cargoStatus,
+    reeferBrand: job.survey?.reeferBrand,
+    reeferModel: job.survey?.reeferModel,
+    setTemperature: job.survey?.reeferSetTemperatureC,
+    ptiStatus: job.survey?.ptiStatus,
+    compressorHours: job.survey?.compressorHours,
+    humidityPercent: job.survey?.humidityPercent,
+    ventilationCmh: job.survey?.ventilationCmh
   });
 
   const refreshSurveys = React.useCallback(() => {
-    return containerApi.getAll({ status: 'SURVEYING' })
-      .then((response: any) => {
+    return Promise.all([containerApi.getAll({ status: 'SURVEYING' }), fetchSurveyChecklistTemplate()])
+      .then(([response, checklistTemplate]: [any, SurveyItemRecord['checklist']]) => {
+        surveyChecklistTemplateRef.current = checklistTemplate;
         if (response?.statusCode !== 200 || !Array.isArray(response.data)) {
           throw new Error(response?.message || 'Không thể tải Survey Queue từ SQL Server.');
         }
@@ -269,8 +304,7 @@ export const SurveyModulePage: React.FC<SurveyModulePageProps> = ({
   }, [refreshSurveys]);
 
   // Mở phiếu giám định: với hồ sơ thật từ Gate-In còn đang chờ (status NEW), phải "nhận" (khóa) trước
-  // qua backend để chặn 2 surveyor cùng mở 1 container — record Pre-Survey local (id "SURV-...") hoặc
-  // hồ sơ đang/đã giám định (đã có người nhận từ trước, kể cả chính mình) thì mở thẳng, không cần khóa lại.
+  // qua backend để chặn 2 surveyor cùng mở 1 container — hồ sơ đang/đã giám định (đã có người nhận từ trước, kể cả chính mình) thì mở thẳng, không cần khóa lại.
   const handleOpenSurvey = async (survey: SurveyItemRecord) => {
     const isBackendJob = /^\d+$/.test(survey.id);
     if (!isBackendJob || survey.status !== 'NEW') {
@@ -329,6 +363,21 @@ export const SurveyModulePage: React.FC<SurveyModulePageProps> = ({
     setSelectedSurvey(null);
   };
 
+  // Hoàn tất giám định thành công: thông báo bước tiếp theo (theo đúng quy tắc SubmitSurveyAsync ở backend)
+  // rồi quay về danh sách giám định.
+  const handleSurveyCompleted = (record: SurveyItemRecord) => {
+    const damageCount = (record.damages || []).length;
+    const next = 'Đã tạo lệnh vệ sinh — container chuyển sang Tổ Vệ Sinh.'
+      + (damageCount > 0 ? ` Có ${damageCount} hư hỏng: sau vệ sinh → Khai thác → thu tiền → lập báo giá sửa chữa.` : '');
+    showToast(
+      `Container ${record.containerNo}${record.eeirNo ? ` · e-EIR ${record.eeirNo}` : ''}. ${next}`,
+      'success',
+      'Hoàn tất giám định'
+    );
+    setSelectedSurvey(null);
+    setActiveTab('queue');
+  };
+
   // Menu items specification from requirements
   const menuItems = [
     { id: 'queue', label: 'Chờ Giám định', icon: Clock, badge: surveys.filter((s) => s.status === 'NEW' || s.status === 'ASSIGNED').length },
@@ -348,8 +397,7 @@ export const SurveyModulePage: React.FC<SurveyModulePageProps> = ({
   // Save / Update Survey handler
   const handleSaveSurvey = async (updated: SurveyItemRecord, isDraft: boolean = false) => {
     // `DepotJob.Id` backend là `long` (vd "42"), KHÔNG phải Guid — `mapJobToSurvey` set
-    // `id: String(job.id)` cho job thật, còn record Pre-Survey tạo tại chỗ (handleStartSurvey) dùng id
-    // giả dạng "SURV-XXXXX". Regex GUID cũ luôn false với id thật, khiến handleSaveSurvey chỉ cập nhật
+    // `id: String(job.id)` cho job thật. Regex GUID cũ luôn false với id thật, khiến handleSaveSurvey chỉ cập nhật
     // state React cục bộ mà KHÔNG BAO GIỜ gọi `surveyApi.submitSurvey` cho container đã Gate-In thật —
     // dữ liệu giám định nhập vào không lưu xuống Postgres, mất khi F5.
     const isBackendJob = /^\d+$/.test(updated.id);
@@ -381,7 +429,7 @@ export const SurveyModulePage: React.FC<SurveyModulePageProps> = ({
             quantity: damage.quantity || 1,
             unit: 'vị trí',
             laborHours: rep?.labourHours ?? 1,
-            laborRate: rep?.labourRate ?? 150000,
+            laborRate: rep?.labourRate ?? 0,
             materialCost: rep?.materialEstimatedCost ?? 0,
             severity: damage.severity,
             notes: damage.description,
@@ -428,7 +476,30 @@ export const SurveyModulePage: React.FC<SurveyModulePageProps> = ({
         // true = "Lưu Tạm": backend giữ nguyên job ở SURVEYING thay vì chuyển ESTIMATING/READY_FOR_OUT,
         // để job không bị rớt khỏi mọi tab hàng đợi (vốn chỉ fetch container status=SURVEYING) chỉ vì
         // surveyor lưu tiến độ giữa chừng thay vì nộp phiếu thật.
-        isDraft
+        isDraft,
+        // CreateSurveyModal thu thập đủ các field dưới đây qua 4 tab nhưng trước đây không gửi lên nên
+        // mất trắng ngay sau khi nộp phiếu — giờ gửi đủ để lưu thật xuống Postgres.
+        owner: updated.owner,
+        containerTypeName: updated.type,
+        manufactureMonthYear: updated.manufactureMonthYear,
+        maxGrossWeightKg: updated.maxGrossWeightKg,
+        material: updated.material,
+        floorType: updated.floorType,
+        cscPlateNo: updated.cscPlateNo,
+        standard: updated.standard,
+        standardNotes: updated.standardNotes,
+        qualityGrade: updated.qualityGrade,
+        actionRequired: updated.actionRequired,
+        shift: updated.shift,
+        yardLocationNote: updated.yardLocation,
+        cargoStatus: updated.cargoStatus,
+        reeferBrand: updated.reeferBrand,
+        reeferModel: updated.reeferModel,
+        reeferSetTemperatureC: updated.setTemperature,
+        ptiStatus: updated.ptiStatus,
+        compressorHours: updated.compressorHours,
+        humidityPercent: updated.humidityPercent,
+        ventilationCmh: updated.ventilationCmh
         });
       } catch (err: any) {
         // Backend trả HTTP 400/500 thật (không phải 200 kèm statusCode lỗi trong body) khi submit thất
@@ -483,48 +554,26 @@ export const SurveyModulePage: React.FC<SurveyModulePageProps> = ({
   // Full create new survey handler — CreateSurveyModal luôn build 1 record với id giả "SURV-xxx" (container
   // nhập từ đầu, độc lập hoàn toàn với luồng Gate-In thật). Trước đây record này chỉ tồn tại trong state
   // React của phiên làm việc, KHÔNG BAO GIỜ lưu xuống backend — F5 là mất trắng dù đã nhập đủ hư hỏng/vệ
-  // sinh/checklist/ảnh. Giờ với container coi như "đã ở trong bãi" (không phải Pre-Survey), tự động Gate-In
-  // trước để có DepotJob thật, rồi nộp luôn phiếu giám định vào job đó — tái dùng đúng handleSaveSurvey.
-  const handleCreateNewSurvey = async (newRecord: SurveyItemRecord, openImmediately: boolean = true) => {
-    // Pre-Survey nghĩa là container CHƯA thật sự vào cổng — không thể tự Gate-In hộ (sẽ tạo dữ liệu xe/
-    // tài xế giả và chặn luôn lượt Gate-In thật sau này vì backend không cho 2 job hoạt động cùng 1
-    // container). Giữ nguyên hành vi cũ: chỉ lưu tạm trong phiên cho tới khi xe thật vào cổng.
-    if (newRecord.isPreSurveyBeforeGateIn) {
-      setSurveys((prev) => [newRecord, ...prev]);
-      if (openImmediately) setSelectedSurvey(newRecord);
-      return;
-    }
-
-    const backendIsoSize = BACKEND_ISO_SIZE_MAP[newRecord.size];
-    const backendShippingLine = BACKEND_SHIPPING_LINE_MAP[newRecord.shippingLine];
-    if (!backendIsoSize || !backendShippingLine || !newRecord.truckPlate || !newRecord.driverName || !newRecord.driverPhone) {
-      showToast(
-        !backendIsoSize
-          ? `Loại container "${newRecord.size}" chưa được hệ thống hỗ trợ Gate-In tự động qua màn này — vui lòng dùng chức năng Gate-In thủ công.`
-          : !backendShippingLine
-          ? `Hãng tàu "${newRecord.shippingLine}" chưa có trong danh mục ShippingLine của hệ thống nên không thể tạo hồ sơ Gate-In tự động.`
-          : 'Thiếu biển số xe / tên tài xế / SĐT tài xế — không thể tạo hồ sơ Gate-In.',
-        'error',
-        'Không thể lưu giám định xuống hệ thống'
-      );
-      setSurveys((prev) => [newRecord, ...prev]);
-      if (openImmediately) setSelectedSurvey(newRecord);
-      return;
-    }
-
+  // sinh/checklist/ảnh. Giờ tự động Gate-In trước để có DepotJob thật, rồi nộp luôn phiếu giám định vào job đó — tái dùng đúng handleSaveSurvey.
+  // Trả về true khi đã lưu xong để CreateSurveyModal chỉ đóng form khi thành công (lỗi thì giữ form + báo lỗi).
+  const handleCreateNewSurvey = async (newRecord: SurveyItemRecord, openImmediately: boolean = true): Promise<boolean> => {
+    // Bước 1: Tiếp nhận cổng — tạo hồ sơ DepotJob thật. Loại container + hãng tàu là mã thật từ DB.
+    // Lỗi thì KHÔNG thêm bản ghi tạm "SURV-..." vào hàng đợi như trước (trông như đã lưu nhưng F5 là mất).
     let realId: string;
     try {
       const gateInResponse: any = await containerApi.createGateIn({
         containerNo: newRecord.containerNo,
-        isoSize: backendIsoSize,
-        shippingLine: backendShippingLine,
-        tareWeightKg: newRecord.tareWeightKg || 3820,
-        maxPayloadKg: newRecord.payloadKg || 28680,
+        isoSize: newRecord.size,
+        shippingLine: newRecord.shippingLine,
+        tareWeightKg: newRecord.tareWeightKg,
+        maxPayloadKg: newRecord.payloadKg,
         truckPlate: newRecord.truckPlate,
         driverName: newRecord.driverName,
         driverPhone: newRecord.driverPhone,
         trailerPlate: newRecord.trailerPlate,
         sealNo: newRecord.sealNo,
+        driverLicense: newRecord.driverLicense,
+        customsSealNo: newRecord.customsSealNo,
         remarks: newRecord.remarks,
         gateInStaffId: currentUserStaffId
       });
@@ -533,14 +582,8 @@ export const SurveyModulePage: React.FC<SurveyModulePageProps> = ({
       }
       realId = String(gateInResponse.data.id);
     } catch (error) {
-      showToast(
-        error instanceof Error ? error.message : 'Không thể tạo hồ sơ Gate-In cho container này.',
-        'error',
-        'Tạo Giám Định Thất Bại'
-      );
-      setSurveys((prev) => [newRecord, ...prev]);
-      if (openImmediately) setSelectedSurvey(newRecord);
-      return;
+      showToast(getApiErrorMessage(error, 'Không thể tạo hồ sơ Gate-In cho container này.'), 'error', 'Tiếp Nhận Cổng Thất Bại');
+      return false;
     }
 
     const realRecord: SurveyItemRecord = { ...newRecord, id: realId };
@@ -549,10 +592,13 @@ export const SurveyModulePage: React.FC<SurveyModulePageProps> = ({
       setSelectedSurvey(realRecord);
     }
 
+    // Bước 2: lưu NHÁP phiếu giám định. 2 nút của form là "Lưu Chờ Giám Định" / "Lưu & Mở Giám Định Ngay" —
+    // giám định chưa làm xong. Trước đây nộp luôn phiếu chính thức với hạng mặc định AV nên container vừa
+    // tạo nhảy thẳng READY_FOR_OUT (sẵn sàng cấp vỏ) dù chưa hề giám định.
     try {
-      await handleSaveSurvey(realRecord, false);
+      await handleSaveSurvey(realRecord, true);
       showToast(
-        `Đã tạo hồ sơ Gate-In & lưu giám định container ${realRecord.containerNo} xuống hệ thống thành công.`,
+        `Đã tiếp nhận cổng container ${realRecord.containerNo} và lưu tạm phiếu giám định.`,
         'success',
         'Tạo Giám Định Thành Công'
       );
@@ -564,47 +610,7 @@ export const SurveyModulePage: React.FC<SurveyModulePageProps> = ({
         'Lưu Nội Dung Giám Định Thất Bại'
       );
     }
-  };
-
-  // Start new survey for non-gate-in or searched container
-  const handleStartSurvey = (containerNo: string, isPreSurvey: boolean, shippingLine: string, size: string) => {
-    const existing = surveys.find((s) => s.containerNo === containerNo);
-    if (existing) {
-      // Container tìm thấy qua Tra Cứu / Pre-Survey có thể là 1 job thật đang SURVEYING — trước đây mở
-      // thẳng bằng setSelectedSurvey, bỏ qua hoàn toàn bước "nhận giám định" (claim) nên 2 surveyor vẫn
-      // mở trùng được cùng 1 container qua đường này dù đã khóa ở màn Danh Sách Chờ.
-      handleOpenSurvey(existing);
-      return;
-    }
-
-    const newRecord: SurveyItemRecord = {
-      id: 'SURV-' + Math.random().toString(36).substring(2, 7).toUpperCase(),
-      surveyNo: `SRV-2026-${Math.floor(1000 + Math.random() * 9000)}`,
-      containerNo,
-      isoCode: size.startsWith('20') ? '22G1' : '45G1',
-      size,
-      // `.includes('R')` cũ khớp nhầm cả Flat Rack (FR) thành Reefer — dùng isReeferSizeCode để chỉ khớp
-      // đúng token Reefer (RF/RH/HR).
-      type: isReeferSizeCode(size) ? 'Reefer High Cube' : 'Dry High Cube',
-      owner: shippingLine + ' Marine Transport',
-      shippingLine,
-      isReefer: isReeferSizeCode(size),
-      isPreSurveyBeforeGateIn: isPreSurvey,
-      gateInTime: isPreSurvey ? 'Chưa Gate-In (Đang ngoài cổng)' : new Date().toISOString().replace('T', ' ').substring(0, 16),
-      surveyDate: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      surveyor: currentUser,
-      status: 'IN_PROGRESS',
-      standard: shippingLine === 'COSCO' ? 'MCIC' : 'IICL-6',
-      condition: 'AV',
-      qualityGrade: 'GRADE_A',
-      damages: [],
-      checklist: INITIAL_CHECKLIST_TEMPLATE.map((c) => ({ ...c })),
-      photos: [],
-      remarks: isPreSurvey ? 'Phiếu Pre-Survey lập trước khi vào cổng bãi.' : 'Tiếp nhận giám định tại làn kiểm tra.'
-    };
-
-    setSurveys((prev) => [newRecord, ...prev]);
-    setSelectedSurvey(newRecord);
+    return true;
   };
 
   const triggerOpenCreateModal = (contNo: string = '') => {
@@ -641,50 +647,41 @@ export const SurveyModulePage: React.FC<SurveyModulePageProps> = ({
   return (
     <div className="space-y-6">
       {surveyLoadError && (
-        <div className="flex items-start gap-2 rounded-xl border border-rose-500/40 bg-rose-950/50 px-4 py-3 text-xs text-rose-200">
+        <div className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">
           <span>{surveyLoadError}</span>
         </div>
       )}
       {masterCatalogError && (
-        <div className="flex items-start gap-2 rounded-xl border border-rose-500/40 bg-rose-950/50 px-4 py-3 text-xs text-rose-200">
+        <div className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">
           <span>{masterCatalogError}</span>
         </div>
       )}
-      {/* Đồng bộ đúng khuôn giao diện "THÔNG BÁO & ZALO GATEWAY"
-          (notifications/components/NotificationHeader.tsx) theo yêu cầu người dùng — xem
-          docs/frontend-theme-unification.md (hạng mục #5). Banner nền TRẮNG với icon logo trong khối
-          gradient xanh dương→sky→chàm (giữ nguyên y hệt, không đổi theo màu nghiệp vụ), dải sub-tab bên
-          dưới đổi hẳn sang nền TỐI. Giữ nguyên nút hành động màu nghiệp vụ (amber) và toàn bộ danh sách
-          12 tab/badge có sẵn, chỉ đổi khung/bố cục banner + style dải tab cho khớp trang tham chiếu. */}
-      <div className="bg-white border-b border-slate-200 -mt-3 -mx-3 sm:-mt-4 sm:-mx-4 md:-mt-6 md:-mx-6 mb-6 px-4 sm:px-6 pt-5 pb-0 shadow-sm">
-        {/* Top Banner (nền trắng) */}
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 pb-4 border-b border-slate-200">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-600 via-sky-600 to-indigo-600 p-0.5 flex items-center justify-center shadow-lg shadow-blue-500/20">
-              <div className="w-full h-full bg-white rounded-[14px] flex items-center justify-center">
-                <ClipboardCheck className="w-6 h-6 text-sky-400" />
-              </div>
+      {/* Đồng bộ đúng chuẩn "Dashboard ERP Tổng Quan" (dashboard/pages/DashboardPage.tsx) theo yêu cầu
+          người dùng 2026-09-06 — xem docs/frontend-theme-unification.md. Banner nền gradient sáng
+          (blue-50→white→indigo-50), KHÔNG còn hộp icon gradient tối và KHÔNG còn dải sub-tab nền tối như
+          chuẩn cũ. Dải tab chuyển sang nền sáng (card slate-50, tab active bg-blue-600 text-white). Giữ
+          nguyên nút hành động màu nghiệp vụ (amber) và toàn bộ danh sách 12 tab/badge có sẵn. */}
+      <div className="p-6 bg-gradient-to-r from-blue-50 via-white to-indigo-50 border border-blue-200 rounded-3xl shadow-sm relative overflow-hidden space-y-4">
+        {/* Top Banner */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="space-y-2 relative z-10">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-700 rounded-full border border-blue-200 text-xs font-bold font-mono">
+              <ClipboardCheck className="w-3.5 h-3.5" />
+              <span>IICL-6 SURVEY &amp; e-EIR</span>
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                  GIÁM ĐỊNH CONTAINER (SURVEY &amp; e-EIR)
-                </h1>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-sky-50 text-sky-700 border border-sky-200">
-                  IICL-6
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Tiếp nhận giám định, ghi nhận hư hỏng và phát hành biên bản e-EIR theo chuẩn IICL-6
-              </p>
-            </div>
+            <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+              Giám Định Container (Survey &amp; e-EIR)
+            </h2>
+            <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
+              Tiếp nhận giám định, ghi nhận hư hỏng và phát hành biên bản e-EIR theo chuẩn IICL-6.
+            </p>
           </div>
 
           {/* Nút hành động — giữ nguyên màu nghiệp vụ (amber) của module Survey */}
-          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-between lg:justify-end">
+          <div className="flex flex-wrap items-center gap-3 relative z-10">
             <button
               onClick={() => triggerOpenCreateModal()}
-              className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-amber-500/25 transition flex items-center gap-2 cursor-pointer whitespace-nowrap active:scale-95"
+              className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-xs rounded-2xl shadow-sm transition flex items-center gap-2 cursor-pointer whitespace-nowrap active:scale-95"
             >
               <Plus className="w-4 h-4 stroke-[3]" />
               <span>+ Tạo Mới Giám Định Đầy Đủ</span>
@@ -692,8 +689,8 @@ export const SurveyModulePage: React.FC<SurveyModulePageProps> = ({
           </div>
         </div>
 
-        {/* Navigation Sub-Tabs (nền tối) */}
-        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-2 mt-1">
+        {/* Navigation Sub-Tabs (nền sáng) */}
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none relative z-10">
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id && !selectedSurvey;
@@ -704,18 +701,18 @@ export const SurveyModulePage: React.FC<SurveyModulePageProps> = ({
                   setActiveTab(item.id);
                   setSelectedSurvey(null);
                 }}
-                className={`flex items-center gap-2 px-3.5 py-2.5 rounded-t-xl text-xs font-bold transition whitespace-nowrap cursor-pointer border-b-2 ${
+                className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
                   isActive
-                    ? 'bg-slate-800/80 text-white border-blue-500 shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border-transparent'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-600 bg-white/60 hover:text-slate-900 hover:bg-white border border-transparent hover:border-slate-200'
                 }`}
               >
-                <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-500'}`} />
                 <span>{item.label}</span>
                 {item.badge !== null && item.badge > 0 && (
                   <span
                     className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold ${
-                      isActive ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300 border border-slate-700'
+                      isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600 border border-slate-200'
                     }`}
                   >
                     {item.badge}
@@ -735,12 +732,12 @@ export const SurveyModulePage: React.FC<SurveyModulePageProps> = ({
           damageCodes={damageCodes}
           repairCodes={repairCodes}
           grades={grades}
+          standards={standards}
           cleaningTariffs={cleaningTariffs}
           currentUser={currentUser}
           onBack={handleBackFromDetail}
           onSaveSurvey={handleSaveSurvey}
-          onOpenEEIR={(s) => setEeirSurvey(s)}
-          onTransferToOperation={handleTransferToOperation}
+          onCompleted={handleSurveyCompleted}
         />
       ) : (
         <>
@@ -801,6 +798,7 @@ export const SurveyModulePage: React.FC<SurveyModulePageProps> = ({
           {activeTab === 'cleaning_tariffs' && (
             <CleaningMaster
               cleaningTariffs={cleaningTariffs}
+              containerTypes={containerTypes}
               onUpdateCleaningTariffs={(tariffs) => { setCleaningTariffs(tariffs); void persistCatalog('CLEANING_TARIFF', cleaningTariffs, tariffs, 'cleaningCode'); }}
             />
           )}
@@ -866,26 +864,30 @@ export const SurveyModulePage: React.FC<SurveyModulePageProps> = ({
         </>
       )}
 
-      {/* Full Create Survey Modal */}
-      <CreateSurveyModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        onSaveSurvey={handleCreateNewSurvey}
-        currentUser={currentUser}
-        locations={locations}
-        damageCodes={damageCodes}
-        repairCodes={repairCodes}
-        grades={grades}
-        cleaningTariffs={cleaningTariffs}
-        initialContainerNo={createPrefillContNo}
-      />
+      {/* Full Create Survey Modal — chỉ mount khi mở: form giữ state nội bộ, nếu mount sẵn thì số container
+          điền từ màn Tra Cứu không được nhận và dữ liệu lần nhập trước còn sót lại khi mở lần sau. */}
+      {isCreateModalOpen && (
+        <CreateSurveyModal
+          isOpen
+          onClose={() => setIsCreateModalOpen(false)}
+          onSaveSurvey={handleCreateNewSurvey}
+          currentUser={currentUser}
+          locations={locations}
+          damageCodes={damageCodes}
+          repairCodes={repairCodes}
+          grades={grades}
+          standards={standards}
+          cleaningTariffs={cleaningTariffs}
+          initialContainerNo={createPrefillContNo}
+        />
+      )}
 
       {/* Search & Non-Gate-In Modal */}
       <ContainerSearchModal
         isOpen={isSearchModalOpen}
         onClose={() => setIsSearchModalOpen(false)}
         existingSurveys={surveys}
-        onStartSurvey={handleStartSurvey}
+        onOpenSurvey={handleOpenSurvey}
         onOpenFullCreateModal={(contNo) => triggerOpenCreateModal(contNo)}
       />
 

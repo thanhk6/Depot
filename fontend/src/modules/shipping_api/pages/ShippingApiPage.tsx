@@ -1,533 +1,292 @@
-import React, { useState, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ContainerRecord } from '../../../services/mockDataStore';
 import { shippingApi } from '../../../api';
+import type { ShippingCarrierStatus, ShippingSyncLogItem } from '../../../api';
+import { getApiErrorMessage } from '../../../utils/apiError';
 import {
   Send,
-  Server,
-  Globe,
   Radio,
-  Activity,
   CheckCircle2,
   AlertCircle,
   Clock,
   Code,
-  Terminal,
-  ShieldCheck,
-  RotateCcw,
-  Search,
-  Filter,
-  Layers,
+  Globe,
   Ship,
-  Copy,
-  Check,
-  Download,
-  ExternalLink,
-  ChevronRight,
-  Sparkles,
-  Zap,
-  Lock,
-  ArrowRight,
+  Search,
   Eye,
   CheckSquare,
   Square,
-  Wrench,
-  Award
+  ShieldCheck,
+  RefreshCw,
+  Settings
 } from 'lucide-react';
-import { QCInspectionRecord } from '../../qc/types/qc';
-import {
-  CarrierApiEndpointConfig,
-  CarrierApiLogRecord
-} from '../types/shippingApi';
-import {
-  CARRIER_API_CONFIGS,
-  INITIAL_API_LOGS,
-  buildCarrierApiRequest,
-  simulateCarrierApiResponse
-} from '../data/carrierApiConfigs';
 import { ApiLogDetailModal } from '../components/ApiLogDetailModal';
+import { logStatusLabel, formatLogTime } from '../utils/shippingLog';
 
 interface ShippingApiPageProps {
   containers: ContainerRecord[];
   onNavigateTab: (tabId: string) => void;
 }
 
-export const ShippingApiPage: React.FC<ShippingApiPageProps> = ({
-  containers,
-  onNavigateTab
-}) => {
-  const [activeMainTab, setActiveMainTab] = useState<'QUEUED' | 'CONSOLE' | 'LOGS' | 'CONFIGS'>('QUEUED');
-  const [selectedCarrierFilter, setSelectedCarrierFilter] = useState<string>('ALL');
+const QC_EVENT = 'QC_PASSED';
+
+// Cổng gửi dữ liệu nghiệm thu (QC đạt) sang API hãng tàu. Trước đây toàn bộ màn là giả lập: 6 hãng gõ cứng
+// luôn "CONNECTED / 200 OK ~480ms", phản hồi + mã ACK + chữ ký số do trình duyệt tự sinh, KPI "542 ms /
+// 100%" gõ cứng. Giờ: danh sách hãng + trạng thái cấu hình lấy từ backend, việc gửi do backend gọi HTTP
+// thật tới endpoint cấu hình trên server, nhật ký là bảng ShippingSyncLogs.
+export const ShippingApiPage: React.FC<ShippingApiPageProps> = ({ containers, onNavigateTab }) => {
+  const [activeMainTab, setActiveMainTab] = useState<'QUEUED' | 'LOGS' | 'CONFIGS'>('QUEUED');
+  const [carrierFilter, setCarrierFilter] = useState<string>('ALL');
   const [searchKeyword, setSearchKeyword] = useState<string>('');
-  const [selectedContainerIds, setSelectedContainerIds] = useState<string[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [carriers, setCarriers] = useState<ShippingCarrierStatus[]>([]);
+  const [logs, setLogs] = useState<ShippingSyncLogItem[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [sendingIds, setSendingIds] = useState<string[]>([]);
+  const [inspectingLog, setInspectingLog] = useState<ShippingSyncLogItem | null>(null);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Gateway configurations
-  const [gateways, setGateways] = useState<CarrierApiEndpointConfig[]>(CARRIER_API_CONFIGS);
+  const refresh = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [carrierList, logList] = await Promise.all([shippingApi.getCarriers(), shippingApi.getLogs({ take: 300 })]);
+      setCarriers(carrierList);
+      setLogs(logList);
+      setLoadError(null);
+    } catch (error) {
+      setLoadError(getApiErrorMessage(error, 'Không tải được trạng thái kết nối hãng tàu.'));
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
-  // API Transmission logs
-  const [apiLogs, setApiLogs] = useState<CarrierApiLogRecord[]>(INITIAL_API_LOGS);
-  const [inspectingLog, setInspectingLog] = useState<CarrierApiLogRecord | null>(null);
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
 
-  // Live Console state
-  const [consoleCarrierCode, setConsoleCarrierCode] = useState<string>('MAERSK');
-  const [consoleEnvironment, setConsoleEnvironment] = useState<'PRODUCTION' | 'SANDBOX'>('PRODUCTION');
-  const [consoleSimulateError, setConsoleSimulateError] = useState<boolean>(false);
-  const [isTransmitting, setIsTransmitting] = useState<boolean>(false);
-  const [transmissionProgress, setTransmissionProgress] = useState<number>(0);
-
-  // Console result
-  const [lastApiResult, setLastApiResult] = useState<{
-    txRef: string;
-    statusCode: number;
-    statusText: string;
-    payload: any;
-    ackRef: string;
-    latencyMs: number;
-    headers: Record<string, string>;
-    requestPayload: any;
-    timestamp: string;
-  } | null>(null);
-
-  const [copiedResponse, setCopiedResponse] = useState<boolean>(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  // Build simulated QC-passed container records from the app state
-  const qcPassedRecords: QCInspectionRecord[] = useMemo(() => {
-    return containers
-      .filter((c) => c.condition === 'AV' || c.status === 'READY_FOR_USE' || c.status === 'IN_YARD' || c.qcDetails?.result === 'PASS')
-      .map((c, idx) => {
-        const isLogged = apiLogs.some((l) => l.containerNos.includes(c.containerNo));
-        return {
-          id: `QC-${c.id}`,
-          containerId: c.id,
-          containerNo: c.containerNo,
-          isoCode: c.isoCode,
-          size: c.size,
-          type: c.type,
-          shippingLine: c.shippingLine,
-          workOrderNo: c.workOrderDetails?.workOrderNo || `WO-${c.containerNo.slice(-4)}`,
-          estimateNo: c.estimateDetails?.estimateNo || `EST-${c.containerNo.slice(-4)}`,
-          technicianName: c.workOrderDetails?.technician || 'Hoàng Văn Sơn (Tổ EMR)',
-          yardLocation: c.yardLocation || { block: 'C', bay: '04', row: '02', tier: '2' },
-          repairedAt: c.workOrderDetails?.assignedAt || '2026-08-16 08:30',
-          inspectedAt: c.qcDetails?.inspectedAt || '2026-08-16 09:15',
-          inspectorName: c.qcDetails?.inspector || 'Vũ Quốc Việt (IICL Certified)',
-          certificateNo: `QC-CERT-${c.containerNo}-2026`,
-          checkItems: [],
-          beforePhotos: [
-            {
-              url: 'https://images.unsplash.com/photo-1541888946425-d0fbb186a5b3?auto=format&fit=crop&w=800&q=80',
-              label: 'Ảnh hư hỏng trước sửa',
-              location: 'Vách trái / Xà đáy'
-            }
-          ],
-          afterPhotos: [
-            {
-              url: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=800&q=80',
-              label: 'Ảnh sau thi công hàn & sơn phủ',
-              location: 'Vách trái / Xà đáy hoàn thiện'
-            }
-          ],
-          qcResult: 'PASS',
-          inspectorComments: 'Nghiệm thu đạt chuẩn IICL-6, cấp vỏ sạch AV.',
-          releasedGrade: 'GRADE_A',
-          shippingDispatch: isLogged
-            ? {
-                status: 'TRANSMITTED',
-                transmittedAt: '2026-08-16 09:30',
-                transmittedMethod: 'API_WEBHOOK',
-                transmissionRefNo: `TX-API-${c.containerNo.slice(-4)}`
-              }
-            : {
-                status: 'PENDING_TRANSMISSION'
-              }
-        };
-      });
-  }, [containers, apiLogs]);
-
-  // Filtered queue
-  const filteredQueue = useMemo(() => {
-    return qcPassedRecords.filter((r) => {
-      const matchCarrier =
-        selectedCarrierFilter === 'ALL' ||
-        r.shippingLine.toUpperCase().includes(selectedCarrierFilter.toUpperCase()) ||
-        (selectedCarrierFilter === 'MAERSK' && r.shippingLine.includes('Maersk')) ||
-        (selectedCarrierFilter === 'ONE' && r.shippingLine.includes('ONE')) ||
-        (selectedCarrierFilter === 'CMA CGM' && r.shippingLine.includes('CMA')) ||
-        (selectedCarrierFilter === 'MSC' && r.shippingLine.includes('MSC')) ||
-        (selectedCarrierFilter === 'COSCO' && r.shippingLine.includes('COSCO'));
-
-      const matchSearch =
-        searchKeyword.trim() === '' ||
-        r.containerNo.toLowerCase().includes(searchKeyword.toLowerCase()) ||
-        r.workOrderNo.toLowerCase().includes(searchKeyword.toLowerCase()) ||
-        r.shippingLine.toLowerCase().includes(searchKeyword.toLowerCase());
-
-      return matchCarrier && matchSearch;
-    });
-  }, [qcPassedRecords, selectedCarrierFilter, searchKeyword]);
-
-  const pendingQueueCount = qcPassedRecords.filter(
-    (r) => r.shippingDispatch?.status !== 'TRANSMITTED'
-  ).length;
-
-  const transmittedCount = apiLogs.reduce((acc, l) => acc + (l.status === 'SUCCESS' ? l.containerCount : 0), 0);
-
-  // Toggle selection
-  const toggleSelectContainer = (containerId: string) => {
-    setSelectedContainerIds((prev) =>
-      prev.includes(containerId) ? prev.filter((id) => id !== containerId) : [...prev, containerId]
-    );
+  const showToast = (type: 'success' | 'error', text: string) => {
+    setToast({ type, text });
+    setTimeout(() => setToast(null), 8000);
   };
 
-  const toggleSelectAll = () => {
-    const unSentIds = filteredQueue
-      .filter((r) => r.shippingDispatch?.status !== 'TRANSMITTED')
-      .map((r) => r.containerId);
+  const carrierOf = useCallback(
+    (shippingLine: string) => carriers.find((c) => c.carrierCode.toUpperCase() === (shippingLine || '').toUpperCase()),
+    [carriers]
+  );
+  const isReady = (c?: ShippingCarrierStatus) => Boolean(c?.configured && c.enabled);
 
-    if (selectedContainerIds.length === unSentIds.length && unSentIds.length > 0) {
-      setSelectedContainerIds([]);
-    } else {
-      setSelectedContainerIds(unSentIds);
+  // Lần gửi QC_PASSED gần nhất của mỗi hồ sơ (logs đã sắp mới nhất trước), bỏ qua bản ghi giả lập cũ.
+  const lastQcLogByJob = useMemo(() => {
+    const map = new Map<string, ShippingSyncLogItem>();
+    for (const log of logs) {
+      if (log.eventType !== QC_EVENT || log.status === 'SIMULATED') continue;
+      const key = String(log.depotJobId);
+      if (!map.has(key)) map.set(key, log);
+    }
+    return map;
+  }, [logs]);
+
+  const queue = useMemo(
+    () =>
+      containers.filter(
+        (c) =>
+          c.status !== 'GATE_OUT' &&
+          (c.qcDetails?.result === 'PASS' || c.status === 'READY_FOR_USE' || c.status === 'IN_YARD' || c.condition === 'AV')
+      ),
+    [containers]
+  );
+
+  const filteredQueue = useMemo(() => {
+    const kw = searchKeyword.trim().toLowerCase();
+    return queue.filter((c) => {
+      const matchCarrier = carrierFilter === 'ALL' || (c.shippingLine || '').toUpperCase() === carrierFilter;
+      const matchSearch =
+        !kw ||
+        c.containerNo.toLowerCase().includes(kw) ||
+        (c.workOrderDetails?.workOrderNo || '').toLowerCase().includes(kw) ||
+        (c.estimateDetails?.estimateNo || '').toLowerCase().includes(kw);
+      return matchCarrier && matchSearch;
+    });
+  }, [queue, carrierFilter, searchKeyword]);
+
+  const pendingCount = queue.filter((c) => lastQcLogByJob.get(c.id)?.status !== 'SENT').length;
+  const realLogs = logs.filter((l) => l.status !== 'SIMULATED');
+  const sentCount = realLogs.filter((l) => l.status === 'SENT').length;
+  const failedCount = realLogs.filter((l) => l.status === 'FAILED').length;
+  const readyCarrierCount = carriers.filter(isReady).length;
+
+  const sendOne = async (c: ContainerRecord): Promise<boolean> => {
+    setSendingIds((prev) => [...prev, c.id]);
+    try {
+      const res: any = await shippingApi.syncJob(c.id, '', QC_EVENT);
+      const ack = res?.data?.ackToken;
+      showToast('success', `Đã gửi ${c.containerNo} tới ${c.shippingLine} (HTTP ${res?.data?.httpStatusCode})${ack ? ` — mã xác nhận: ${ack}` : ''}.`);
+      return true;
+    } catch (error) {
+      showToast('error', `${c.containerNo}: ${getApiErrorMessage(error, 'Gửi tới hãng tàu thất bại.')}`);
+      return false;
+    } finally {
+      setSendingIds((prev) => prev.filter((id) => id !== c.id));
     }
   };
 
-  // Execute Real-Time API Dispatch
-  const executeApiDispatch = (
-    carrierCode: string,
-    recordsToSend: QCInspectionRecord[],
-    forceError: boolean = false
-  ) => {
-    if (recordsToSend.length === 0) return;
-
-    const carrier =
-      gateways.find((g) => g.carrierCode === carrierCode) ||
-      gateways[0];
-
-    const { txRef, headers, payload } = buildCarrierApiRequest(carrier, recordsToSend);
-
-    setIsTransmitting(true);
-    setTransmissionProgress(15);
-
-    const timer1 = setTimeout(() => setTransmissionProgress(55), 250);
-    const timer2 = setTimeout(() => setTransmissionProgress(85), 500);
-
-    setTimeout(() => {
-      void (async () => {
-        try {
-          if (!forceError) {
-            const backendResults = await Promise.all(
-              recordsToSend.map((record) => shippingApi.syncJob(record.containerId, carrier.carrierCode, 'QC_PASSED'))
-            );
-
-            const backendFailure = backendResults.find((result: any) => result?.statusCode !== 200);
-            if (backendFailure) {
-              throw new Error(backendFailure?.message || 'Không thể đồng bộ hãng tàu.');
-            }
-          }
-
-          const { statusCode, statusText, payload: respPayload, ackRef, latencyMs } =
-            simulateCarrierApiResponse(carrier, txRef, recordsToSend, forceError);
-
-          setTransmissionProgress(100);
-          setIsTransmitting(false);
-
-          const isSuccess = statusCode >= 200 && statusCode < 300;
-
-          const newLog: CarrierApiLogRecord = {
-            id: `LOG-${Date.now()}`,
-            transactionRef: txRef,
-            carrierCode: carrier.carrierCode,
-            carrierName: carrier.carrierName,
-            endpointUrl: carrier.endpointUrl,
-            httpMethod: 'POST',
-            containerCount: recordsToSend.length,
-            containerNos: recordsToSend.map((r) => r.containerNo),
-            requestHeaders: headers,
-            requestPayload: payload,
-            responseStatusCode: statusCode,
-            responseStatusText: statusText,
-            responsePayload: respPayload,
-            ackReferenceNo: isSuccess ? ackRef : undefined,
-            latencyMs,
-            status: isSuccess ? 'SUCCESS' : 'FAILED',
-            timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
-            triggeredBy: 'Vũ Quốc Việt (QC Manager)',
-            errorMessage: isSuccess ? undefined : respPayload.message
-          };
-
-          setApiLogs((prev) => [newLog, ...prev]);
-
-          setLastApiResult({
-            txRef,
-            statusCode,
-            statusText,
-            payload: respPayload,
-            ackRef,
-            latencyMs,
-            headers,
-            requestPayload: payload,
-            timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19)
-          });
-
-          if (isSuccess) {
-            setToastMessage(
-              `🚀 Truyền API thành công tới ${carrier.carrierName}! Mã xác nhận (ACK): ${ackRef} (${recordsToSend.length} Cont, ${latencyMs}ms)`
-            );
-            setSelectedContainerIds([]);
-          } else {
-            setToastMessage(
-              `⚠️ Phản hồi API [HTTP ${statusCode} ${statusText}]: ${respPayload.message}`
-            );
-          }
-        } catch (error) {
-          setTransmissionProgress(100);
-          setIsTransmitting(false);
-          setToastMessage(
-            error instanceof Error ? error.message : 'Không thể đồng bộ hãng tàu qua backend.'
-          );
-        } finally {
-          setTimeout(() => setToastMessage(null), 8000);
-        }
-      })();
-    }, 850);
+  const handleSingleSend = async (c: ContainerRecord) => {
+    await sendOne(c);
+    await refresh();
   };
 
-  // Handle single send
-  const handleSingleSend = (record: QCInspectionRecord) => {
-    // Detect carrier code
-    const line = record.shippingLine.toUpperCase();
-    const carrier =
-      gateways.find((g) => line.includes(g.carrierCode.toUpperCase())) ||
-      gateways[0];
-
-    executeApiDispatch(carrier.carrierCode, [record]);
+  // Gửi lần lượt từng container (mỗi container theo hãng tàu của chính nó), dừng báo lỗi riêng từng cái.
+  const handleBulkSend = async () => {
+    const targets = queue.filter((c) => selectedIds.includes(c.id) && isReady(carrierOf(c.shippingLine)));
+    let ok = 0;
+    for (const c of targets) if (await sendOne(c)) ok++;
+    setSelectedIds([]);
+    await refresh();
+    showToast(ok === targets.length ? 'success' : 'error', `Đã gửi thành công ${ok}/${targets.length} container.`);
   };
 
-  // Handle bulk send
-  const handleBulkSend = () => {
-    const selectedRecords = qcPassedRecords.filter((r) =>
-      selectedContainerIds.includes(r.containerId)
-    );
-    if (selectedRecords.length === 0) return;
+  const toggleSelect = (id: string) =>
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
-    // Detect carrier or use selected filter
-    const carrierCode =
-      selectedCarrierFilter !== 'ALL' ? selectedCarrierFilter : 'MAERSK';
+  const selectableIds = filteredQueue
+    .filter((c) => isReady(carrierOf(c.shippingLine)) && lastQcLogByJob.get(c.id)?.status !== 'SENT')
+    .map((c) => c.id);
+  const toggleSelectAll = () =>
+    setSelectedIds(selectedIds.length === selectableIds.length && selectableIds.length > 0 ? [] : selectableIds);
 
-    executeApiDispatch(carrierCode, selectedRecords);
-  };
-
-  // Copy JSON Response
-  const handleCopyResponse = () => {
-    if (!lastApiResult) return;
-    navigator.clipboard.writeText(JSON.stringify(lastApiResult.payload, null, 2));
-    setCopiedResponse(true);
-    setTimeout(() => setCopiedResponse(false), 2000);
-  };
-
-  const selectedConsoleCarrier = gateways.find((g) => g.carrierCode === consoleCarrierCode) || gateways[0];
+  const tabButton = (id: typeof activeMainTab, icon: React.ReactNode, label: string) => (
+    <button
+      onClick={() => setActiveMainTab(id)}
+      className={`px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center gap-2 ${
+        activeMainTab === id ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-50 text-slate-500 hover:text-slate-900 border border-slate-200'
+      }`}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
+  );
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto animate-fade-in pb-16">
-      {/* Top Banner */}
-      <div className="p-6 bg-slate-900 border border-slate-800 rounded-3xl flex items-center justify-between flex-wrap gap-4 shadow-xl">
+      {/* Header */}
+      <div className="p-6 bg-white border border-slate-200 rounded-3xl flex items-center justify-between flex-wrap gap-4 shadow-xl">
         <div className="flex items-center gap-3">
-          <div className="p-3.5 bg-blue-600/20 border border-blue-500/30 text-blue-400 rounded-2xl">
-            <Radio className="w-7 h-7 animate-pulse" />
+          <div className="p-3.5 bg-blue-50 border border-blue-200 text-blue-600 rounded-2xl">
+            <Radio className="w-7 h-7" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl font-bold text-white tracking-wide">
-                10. CỔNG TRUYỀN DỮ LIỆU API HÃNG TÀU (SHIPPING LINE API GATEWAY)
-              </h2>
-              <span className="px-2.5 py-0.5 bg-blue-950 border border-blue-800 text-blue-300 text-xs font-mono font-bold rounded-lg flex items-center gap-1">
-                <Zap className="w-3.5 h-3.5 text-blue-400" />
-                <span>REST API v3 / JSON</span>
-              </span>
-            </div>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Gửi dữ liệu nghiệm thu sửa chữa hoàn thành (QC AV Release) trực tiếp qua API RESTful / Webhook tới máy chủ các Hãng Tàu quốc tế &amp; nhận phản hồi (Response Payload / ACK Token) theo thời gian thực.
+            <h2 className="text-xl font-bold text-slate-900 tracking-wide">10. CỔNG TRUYỀN DỮ LIỆU API HÃNG TÀU</h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Gửi kết quả nghiệm thu (QC đạt) tới API của hãng tàu. Endpoint + khóa API cấu hình trên server; phản hồi được lưu nguyên văn.
             </p>
           </div>
         </div>
-
         <div className="flex items-center gap-2">
           <button
-            onClick={() => onNavigateTab('qc')}
-            className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow"
+            onClick={() => void refresh()}
+            disabled={isLoading}
+            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
           >
-            <ShieldCheck className="w-4 h-4 text-purple-400" />
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            <span>Tải lại</span>
+          </button>
+          <button
+            onClick={() => onNavigateTab('qc')}
+            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer"
+          >
+            <ShieldCheck className="w-4 h-4 text-purple-600" />
             <span>&larr; Bước 9: Kỹ Thuật QC</span>
           </button>
           <button
             onClick={() => onNavigateTab('gate_out')}
-            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow"
+            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer"
           >
-            <span>Bước 11: Cổng Xuất &amp; Cấp Vỏ (Gate-Out) &rarr;</span>
+            <span>Bước 11: Gate-Out &rarr;</span>
           </button>
         </div>
       </div>
 
-      {/* Toast notification */}
-      {toastMessage && (
-        <div className="p-4 bg-slate-900/95 border-2 border-blue-500 rounded-2xl flex items-center justify-between text-xs text-slate-200 shadow-2xl animate-fade-in">
+      {toast && (
+        <div
+          className={`p-4 bg-white border-2 rounded-2xl flex items-center justify-between gap-3 text-xs text-slate-700 shadow-xl ${
+            toast.type === 'success' ? 'border-emerald-500' : 'border-rose-500'
+          }`}
+        >
           <div className="flex items-center gap-3">
-            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-            <span className="font-bold">{toastMessage}</span>
+            {toast.type === 'success' ? (
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+            )}
+            <span className="font-bold">{toast.text}</span>
           </div>
-          <button
-            onClick={() => setToastMessage(null)}
-            className="text-slate-400 hover:text-white p-1"
-          >
-            &times;
-          </button>
+          <button onClick={() => setToast(null)} className="text-slate-500 hover:text-slate-900 p-1">&times;</button>
         </div>
       )}
 
-      {/* Carrier Gateway Real-time Health Status Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
-        {gateways.map((g) => (
-          <div
-            key={g.carrierCode}
-            onClick={() => {
-              setConsoleCarrierCode(g.carrierCode);
-              setSelectedCarrierFilter(g.carrierCode);
-            }}
-            className={`p-3 rounded-2xl border transition cursor-pointer flex flex-col justify-between ${
-              consoleCarrierCode === g.carrierCode
-                ? 'bg-blue-950/60 border-blue-500 shadow-md shadow-blue-950'
-                : 'bg-slate-900/80 border-slate-800 hover:border-slate-700'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-xs text-white">{g.carrierCode}</span>
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+      {loadError && (
+        <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-700 font-bold">{loadError}</div>
+      )}
+
+      {!loadError && carriers.length > 0 && readyCarrierCount === 0 && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-800 flex items-start gap-2.5">
+          <Settings className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>
+            Chưa có hãng tàu nào được cấu hình kết nối API nên chưa gửi được. Xem tab <strong>Cấu hình kết nối</strong> để biết cách khai báo
+            endpoint + khóa API do hãng tàu cấp.
+          </span>
+        </div>
+      )}
+
+      {/* KPI — tính từ nhật ký gửi thật */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: 'Container chờ gửi', value: pendingCount, icon: <Clock className="w-4 h-4 text-amber-600" />, color: 'text-amber-600' },
+          { label: 'Lần gửi thành công', value: sentCount, icon: <CheckCircle2 className="w-4 h-4 text-emerald-600" />, color: 'text-emerald-600' },
+          { label: 'Lần gửi lỗi', value: failedCount, icon: <AlertCircle className="w-4 h-4 text-rose-600" />, color: 'text-rose-600' },
+          { label: 'Hãng đã cấu hình API', value: `${readyCarrierCount}/${carriers.length}`, icon: <Globe className="w-4 h-4 text-blue-600" />, color: 'text-blue-600' }
+        ].map((k) => (
+          <div key={k.label} className="p-4 bg-white border border-slate-200 rounded-2xl space-y-1">
+            <div className="flex items-center justify-between text-xs font-bold text-slate-500">
+              <span>{k.label}</span>
+              {k.icon}
             </div>
-            <div className="mt-2 flex items-center justify-between text-[10px] text-slate-400 font-mono">
-              <span className="text-emerald-400 font-bold">200 OK</span>
-              <span>~480ms</span>
-            </div>
+            <div className={`text-2xl font-black font-mono ${k.color}`}>{k.value}</div>
           </div>
         ))}
       </div>
 
-      {/* KPI Stats Overview */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-        <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-1">
-          <div className="flex items-center justify-between text-xs font-bold text-slate-400">
-            <span>Container Chờ Gửi API</span>
-            <Clock className="w-4 h-4 text-amber-400" />
-          </div>
-          <div className="text-2xl font-black text-amber-400 font-mono">{pendingQueueCount}</div>
-          <span className="text-[10px] text-slate-500">Đã QC Đạt &bull; Sẵn sàng đóng gói JSON</span>
-        </div>
-
-        <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-1">
-          <div className="flex items-center justify-between text-xs font-bold text-slate-400">
-            <span>Giao Dịch API Thành Công</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-          </div>
-          <div className="text-2xl font-black text-emerald-400 font-mono">
-            {transmittedCount}
-          </div>
-          <span className="text-[10px] text-slate-500">HTTP 200/201 &bull; Nhận mã ACK chấp thuận</span>
-        </div>
-
-        <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-1">
-          <div className="flex items-center justify-between text-xs font-bold text-slate-400">
-            <span>Độ Trễ Trung Bình (Latency)</span>
-            <Activity className="w-4 h-4 text-blue-400" />
-          </div>
-          <div className="text-2xl font-black text-blue-400 font-mono">542 ms</div>
-          <span className="text-[10px] text-slate-500">Cổng REST / TLS 1.3 bảo mật cao</span>
-        </div>
-
-        <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-1">
-          <div className="flex items-center justify-between text-xs font-bold text-slate-400">
-            <span>Tỷ Lệ Chấp Thuận</span>
-            <ShieldCheck className="w-4 h-4 text-purple-400" />
-          </div>
-          <div className="text-2xl font-black text-purple-400 font-mono">100.0%</div>
-          <span className="text-[10px] text-slate-500">Đối soát tự động với hợp đồng M&amp;R</span>
-        </div>
-      </div>
-
-      {/* Main Module Tabs */}
-      <div className="p-4 bg-slate-900 border border-slate-800 rounded-3xl space-y-4">
+      {/* Tabs + filters */}
+      <div className="p-4 bg-white border border-slate-200 rounded-3xl space-y-4">
         <div className="flex items-center gap-2 overflow-x-auto pb-1">
-          <button
-            onClick={() => setActiveMainTab('QUEUED')}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center gap-2 ${
-              activeMainTab === 'QUEUED'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-950'
-                : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
-            }`}
-          >
-            <Ship className="w-4 h-4" />
-            <span>1. Danh Sách Chờ Truyền API ({pendingQueueCount})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveMainTab('CONSOLE')}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center gap-2 ${
-              activeMainTab === 'CONSOLE'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-950'
-                : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
-            }`}
-          >
-            <Terminal className="w-4 h-4" />
-            <span>2. Trình Thử Nghiệm API &amp; Xem Kết Quả Trả Về (API Console)</span>
-          </button>
-
-          <button
-            onClick={() => setActiveMainTab('LOGS')}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center gap-2 ${
-              activeMainTab === 'LOGS'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-950'
-                : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
-            }`}
-          >
-            <Code className="w-4 h-4" />
-            <span>3. Nhật Ký Giao Dịch &amp; Phản Hồi Server ({apiLogs.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveMainTab('CONFIGS')}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center gap-2 ${
-              activeMainTab === 'CONFIGS'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-950'
-                : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
-            }`}
-          >
-            <Globe className="w-4 h-4" />
-            <span>4. Cấu Hình Cổng API Hãng Tàu ({gateways.length})</span>
-          </button>
+          {tabButton('QUEUED', <Ship className="w-4 h-4" />, `1. Danh sách chờ gửi (${pendingCount})`)}
+          {tabButton('LOGS', <Code className="w-4 h-4" />, `2. Nhật ký gửi (${realLogs.length})`)}
+          {tabButton('CONFIGS', <Globe className="w-4 h-4" />, `3. Cấu hình kết nối (${readyCarrierCount}/${carriers.length})`)}
         </div>
 
-        {/* Filter bar for QUEUED tab */}
         {activeMainTab === 'QUEUED' && (
-          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 text-xs pt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 text-xs">
             <div className="sm:col-span-8 relative">
               <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={searchKeyword}
                 onChange={(e) => setSearchKeyword(e.target.value)}
-                placeholder="Tìm container, số lệnh Work Order, mã dự toán Estimate..."
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 text-white text-xs rounded-xl focus:outline-none focus:border-blue-500"
+                placeholder="Tìm số container, Work Order, Estimate..."
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 text-slate-900 text-xs rounded-xl focus:outline-none focus:border-blue-500"
               />
             </div>
-
             <div className="sm:col-span-4">
               <select
-                value={selectedCarrierFilter}
-                onChange={(e) => setSelectedCarrierFilter(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 text-white text-xs rounded-xl focus:outline-none"
+                value={carrierFilter}
+                onChange={(e) => setCarrierFilter(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 text-slate-900 text-xs rounded-xl focus:outline-none"
               >
-                <option value="ALL">Tất cả Hãng Tàu</option>
-                {gateways.map((g) => (
-                  <option key={g.carrierCode} value={g.carrierCode}>
-                    {g.carrierName}
+                <option value="ALL">Tất cả hãng tàu</option>
+                {carriers.map((c) => (
+                  <option key={c.carrierCode} value={c.carrierCode.toUpperCase()}>
+                    {c.carrierName} ({c.carrierCode})
                   </option>
                 ))}
               </select>
@@ -536,203 +295,124 @@ export const ShippingApiPage: React.FC<ShippingApiPageProps> = ({
         )}
       </div>
 
-      {/* TAB 1: QUEUED CONTAINERS */}
+      {/* TAB 1: QUEUE */}
       {activeMainTab === 'QUEUED' && (
         <div className="space-y-4">
-          {/* Multi-selection Bulk Action Bar */}
-          {selectedContainerIds.length > 0 && (
-            <div className="p-4 bg-gradient-to-r from-blue-950 to-indigo-950 border-2 border-blue-500 rounded-3xl flex items-center justify-between flex-wrap gap-3 shadow-xl animate-fade-in">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-blue-600/30 text-blue-300 rounded-xl border border-blue-500/40">
-                  <CheckSquare className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="font-bold text-white text-sm">
-                    Đã chọn {selectedContainerIds.length} container sẵn sàng truyền API
-                  </span>
-                  <p className="text-[11px] text-blue-200">
-                    Hệ thống sẽ tự động đóng gói payload JSON chuẩn M&amp;R và gọi POST Endpoint hãng tàu.
-                  </p>
-                </div>
-              </div>
-
+          {selectedIds.length > 0 && (
+            <div className="p-4 bg-blue-50 border-2 border-blue-500 rounded-3xl flex items-center justify-between flex-wrap gap-3">
+              <span className="font-bold text-slate-900 text-sm">Đã chọn {selectedIds.length} container</span>
               <div className="flex items-center gap-2.5">
                 <button
-                  onClick={() => setSelectedContainerIds([])}
-                  className="px-3.5 py-2 bg-slate-900/80 hover:bg-slate-900 text-slate-300 rounded-xl text-xs font-bold border border-slate-700 transition cursor-pointer"
+                  onClick={() => setSelectedIds([])}
+                  className="px-3.5 py-2 bg-white text-slate-700 rounded-xl text-xs font-bold border border-slate-200 cursor-pointer"
                 >
-                  Bỏ Chọn
+                  Bỏ chọn
                 </button>
-
                 <button
-                  disabled={isTransmitting}
-                  onClick={handleBulkSend}
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black shadow-lg shadow-blue-950 transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  disabled={sendingIds.length > 0}
+                  onClick={() => void handleBulkSend()}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black shadow-lg transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   <Send className="w-4 h-4" />
-                  <span>
-                    {isTransmitting
-                      ? 'Đang Truyền Dữ Liệu...'
-                      : `GỬI API ĐỒNG LOẠT (${selectedContainerIds.length} CONT)`}
-                  </span>
+                  <span>{sendingIds.length > 0 ? 'Đang gửi...' : `Gửi ${selectedIds.length} container`}</span>
                 </button>
               </div>
             </div>
           )}
 
-          {/* Table */}
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
-            <div className="p-4 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between text-xs flex-wrap gap-2">
-              <div className="flex items-center gap-3">
-                <span className="font-bold text-slate-300 uppercase tracking-wider">
-                  Danh Sách Container Nghiệm Thu Đạt Cần Truyền API ({filteredQueue.length})
-                </span>
-                <button
-                  onClick={toggleSelectAll}
-                  className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
-                >
-                  <CheckSquare className="w-3.5 h-3.5 text-blue-400" />
-                  <span>Chọn tất cả chưa gửi</span>
-                </button>
-              </div>
-
-              <span className="text-slate-500 font-mono text-[11px]">
-                Giao thức: <strong>HTTPS RESTful JSON / OAuth2 Token</strong>
-              </span>
+          <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-xl">
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center gap-3 text-xs flex-wrap">
+              <span className="font-bold text-slate-700 uppercase tracking-wider">Container nghiệm thu đạt ({filteredQueue.length})</span>
+              <button
+                onClick={toggleSelectAll}
+                disabled={selectableIds.length === 0}
+                className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                <CheckSquare className="w-3.5 h-3.5 text-blue-600" />
+                <span>Chọn tất cả chưa gửi</span>
+              </button>
             </div>
 
             {filteredQueue.length === 0 ? (
               <div className="p-12 text-center space-y-3">
-                <Ship className="w-12 h-12 text-slate-600 mx-auto" />
-                <h4 className="text-sm font-bold text-slate-300">Không tìm thấy container phù hợp</h4>
-                <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                  Các container sau khi được giám định QC đạt chuẩn AV ở Bước 9 sẽ tự động xuất hiện tại đây.
-                </p>
+                <Ship className="w-12 h-12 text-slate-400 mx-auto" />
+                <h4 className="text-sm font-bold text-slate-700">Không có container phù hợp</h4>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">Container QC đạt ở Bước 9 sẽ xuất hiện tại đây.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="bg-slate-950/60 border-b border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                      <th className="p-4 w-10 text-center">
-                        <span className="sr-only">Chọn</span>
-                      </th>
-                      <th className="p-4">Container No &amp; Loại Vỏ</th>
-                      <th className="p-4">Hãng Tàu &amp; Endpoint</th>
-                      <th className="p-4">Lệnh WO / Estimate</th>
-                      <th className="p-4">Hạng Cấp (Grade)</th>
-                      <th className="p-4">Trạng Thái API</th>
-                      <th className="p-4 text-right">Thao Tác Gửi API</th>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      <th className="p-4 w-10" />
+                      <th className="p-4">Container</th>
+                      <th className="p-4">Hãng tàu / Kết nối</th>
+                      <th className="p-4">WO / Estimate</th>
+                      <th className="p-4">Lần gửi gần nhất</th>
+                      <th className="p-4 text-right">Thao tác</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/80 text-xs">
-                    {filteredQueue.map((r) => {
-                      const isSelected = selectedContainerIds.includes(r.containerId);
-                      const isTransmitted = r.shippingDispatch?.status === 'TRANSMITTED';
-
+                  <tbody className="divide-y divide-slate-200/80 text-xs">
+                    {filteredQueue.map((c) => {
+                      const carrier = carrierOf(c.shippingLine);
+                      const ready = isReady(carrier);
+                      const last = lastQcLogByJob.get(c.id);
+                      const sending = sendingIds.includes(c.id);
+                      const selectable = ready && last?.status !== 'SENT';
                       return (
-                        <tr
-                          key={r.id}
-                          className={`hover:bg-slate-850 transition duration-150 ${
-                            isSelected ? 'bg-blue-950/30' : ''
-                          }`}
-                        >
+                        <tr key={c.id} className={selectedIds.includes(c.id) ? 'bg-blue-50' : 'hover:bg-slate-50'}>
                           <td className="p-4 text-center">
                             <button
                               type="button"
-                              onClick={() => toggleSelectContainer(r.containerId)}
-                              className="text-slate-400 hover:text-blue-400 transition cursor-pointer"
+                              disabled={!selectable}
+                              onClick={() => toggleSelect(c.id)}
+                              className="text-slate-500 hover:text-blue-600 transition cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                             >
-                              {isSelected ? (
-                                <CheckSquare className="w-4 h-4 text-blue-400" />
-                              ) : (
-                                <Square className="w-4 h-4 text-slate-600" />
-                              )}
+                              {selectedIds.includes(c.id) ? <CheckSquare className="w-4 h-4 text-blue-600" /> : <Square className="w-4 h-4" />}
                             </button>
                           </td>
-
                           <td className="p-4">
-                            <div className="font-mono font-black text-white text-sm">
-                              {r.containerNo}
-                            </div>
-                            <div className="text-[11px] text-slate-400 font-mono mt-0.5">
-                              {r.size} {r.type} ({r.isoCode})
-                            </div>
+                            <div className="font-mono font-black text-slate-900 text-sm">{c.containerNo}</div>
+                            <div className="text-[11px] text-slate-500 font-mono mt-0.5">{c.size} {c.isoCode ? `(${c.isoCode})` : ''}</div>
                           </td>
-
                           <td className="p-4">
-                            <span className="px-2.5 py-0.5 bg-blue-950 border border-blue-800 text-blue-300 font-mono font-bold rounded text-[11px]">
-                              {r.shippingLine}
+                            <span className="px-2.5 py-0.5 bg-blue-50 border border-blue-200 text-blue-700 font-mono font-bold rounded text-[11px]">
+                              {c.shippingLine || '—'}
                             </span>
-                            <div className="text-[10px] text-slate-400 font-mono mt-1">
-                              POST /depot-operations/v3/mnr
+                            <div className={`text-[10px] mt-1 font-bold ${ready ? 'text-emerald-600' : 'text-amber-600'}`}>
+                              {ready ? 'Đã cấu hình API' : carrier?.configured ? 'Kết nối đang tắt' : 'Chưa cấu hình API'}
                             </div>
                           </td>
-
                           <td className="p-4 font-mono">
-                            <div className="text-amber-400 font-bold">{r.workOrderNo}</div>
-                            <div className="text-slate-400 text-[11px]">{r.estimateNo}</div>
+                            <div className="text-amber-600 font-bold">{c.workOrderDetails?.workOrderNo || '—'}</div>
+                            <div className="text-slate-500 text-[11px]">{c.estimateDetails?.estimateNo || ''}</div>
                           </td>
-
                           <td className="p-4">
-                            <span className="px-2 py-0.5 bg-emerald-950 text-emerald-300 border border-emerald-800 rounded font-mono text-[10px] font-bold">
-                              {r.releasedGrade || 'GRADE_A'}
-                            </span>
-                          </td>
-
-                          <td className="p-4">
-                            {isTransmitted ? (
-                              <div className="space-y-0.5">
-                                <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-lg text-[11px] font-bold inline-flex items-center gap-1.5 font-mono">
-                                  <Check className="w-3.5 h-3.5 text-emerald-400 stroke-[3]" />
-                                  <span>200 OK ACCEPTED</span>
+                            {last ? (
+                              <button onClick={() => setInspectingLog(last)} className="text-left cursor-pointer">
+                                <span
+                                  className={`px-2.5 py-0.5 rounded-lg text-[11px] font-bold border ${
+                                    last.status === 'SENT' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'
+                                  }`}
+                                >
+                                  {logStatusLabel(last)}
                                 </span>
-                                <div className="text-[10px] text-slate-400 font-mono">
-                                  Đã nhận mã ACK &bull; Đã mở khóa AV
-                                </div>
-                              </div>
+                                <div className="text-[10px] text-slate-500 font-mono mt-0.5">{formatLogTime(last.syncedAt)}</div>
+                              </button>
                             ) : (
-                              <div className="space-y-0.5">
-                                <span className="px-2.5 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 font-mono">
-                                  <Clock className="w-3 h-3 text-amber-400" />
-                                  <span>Chờ Gửi API</span>
-                                </span>
-                                <div className="text-[10px] text-slate-500 font-mono">
-                                  Sẵn sàng truyền
-                                </div>
-                              </div>
+                              <span className="text-slate-500 text-[11px]">Chưa gửi</span>
                             )}
                           </td>
-
                           <td className="p-4 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                onClick={() => {
-                                  setConsoleCarrierCode(
-                                    r.shippingLine.toUpperCase().includes('ONE')
-                                      ? 'ONE'
-                                      : r.shippingLine.toUpperCase().includes('CMA')
-                                      ? 'CMA CGM'
-                                      : 'MAERSK'
-                                  );
-                                  setActiveMainTab('CONSOLE');
-                                }}
-                                className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl border border-slate-700 transition flex items-center gap-1 cursor-pointer"
-                                title="Xem trước Payload JSON trong Console"
-                              >
-                                <Code className="w-3.5 h-3.5 text-blue-400" />
-                                <span>Xem JSON</span>
-                              </button>
-
-                              <button
-                                disabled={isTransmitting}
-                                onClick={() => handleSingleSend(r)}
-                                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow shadow-blue-950 disabled:opacity-50"
-                              >
-                                <Send className="w-3.5 h-3.5" />
-                                <span>Gửi API Ngay</span>
-                              </button>
-                            </div>
+                            <button
+                              disabled={!ready || sending}
+                              title={ready ? '' : 'Hãng tàu này chưa được cấu hình kết nối API trên server'}
+                              onClick={() => void handleSingleSend(c)}
+                              className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition inline-flex items-center gap-1.5 cursor-pointer shadow disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                              <Send className="w-3.5 h-3.5" />
+                              <span>{sending ? 'Đang gửi...' : last?.status === 'SENT' ? 'Gửi lại' : 'Gửi'}</span>
+                            </button>
                           </td>
                         </tr>
                       );
@@ -745,391 +425,127 @@ export const ShippingApiPage: React.FC<ShippingApiPageProps> = ({
         </div>
       )}
 
-      {/* TAB 2: LIVE API CONSOLE & TESTER */}
-      {activeMainTab === 'CONSOLE' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left Column: API Request Config & JSON Payload */}
-          <div className="lg:col-span-6 space-y-4">
-            <div className="p-5 bg-slate-900 border border-slate-800 rounded-3xl space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Terminal className="w-5 h-5 text-blue-400" />
-                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                    Thiết Lập Yêu Cầu Gửi API (HTTP POST Request)
-                  </h3>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setConsoleEnvironment((prev) => (prev === 'PRODUCTION' ? 'SANDBOX' : 'PRODUCTION'))}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold border transition cursor-pointer ${
-                      consoleEnvironment === 'PRODUCTION'
-                        ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
-                        : 'bg-amber-950 text-amber-300 border-amber-800'
-                    }`}
-                  >
-                    Env: {consoleEnvironment}
-                  </button>
-                </div>
-              </div>
-
-              {/* Endpoint selection */}
-              <div className="space-y-1.5 text-xs">
-                <label className="text-slate-300 font-bold block">Chọn Cổng API Hãng Tàu Đích:</label>
-                <select
-                  value={consoleCarrierCode}
-                  onChange={(e) => setConsoleCarrierCode(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 text-white rounded-xl font-medium focus:outline-none focus:border-blue-500"
-                >
-                  {gateways.map((g) => (
-                    <option key={g.carrierCode} value={g.carrierCode}>
-                      {g.carrierName} ({g.endpointUrl})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* HTTP Request URL Bar */}
-              <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 font-mono text-xs flex items-center justify-between gap-2 overflow-x-auto">
-                <div className="flex items-center gap-2">
-                  <span className="px-2 py-0.5 bg-blue-600 text-white font-black rounded text-[11px]">
-                    POST
-                  </span>
-                  <span className="text-slate-300 break-all">{selectedConsoleCarrier.endpointUrl}</span>
-                </div>
-                <span className="text-[10px] text-emerald-400 font-bold shrink-0">TLS 1.3 / OAuth2</span>
-              </div>
-
-              {/* Error Simulation Toggle */}
-              <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-between text-xs">
-                <div className="space-y-0.5">
-                  <span className="font-bold text-slate-200 block">Thử Nghiệm Phản Hồi Lỗi (Simulate Error 422):</span>
-                  <span className="text-[11px] text-slate-400">
-                    Bật tùy chọn này để xem hệ thống xử lý khi Hãng tàu trả mã từ chối hợp lệ.
-                  </span>
-                </div>
-                <button
-                  onClick={() => setConsoleSimulateError(!consoleSimulateError)}
-                  className={`w-12 h-6 flex items-center rounded-full p-1 transition cursor-pointer ${
-                    consoleSimulateError ? 'bg-rose-600 justify-end' : 'bg-slate-800 justify-start'
-                  }`}
-                >
-                  <div className="bg-slate-200 w-4 h-4 rounded-full shadow-md" />
-                </button>
-              </div>
-
-              {/* Request Payload Preview */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-300 font-bold">Request Body Payload (JSON):</span>
-                  <span className="text-slate-500 font-mono text-[11px]">
-                    Đóng gói {filteredQueue.slice(0, 2).length} Containers
-                  </span>
-                </div>
-                <pre className="p-4 bg-slate-950 rounded-2xl border border-slate-800 text-blue-300 font-mono text-[11px] leading-relaxed max-h-72 overflow-y-auto select-all scrollbar-thin">
-                  {JSON.stringify(
-                    buildCarrierApiRequest(selectedConsoleCarrier, filteredQueue.slice(0, 2)).payload,
-                    null,
-                    2
-                  )}
-                </pre>
-              </div>
-
-              {/* Action Button */}
-              <button
-                disabled={isTransmitting}
-                onClick={() =>
-                  executeApiDispatch(
-                    selectedConsoleCarrier.carrierCode,
-                    filteredQueue.slice(0, 2),
-                    consoleSimulateError
-                  )
-                }
-                className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow-xl shadow-blue-950 transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-              >
-                <Send className="w-4 h-4" />
-                <span>
-                  {isTransmitting
-                    ? `Đang Gọi API Tới ${selectedConsoleCarrier.carrierName}... (${transmissionProgress}%)`
-                    : `GỬI YÊU CẦU POST API (${selectedConsoleCarrier.carrierCode})`}
-                </span>
-              </button>
-            </div>
-          </div>
-
-          {/* Right Column: API Response Result Viewer */}
-          <div className="lg:col-span-6 space-y-4">
-            <div className="p-5 bg-slate-900 border border-slate-800 rounded-3xl space-y-4 min-h-[500px] flex flex-col">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Activity className="w-5 h-5 text-emerald-400" />
-                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                    Kết Quả API Trả Về (Server Response)
-                  </h3>
-                </div>
-
-                {lastApiResult && (
-                  <button
-                    onClick={handleCopyResponse}
-                    className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border border-slate-700"
-                  >
-                    {copiedResponse ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copiedResponse ? 'Đã Sao Chép' : 'Sao Chép JSON'}</span>
-                  </button>
-                )}
-              </div>
-
-              {lastApiResult ? (
-                <div className="space-y-4 flex-1 flex flex-col font-mono text-xs">
-                  {/* Status Banner */}
-                  <div
-                    className={`p-4 rounded-2xl border flex items-center justify-between flex-wrap gap-2 ${
-                      lastApiResult.statusCode === 200
-                        ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-200'
-                        : 'bg-rose-950/60 border-rose-500/40 text-rose-200'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      {lastApiResult.statusCode === 200 ? (
-                        <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                      ) : (
-                        <AlertCircle className="w-5 h-5 text-rose-400" />
-                      )}
-                      <div>
-                        <span className="font-bold text-sm">
-                          HTTP {lastApiResult.statusCode} {lastApiResult.statusText}
-                        </span>
-                        <div className="text-[11px] opacity-80">
-                          ACK Ref: <strong>{lastApiResult.ackRef}</strong>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="text-right text-[11px]">
-                      <div className="text-amber-400 font-bold">Latency: {lastApiResult.latencyMs} ms</div>
-                      <div className="text-slate-400">{lastApiResult.timestamp}</div>
-                    </div>
-                  </div>
-
-                  {/* Highlights */}
-                  {lastApiResult.statusCode === 200 && (
-                    <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 space-y-1.5 text-xs text-slate-300">
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400">Trạng Thái Vỏ Cập Nhật:</span>
-                        <span className="text-emerald-400 font-bold">AV (AVAILABLE FOR EXPORT)</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400">Lệnh Cấp Ra Cảng:</span>
-                        <span className="text-blue-400 font-bold">ĐÃ MỞ KHÓA (GATE-OUT UNLOCKED)</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Raw JSON viewer */}
-                  <div className="flex-1 flex flex-col space-y-1">
-                    <span className="text-slate-400 font-bold text-[11px]">Response JSON Payload:</span>
-                    <pre className="p-4 bg-slate-950 rounded-2xl border border-slate-800 text-emerald-400 leading-relaxed overflow-y-auto flex-1 select-all scrollbar-thin max-h-96">
-                      {JSON.stringify(lastApiResult.payload, null, 2)}
-                    </pre>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex-1 flex flex-col items-center justify-center text-center p-12 text-slate-500 space-y-3">
-                  <Terminal className="w-12 h-12 text-slate-700" />
-                  <p className="text-xs max-w-sm">
-                    Chưa có giao dịch nào được thực hiện trong phiên này. Hãy chọn cổng API và nhấn <strong>"GỬI YÊU CẦU POST API"</strong> để xem dữ liệu phản hồi trực tiếp.
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 3: API TRANSMISSION LOGS */}
+      {/* TAB 2: LOGS */}
       {activeMainTab === 'LOGS' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
-          <div className="p-4 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between text-xs flex-wrap gap-2">
-            <div className="flex items-center gap-2">
-              <Code className="w-4 h-4 text-blue-400" />
-              <span className="font-bold text-slate-300 uppercase tracking-wider">
-                Nhật Ký Tất Cả Giao Dịch API &amp; Mã Phản Hồi Server ({apiLogs.length})
-              </span>
-            </div>
-
-            <button
-              onClick={() => {
-                const blob = new Blob([JSON.stringify(apiLogs, null, 2)], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `API-LOGS-${Date.now()}.json`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-              }}
-              className="px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/40 text-blue-300 border border-blue-500/30 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Xuất File JSON Logs</span>
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse font-mono text-xs">
-              <thead>
-                <tr className="bg-slate-950/60 border-b border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                  <th className="p-4">Thời Gian</th>
-                  <th className="p-4">Mã Giao Dịch (Ref)</th>
-                  <th className="p-4">Hãng Tàu</th>
-                  <th className="p-4">Containers</th>
-                  <th className="p-4">Status Code</th>
-                  <th className="p-4">Độ Trễ</th>
-                  <th className="p-4">Mã Xác Nhận (ACK)</th>
-                  <th className="p-4 text-right">Chi Tiết</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/80">
-                {apiLogs.map((log) => {
-                  const isSuccess = log.responseStatusCode >= 200 && log.responseStatusCode < 300;
-                  return (
-                    <tr key={log.id} className="hover:bg-slate-850 transition duration-150">
-                      <td className="p-4 text-slate-400 text-[11px] whitespace-nowrap">
-                        {log.timestamp}
-                      </td>
-
-                      <td className="p-4 font-bold text-blue-400 whitespace-nowrap">
-                        {log.transactionRef}
-                      </td>
-
-                      <td className="p-4 text-white font-bold whitespace-nowrap">
-                        {log.carrierName}
-                      </td>
-
-                      <td className="p-4">
-                        <div className="flex items-center gap-1 flex-wrap">
-                          {log.containerNos.map((no) => (
-                            <span
-                              key={no}
-                              className="px-1.5 py-0.5 bg-slate-950 text-slate-300 rounded border border-slate-800 text-[10px]"
-                            >
-                              {no}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-
+        <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-xl">
+          {logs.length === 0 ? (
+            <div className="p-12 text-center text-xs text-slate-500">Chưa có lần gửi nào.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    <th className="p-4">Thời gian</th>
+                    <th className="p-4">Container</th>
+                    <th className="p-4">Hãng tàu</th>
+                    <th className="p-4">Sự kiện</th>
+                    <th className="p-4">Kết quả</th>
+                    <th className="p-4">Độ trễ</th>
+                    <th className="p-4">Mã xác nhận</th>
+                    <th className="p-4">Người gửi</th>
+                    <th className="p-4 text-right">Chi tiết</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200/80">
+                  {logs.map((log) => (
+                    <tr key={log.id} className={log.status === 'SIMULATED' ? 'opacity-60' : 'hover:bg-slate-50'}>
+                      <td className="p-4 text-slate-500 whitespace-nowrap">{formatLogTime(log.syncedAt)}</td>
+                      <td className="p-4 font-mono font-bold text-slate-900">{log.containerNo}</td>
+                      <td className="p-4 font-mono">{log.carrierCode}</td>
+                      <td className="p-4 font-mono text-[11px]">{log.eventType}</td>
                       <td className="p-4">
                         <span
-                          className={`px-2 py-0.5 rounded font-bold text-[11px] border ${
-                            isSuccess
-                              ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
-                              : 'bg-rose-950 text-rose-300 border-rose-800'
+                          className={`px-2 py-0.5 rounded font-bold text-[11px] border whitespace-nowrap ${
+                            log.status === 'SENT'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : log.status === 'SIMULATED'
+                              ? 'bg-slate-100 text-slate-600 border-slate-200'
+                              : 'bg-rose-50 text-rose-700 border-rose-200'
                           }`}
                         >
-                          HTTP {log.responseStatusCode} {log.responseStatusText}
+                          {logStatusLabel(log)}
                         </span>
                       </td>
-
-                      <td className="p-4 text-amber-400">{log.latencyMs} ms</td>
-
-                      <td className="p-4 text-emerald-400 font-bold whitespace-nowrap">
-                        {log.ackReferenceNo || '-'}
-                      </td>
-
+                      <td className="p-4 font-mono text-amber-600">{log.latencyMs != null ? `${log.latencyMs} ms` : '—'}</td>
+                      <td className="p-4 font-mono text-emerald-700">{log.ackToken || '—'}</td>
+                      <td className="p-4 text-slate-600">{log.triggeredBy || '—'}</td>
                       <td className="p-4 text-right">
                         <button
                           onClick={() => setInspectingLog(log)}
-                          className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold border border-slate-700 transition flex items-center gap-1.5 ml-auto cursor-pointer"
+                          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold border border-slate-200 transition inline-flex items-center gap-1.5 cursor-pointer"
                         >
-                          <Eye className="w-3.5 h-3.5 text-blue-400" />
-                          <span>Xem Payload</span>
+                          <Eye className="w-3.5 h-3.5 text-blue-600" />
+                          <span>Xem</span>
                         </button>
                       </td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 3: CONFIGS (chỉ đọc — khóa bí mật không bao giờ gửi xuống trình duyệt) */}
+      {activeMainTab === 'CONFIGS' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {carriers.map((c) => (
+              <div key={c.carrierCode} className="p-5 bg-white border border-slate-200 rounded-3xl space-y-3 text-xs">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900">{c.carrierName}</h4>
+                    <span className="text-[11px] text-slate-500 font-mono">Mã: {c.carrierCode}</span>
+                  </div>
+                  <span
+                    className={`px-2.5 py-1 rounded-lg font-bold border ${
+                      isReady(c)
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-amber-50 text-amber-700 border-amber-200'
+                    }`}
+                  >
+                    {isReady(c) ? 'ĐÃ CẤU HÌNH' : c.configured ? 'ĐANG TẮT' : 'CHƯA CẤU HÌNH'}
+                  </span>
+                </div>
+                {c.configured ? (
+                  <div className="space-y-2 font-mono">
+                    <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200 break-all">POST {c.endpointUrl}</div>
+                    <div className="grid grid-cols-3 gap-2 text-[11px]">
+                      <div className="p-2 bg-slate-50 rounded-xl border border-slate-200">Xác thực: <strong>{c.authType}</strong></div>
+                      <div className="p-2 bg-slate-50 rounded-xl border border-slate-200">Khóa: <strong>{c.hasSecret ? 'Đã có' : 'Chưa có'}</strong></div>
+                      <div className="p-2 bg-slate-50 rounded-xl border border-slate-200">Timeout: <strong>{c.timeoutSeconds}s</strong></div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-slate-500">Chưa khai báo endpoint cho hãng này nên không gửi qua API được.</p>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="p-5 bg-white border border-slate-200 rounded-3xl text-xs text-slate-700 space-y-2">
+            <h4 className="font-bold text-slate-900">Cách cấu hình (trên server backend)</h4>
+            <p>
+              Mỗi hãng tàu cấp endpoint và khóa API riêng theo hợp đồng EDI/M&amp;R. Khai báo trong <code>appsettings.json</code> mục{' '}
+              <code>CarrierIntegrations</code> (khóa theo <strong>mã hãng tàu trong danh mục</strong>), hoặc biến môi trường
+              {' '}<code>CarrierIntegrations__MÃ__EndpointUrl</code>, <code>CarrierIntegrations__MÃ__Secret</code>... rồi khởi động lại backend.
+            </p>
+            <pre className="p-3 bg-slate-50 rounded-xl border border-slate-200 font-mono text-[11px] overflow-x-auto">{`"CarrierIntegrations": {
+  "MSCU": {
+    "EndpointUrl": "<URL hãng tàu cấp>",
+    "AuthType": "BEARER",        // BEARER | API_KEY | NONE
+    "ApiKeyHeader": "X-API-Key", // dùng khi AuthType = API_KEY
+    "Secret": "<khóa API — nên đặt qua biến môi trường>",
+    "TimeoutSeconds": 15,
+    "Enabled": true
+  }
+}`}</pre>
           </div>
         </div>
       )}
 
-      {/* TAB 4: API GATEWAY CONFIGS */}
-      {activeMainTab === 'CONFIGS' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {gateways.map((g) => (
-            <div
-              key={g.carrierCode}
-              className="p-5 bg-slate-900 border border-slate-800 rounded-3xl space-y-4"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className={`p-2.5 rounded-xl border ${g.logoColor}`}>
-                    <Ship className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-white">{g.carrierName}</h4>
-                    <span className="text-[10px] text-slate-400 font-mono">
-                      Mã Hãng: <strong>{g.carrierCode}</strong>
-                    </span>
-                  </div>
-                </div>
-
-                <span className="px-2.5 py-1 bg-emerald-950 text-emerald-300 border border-emerald-800 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span>CONNECTED</span>
-                </span>
-              </div>
-
-              <div className="space-y-2 text-xs font-mono">
-                <div className="p-2.5 bg-slate-950 rounded-xl border border-slate-800 text-slate-300 break-all">
-                  <span className="text-blue-400 font-bold block text-[10px]">REST API ENDPOINT:</span>
-                  {g.endpointUrl}
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-[11px]">
-                  <div className="p-2 bg-slate-950 rounded-xl border border-slate-800">
-                    <span className="text-slate-500 block">Xác Thực (Auth):</span>
-                    <span className="text-purple-400 font-bold">{g.authType}</span>
-                  </div>
-                  <div className="p-2 bg-slate-950 rounded-xl border border-slate-800">
-                    <span className="text-slate-500 block">Giao Thức:</span>
-                    <span className="text-emerald-400 font-bold">{g.protocol}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-800">
-                <span className="text-slate-400">Tự động truyền khi QC Đạt:</span>
-                <button
-                  onClick={() => {
-                    setGateways((prev) =>
-                      prev.map((item) =>
-                        item.carrierCode === g.carrierCode
-                          ? { ...item, autoTransmitOnQcPass: !item.autoTransmitOnQcPass }
-                          : item
-                      )
-                    );
-                  }}
-                  className={`px-3 py-1 rounded-xl font-bold transition cursor-pointer ${
-                    g.autoTransmitOnQcPass
-                      ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                      : 'bg-slate-800 text-slate-400'
-                  }`}
-                >
-                  {g.autoTransmitOnQcPass ? 'Đang Bật (Auto)' : 'Thủ Công (Manual)'}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Modal View Log Detail */}
-      {inspectingLog && (
-        <ApiLogDetailModal log={inspectingLog} onClose={() => setInspectingLog(null)} />
-      )}
+      {inspectingLog && <ApiLogDetailModal log={inspectingLog} onClose={() => setInspectingLog(null)} />}
     </div>
   );
 };

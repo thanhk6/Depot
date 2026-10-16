@@ -15,8 +15,9 @@ namespace Depot.Application.Services
         private readonly DepotDbContext db;
         public YardOverviewService(DepotDbContext db) => this.db = db;
 
+        /// <summary>Rỗng khi container chưa hạ bãi (BlockCode rỗng).</summary>
         private static string BuildLocationCode(string blockCode, int bay, int row, int tier)
-            => $"{blockCode}-{bay:D2}-{row:D2}-{tier:D2}";
+            => string.IsNullOrEmpty(blockCode) ? string.Empty : $"{blockCode}-{bay:D2}-{row:D2}-{tier:D2}";
 
         private static string DeriveCondition(string status) => status switch
         {
@@ -24,7 +25,9 @@ namespace Depot.Application.Services
             _ => "AV"
         };
 
-        private static YardContainerDto MapContainer(DepotJob job, HashSet<string> cleaningContainerNos)
+        /// <summary>DepotJob không còn navigation ShippingLine/computed ShippingLineCode — Caller tự query
+        /// rời sang ShippingLine.Code theo ShippingLineId rồi truyền vào đây (xem docs/backend-progress/00-quy-tac-backend.md).</summary>
+        private static YardContainerDto MapContainer(DepotJob job, HashSet<string> cleaningContainerNos, Dictionary<long, string> shippingLineCodes)
         {
             var condition = cleaningContainerNos.Contains(job.ContainerNo) ? "CL" : DeriveCondition(job.Status);
             return new YardContainerDto
@@ -32,7 +35,7 @@ namespace Depot.Application.Services
                 Id = job.Id.ToString(),
                 ContainerNo = job.ContainerNo,
                 IsoType = job.IsoSize,
-                ShippingLine = job.ShippingLineCode,
+                ShippingLine = shippingLineCodes.GetValueOrDefault(job.ShippingLineId),
                 Condition = condition,
                 Status = job.Status,
                 LocationCode = BuildLocationCode(job.BlockCode, job.Bay, job.Row, job.Tier),
@@ -152,7 +155,6 @@ namespace Depot.Application.Services
         public async Task<YardOverviewDto> GetOverviewAsync()
         {
             var activeJobs = await db.DepotJobs.AsNoTracking()
-                .Include(x => x.ShippingLine)
                 .Where(x => x.Status != "GATE_OUT")
                 .ToListAsync();
             var blockLayouts = await db.YardBlockLayouts.AsNoTracking().ToListAsync();
@@ -162,8 +164,11 @@ namespace Depot.Application.Services
                 .OrderByDescending(x => x.DispatchedAt).Take(50).ToListAsync();
             var gateLanes = await db.YardGateLanes.AsNoTracking().ToListAsync();
             var cleaningContainerNos = await GetActiveCleaningContainerNosAsync();
+            var shippingLineCodes = await db.ShippingLines.AsNoTracking()
+                .Where(s => activeJobs.Select(j => j.ShippingLineId).Distinct().Contains(s.Id))
+                .ToDictionaryAsync(s => s.Id, s => s.Code);
 
-            var containers = activeJobs.Select(j => MapContainer(j, cleaningContainerNos)).ToList();
+            var containers = activeJobs.Select(j => MapContainer(j, cleaningContainerNos, shippingLineCodes)).ToList();
             var jobsByBlock = activeJobs.GroupBy(x => x.BlockCode).ToDictionary(g => g.Key, g => g.ToList());
 
             var blocks = blockLayouts.Select(b =>
@@ -237,7 +242,7 @@ namespace Depot.Application.Services
 
         public async Task<List<YardContainerDto>> SearchContainersAsync(string? containerNo)
         {
-            var query = db.DepotJobs.AsNoTracking().Include(x => x.ShippingLine).Where(x => x.Status != "GATE_OUT");
+            var query = db.DepotJobs.AsNoTracking().Where(x => x.Status != "GATE_OUT");
             if (!string.IsNullOrWhiteSpace(containerNo))
             {
                 var q = containerNo.Trim().ToUpperInvariant();
@@ -245,18 +250,22 @@ namespace Depot.Application.Services
             }
             var jobs = await query.Take(50).ToListAsync();
             var cleaningContainerNos = await GetActiveCleaningContainerNosAsync();
-            return jobs.Select(j => MapContainer(j, cleaningContainerNos)).ToList();
+            var shippingLineCodes = await db.ShippingLines.AsNoTracking()
+                .Where(s => jobs.Select(j => j.ShippingLineId).Distinct().Contains(s.Id))
+                .ToDictionaryAsync(s => s.Id, s => s.Code);
+            return jobs.Select(j => MapContainer(j, cleaningContainerNos, shippingLineCodes)).ToList();
         }
 
         public async Task<YardContainerDto?> GetContainerByIdAsync(string idOrContainerNo)
         {
-            IQueryable<DepotJob> query = db.DepotJobs.AsNoTracking().Include(x => x.ShippingLine);
+            IQueryable<DepotJob> query = db.DepotJobs.AsNoTracking();
             var job = long.TryParse(idOrContainerNo, out var parsedId)
                 ? await query.FirstOrDefaultAsync(x => x.Id == parsedId)
                 : await query.FirstOrDefaultAsync(x => x.ContainerNo == idOrContainerNo.ToUpperInvariant());
             if (job == null) return null;
             var cleaningContainerNos = await GetActiveCleaningContainerNosAsync();
-            return MapContainer(job, cleaningContainerNos);
+            var shippingLineCode = await db.ShippingLines.AsNoTracking().Where(s => s.Id == job.ShippingLineId).Select(s => s.Code).FirstOrDefaultAsync();
+            return MapContainer(job, cleaningContainerNos, new Dictionary<long, string> { [job.ShippingLineId] = shippingLineCode ?? string.Empty });
         }
 
         public async Task<List<YardMoveHistory>> GetMoveHistoryAsync(string? containerId)
@@ -275,8 +284,8 @@ namespace Depot.Application.Services
                 return ApiResult<YardContainerDto>.Failure("Thiếu container hoặc vị trí đích.");
 
             var job = long.TryParse(request.ContainerId, out var parsedId)
-                ? await db.DepotJobs.Include(x => x.ShippingLine).FirstOrDefaultAsync(x => x.Id == parsedId)
-                : await db.DepotJobs.Include(x => x.ShippingLine).FirstOrDefaultAsync(x => x.ContainerNo == request.ContainerId.ToUpperInvariant());
+                ? await db.DepotJobs.FirstOrDefaultAsync(x => x.Id == parsedId)
+                : await db.DepotJobs.FirstOrDefaultAsync(x => x.ContainerNo == request.ContainerId.ToUpperInvariant());
             if (job == null) return ApiResult<YardContainerDto>.Failure("Không tìm thấy Container trong hệ thống.");
 
             var parts = request.TargetLocation.ToUpperInvariant().Split('-');
@@ -294,7 +303,7 @@ namespace Depot.Application.Services
             if (occupant != null)
                 return ApiResult<YardContainerDto>.Failure($"Vị trí {request.TargetLocation} đã có container {occupant.ContainerNo} chiếm giữ.");
 
-            var fromLocation = BuildLocationCode(job.BlockCode, job.Bay, job.Row, job.Tier);
+            var fromLocation = string.IsNullOrEmpty(job.BlockCode) ? "NGOÀI BÃI (khu giám định/vệ sinh)" : BuildLocationCode(job.BlockCode, job.Bay, job.Row, job.Tier);
             job.BlockCode = blockCode;
             job.Bay = bay;
             job.Row = row;
@@ -329,7 +338,8 @@ namespace Depot.Application.Services
             await db.SaveChangesAsync();
 
             var cleaningContainerNos = await GetActiveCleaningContainerNosAsync();
-            return ApiResult<YardContainerDto>.Success(MapContainer(job, cleaningContainerNos),
+            var shippingLineCode = await db.ShippingLines.AsNoTracking().Where(s => s.Id == job.ShippingLineId).Select(s => s.Code).FirstOrDefaultAsync();
+            return ApiResult<YardContainerDto>.Success(MapContainer(job, cleaningContainerNos, new Dictionary<long, string> { [job.ShippingLineId] = shippingLineCode ?? string.Empty }),
                 $"Đã di chuyển Container {job.ContainerNo} từ {fromLocation} tới {request.TargetLocation.ToUpperInvariant()} thành công!");
         }
 
@@ -371,6 +381,20 @@ namespace Depot.Application.Services
         {
             var block = await db.YardBlockLayouts.FirstOrDefaultAsync(x => x.Code == blockCode);
             if (block == null) return null;
+
+            // BUG-022: trước đây nhận BayCount = 0, MaxTier âm, trạng thái tuỳ ý — sơ đồ bãi và gợi ý vị trí hỏng.
+            if (request.BayCount < 1 || request.RowCount < 1 || request.MaxTier < 1)
+                throw new ArgumentException("Số bay, số hàng và số tầng tối đa phải từ 1 trở lên.");
+            if (request.Status is not ("ACTIVE" or "MAINTENANCE"))
+                throw new ArgumentException($"Trạng thái block '{request.Status}' không hợp lệ (ACTIVE hoặc MAINTENANCE).");
+            // Thu nhỏ block mà còn container nằm ở phần bị cắt thì container đó "mất vị trí" trên sơ đồ.
+            var outOfRange = await db.DepotJobs.AsNoTracking()
+                .Where(x => x.Status != "GATE_OUT" && x.BlockCode == blockCode
+                    && (x.Bay > request.BayCount || x.Row > request.RowCount || x.Tier > request.MaxTier))
+                .Select(x => x.ContainerNo)
+                .ToListAsync();
+            if (outOfRange.Count > 0)
+                throw new ArgumentException($"Không thể thu nhỏ block: còn container ngoài kích thước mới ({string.Join(", ", outOfRange.Take(5))}{(outOfRange.Count > 5 ? "…" : "")}). Chuyển các container này trước.");
 
             block.BlockName = request.BlockName;
             block.Description = request.Description;

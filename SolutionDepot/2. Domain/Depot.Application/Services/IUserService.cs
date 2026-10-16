@@ -9,6 +9,7 @@ namespace Depot.Application.Services
     {
         Task<ApiResult<UserDto>> Authencate(LoginRequest request);
         Task<List<UserDto>> GetUsersAsync();
+        Task<UserDto?> GetProfileAsync(long id);
         Task<UserDto?> CreateUserAsync(CreateSystemUserRequest request);
         Task<UserDto?> UpdateUserAsync(long id, UpdateSystemUserRequest request);
         Task<bool> DeleteUserAsync(long id);

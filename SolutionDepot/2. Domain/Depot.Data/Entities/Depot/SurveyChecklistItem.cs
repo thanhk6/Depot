@@ -10,7 +10,6 @@ namespace Depot.Data.Entities.Depot
     public class SurveyChecklistItem : FullAuditedEntity<long>
     {
         public long SurveyId { get; set; }
-        public virtual Survey? Survey { get; set; }
 
         /// <summary>Mã khu vực, vd ROOF/FRONT_WALL/DOOR/FLOOR/CLEANING... (khớp InspectionZoneKey frontend).</summary>
         public string ZoneKey { get; set; } = string.Empty;

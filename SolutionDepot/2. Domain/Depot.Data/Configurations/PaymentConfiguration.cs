@@ -10,6 +10,7 @@ namespace Depot.Data.Configurations
         {
             builder.Property(x => x.DepotJobId).IsRequired();
             builder.HasIndex(x => x.DepotJobId).IsUnique();
+            builder.Property(x => x.TransactionRef).HasMaxLength(100);
         }
     }
 
@@ -24,10 +25,12 @@ namespace Depot.Data.Configurations
             builder.Property(x => x.TransactionId).HasMaxLength(100);
             builder.HasIndex(x => x.OrderNo).IsUnique();
             builder.HasIndex(x => x.DepotJobId).IsUnique();
+            // ServiceOrder mang GrandTotal/PaymentStatus — cùng lý do với Payment/JobAuditLog ở
+            // DepotJobConfiguration.cs, không được cascade-xoá hồ sơ tài chính theo DepotJob.
             builder.HasOne(x => x.DepotJob)
                 .WithMany()
                 .HasForeignKey(x => x.DepotJobId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Restrict);
             builder.HasMany(x => x.Items).WithOne(x => x.ServiceOrder).HasForeignKey(x => x.ServiceOrderId).OnDelete(DeleteBehavior.Cascade);
             builder.Property(x => x.Subtotal).HasPrecision(18, 2);
             builder.Property(x => x.TotalVat).HasPrecision(18, 2);

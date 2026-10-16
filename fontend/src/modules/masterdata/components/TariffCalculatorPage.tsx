@@ -146,13 +146,13 @@ export const TariffCalculatorPage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header Info Banner */}
-      <div className="p-6 bg-slate-900 border border-slate-800 rounded-3xl flex items-start gap-4 shadow-xl">
-        <div className="p-3.5 bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 rounded-2xl shadow-lg shrink-0">
+      <div className="p-6 bg-white border border-slate-200 rounded-3xl flex items-start gap-4 shadow-xl">
+        <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-600 rounded-2xl shadow-lg shrink-0">
           <Calculator className="w-8 h-8" />
         </div>
         <div>
-          <h2 className="text-xl font-bold text-white tracking-tight">MÁY TÍNH CƯỚC NÂNG HẠ &amp; LƯU BÃI</h2>
-          <p className="text-xs text-slate-400 mt-1 max-w-3xl">
+          <h2 className="text-xl font-bold text-slate-900 tracking-tight">MÁY TÍNH CƯỚC NÂNG HẠ &amp; LƯU BÃI</h2>
+          <p className="text-xs text-slate-500 mt-1 max-w-3xl">
             Mô phỏng tự động tính toán tổng số tiền Nâng Hạ + Lưu Bãi lũy tiến + Phụ phí ca đêm + Thuế VAT, dựa trên biểu cước thật đang cấu hình ở 2 danh mục "Cước Nâng Hạ" và "Cước Lưu Bãi".
           </p>
         </div>
@@ -160,17 +160,17 @@ export const TariffCalculatorPage: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Inputs Section */}
-        <div className="lg:col-span-5 p-6 bg-slate-900 border border-slate-800 rounded-3xl space-y-5 shadow-xl">
+        <div className="lg:col-span-5 p-6 bg-white border border-slate-200 rounded-3xl space-y-5 shadow-xl">
           <div>
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <Calculator className="w-5 h-5 text-emerald-400" />
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <Calculator className="w-5 h-5 text-emerald-600" />
               <span>Nhập Thông Số Tính Toán Chi Phí</span>
             </h3>
           </div>
 
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1.5">1. Kích Cỡ &amp; Quy Cách Container:</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">1. Kích Cỡ &amp; Quy Cách Container:</label>
               <div className="grid grid-cols-3 gap-2">
                 {[
                   { id: '20GP', label: "20' GP / DC" },
@@ -185,7 +185,7 @@ export const TariffCalculatorPage: React.FC = () => {
                     type="button"
                     onClick={() => setCalcContSize(sz.id as any)}
                     className={`p-2 rounded-xl text-xs font-bold transition border cursor-pointer ${
-                      calcContSize === sz.id ? 'bg-emerald-600/20 text-emerald-300 border-emerald-500/50 shadow' : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                      calcContSize === sz.id ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow' : 'bg-slate-50 text-slate-500 border-slate-200 hover:text-slate-900'
                     }`}
                   >
                     {sz.label}
@@ -195,11 +195,11 @@ export const TariffCalculatorPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1.5">2. Nghiệp Vụ Nâng / Hạ (LoLo):</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">2. Nghiệp Vụ Nâng / Hạ (LoLo):</label>
               <select
                 value={calcLoloAction}
                 onChange={(e) => setCalcLoloAction(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500 font-medium"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-emerald-500 font-medium"
               >
                 {loloTariffs.map((t) => (
                   <option key={t.tariffCode} value={t.tariffCode}>{t.nameVi} ({t.tariffCode})</option>
@@ -208,11 +208,11 @@ export const TariffCalculatorPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1.5">3. Chính Sách Lưu Bãi Áp Dụng:</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">3. Chính Sách Lưu Bãi Áp Dụng:</label>
               <select
                 value={calcStorageRule}
                 onChange={(e) => setCalcStorageRule(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500 font-medium"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-emerald-500 font-medium"
               >
                 {storageRules.map((r) => (
                   <option key={r.ruleCode} value={r.ruleCode}>{r.shippingLineName} ({r.defaultFreeDays} ngày Free)</option>
@@ -221,9 +221,9 @@ export const TariffCalculatorPage: React.FC = () => {
             </div>
 
             <div>
-              <div className="flex items-center justify-between text-xs font-bold text-slate-300 mb-1.5">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-700 mb-1.5">
                 <span>4. Tổng Số Ngày Lưu Bãi Thực Tế:</span>
-                <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 font-mono text-sm rounded-lg">{calcStorageDays} Ngày</span>
+                <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 font-mono text-sm rounded-lg">{calcStorageDays} Ngày</span>
               </div>
               <input
                 type="range"
@@ -241,7 +241,7 @@ export const TariffCalculatorPage: React.FC = () => {
               </div>
             </div>
 
-            <label className="flex items-center gap-3 p-3 bg-slate-950 border border-slate-800 rounded-xl cursor-pointer hover:border-slate-700 transition">
+            <label className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:border-slate-200 transition">
               <input
                 type="checkbox"
                 checked={calcNightShift}
@@ -249,62 +249,62 @@ export const TariffCalculatorPage: React.FC = () => {
                 className="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-500 accent-emerald-500"
               />
               <div>
-                <div className="text-xs font-bold text-white">Nâng hạ ca đêm / Ngày Lễ</div>
-                <div className="text-[11px] text-slate-400">Cộng phụ phí ngoài giờ quy định</div>
+                <div className="text-xs font-bold text-slate-900">Nâng hạ ca đêm / Ngày Lễ</div>
+                <div className="text-[11px] text-slate-500">Cộng phụ phí ngoài giờ quy định</div>
               </div>
             </label>
           </div>
         </div>
 
         {/* Detailed Invoice Breakdown Section */}
-        <div className="lg:col-span-7 p-6 bg-slate-900 border border-slate-800 rounded-3xl space-y-5 shadow-xl flex flex-col justify-between">
+        <div className="lg:col-span-7 p-6 bg-white border border-slate-200 rounded-3xl space-y-5 shadow-xl flex flex-col justify-between">
           <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <div>
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <Receipt className="w-5 h-5 text-cyan-400" />
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Receipt className="w-5 h-5 text-cyan-600" />
                   <span>Dự Toán Hóa Đơn Chi Tiết (Estimated Tariff Invoice)</span>
                 </h3>
-                <span className="text-xs text-slate-400">
+                <span className="text-xs text-slate-500">
                   Quy chuẩn Cont: {calcContSize} &bull; Lưu bãi {calcStorageDays} ngày &bull; {calculationResult.selectedStorage.shippingLineName}
                 </span>
               </div>
-              <button onClick={() => window.print()} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-bold flex items-center gap-1.5 transition">
+              <button onClick={() => window.print()} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1.5 transition">
                 <Printer className="w-3.5 h-3.5" />
                 <span>In Phiếu</span>
               </button>
             </div>
 
             <div className="space-y-2.5 text-xs">
-              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800/80 space-y-1.5">
-                <div className="flex items-center justify-between font-bold text-white">
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1.5">
+                <div className="flex items-center justify-between font-bold text-slate-900">
                   <span className="flex items-center gap-1.5">
-                    <Truck className="w-4 h-4 text-cyan-400" />
+                    <Truck className="w-4 h-4 text-cyan-600" />
                     1. Cước Nâng / Hạ (LoLo)
                   </span>
-                  <span className="font-mono text-cyan-300 font-bold">{formatVND(calculationResult.loloBasePrice)}</span>
+                  <span className="font-mono text-cyan-700 font-bold">{formatVND(calculationResult.loloBasePrice)}</span>
                 </div>
-                <div className="text-[11px] text-slate-400 pl-5">{calculationResult.selectedLolo.nameVi}</div>
+                <div className="text-[11px] text-slate-500 pl-5">{calculationResult.selectedLolo.nameVi}</div>
                 {calculationResult.nightSurcharge > 0 && (
-                  <div className="flex items-center justify-between text-[11px] pl-5 text-amber-300 font-medium">
+                  <div className="flex items-center justify-between text-[11px] pl-5 text-amber-700 font-medium">
                     <span>&bull; Phụ phí nâng hạ ca đêm / lễ:</span>
                     <span className="font-mono">+{formatVND(calculationResult.nightSurcharge)}</span>
                   </div>
                 )}
               </div>
 
-              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800/80 space-y-2">
-                <div className="flex items-center justify-between font-bold text-white">
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2">
+                <div className="flex items-center justify-between font-bold text-slate-900">
                   <span className="flex items-center gap-1.5">
-                    <Layers className="w-4 h-4 text-indigo-400" />
+                    <Layers className="w-4 h-4 text-indigo-600" />
                     2. Tiền Lưu Bãi Lũy Tiến ({calcStorageDays} ngày)
                   </span>
-                  <span className="font-mono text-indigo-300 font-bold">{formatVND(calculationResult.totalStorageCost)}</span>
+                  <span className="font-mono text-indigo-700 font-bold">{formatVND(calculationResult.totalStorageCost)}</span>
                 </div>
 
-                <div className="space-y-1 pl-5 border-l-2 border-slate-800">
+                <div className="space-y-1 pl-5 border-l-2 border-slate-200">
                   {calculationResult.tierBreakdown.map((t, idx) => (
-                    <div key={idx} className="flex items-center justify-between text-[11px] text-slate-300">
+                    <div key={idx} className="flex items-center justify-between text-[11px] text-slate-700">
                       <span>&bull; {t.name} ({t.days} ngày x {formatVND(t.dailyRate)}):</span>
                       <span className="font-mono font-bold">{formatVND(t.subtotal)}</span>
                     </div>
@@ -314,19 +314,19 @@ export const TariffCalculatorPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="p-5 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950/50 border border-emerald-500/30 rounded-2xl space-y-2.5">
-            <div className="flex items-center justify-between text-xs text-slate-400">
+          <div className="p-5 bg-emerald-50/60 border border-emerald-200 rounded-2xl space-y-2.5">
+            <div className="flex items-center justify-between text-xs text-slate-500">
               <span>Cộng tiền trước thuế (Subtotal):</span>
-              <span className="font-mono text-white font-bold">{formatVND(calculationResult.totalBeforeVat)}</span>
+              <span className="font-mono text-slate-900 font-bold">{formatVND(calculationResult.totalBeforeVat)}</span>
             </div>
-            <div className="flex items-center justify-between text-xs text-slate-400">
+            <div className="flex items-center justify-between text-xs text-slate-500">
               <span>Thuế giá trị gia tăng (VAT 8%):</span>
-              <span className="font-mono text-emerald-400 font-bold">+{formatVND(calculationResult.vatAmount)}</span>
+              <span className="font-mono text-emerald-600 font-bold">+{formatVND(calculationResult.vatAmount)}</span>
             </div>
-            <div className="h-[1px] bg-slate-800 pt-1" />
-            <div className="flex items-center justify-between text-sm sm:text-base font-bold text-white pt-1">
+            <div className="h-[1px] bg-slate-100 pt-1" />
+            <div className="flex items-center justify-between text-sm sm:text-base font-bold text-slate-900 pt-1">
               <span>TỔNG TIỀN PHẢI THANH TOÁN:</span>
-              <span className="font-mono text-2xl text-emerald-400 font-black">{formatVND(calculationResult.grandTotal)}</span>
+              <span className="font-mono text-2xl text-emerald-600 font-black">{formatVND(calculationResult.grandTotal)}</span>
             </div>
           </div>
         </div>

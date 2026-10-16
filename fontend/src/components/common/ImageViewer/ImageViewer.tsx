@@ -47,7 +47,8 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({
           alt={title}
           className="max-h-[70vh] w-auto object-contain rounded-xl shadow-lg"
           onError={(e) => {
-            (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=800&q=80';
+            // Ảnh lỗi thì ẩn đi thay vì thay bằng ảnh mẫu Unsplash (dễ bị hiểu nhầm là ảnh container thật).
+            (e.target as HTMLImageElement).style.visibility = 'hidden';
           }}
         />
       </div>
