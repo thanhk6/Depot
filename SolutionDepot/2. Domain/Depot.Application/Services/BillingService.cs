@@ -40,26 +40,37 @@ namespace Depot.Application.Services
         {
             var syncedJobNos = await db.ShippingLineDebts.Select(x => x.JobNo).ToListAsync();
 
-            var estimates = await db.Estimates.AsNoTracking()
-                .Include(x => x.DepotJob).ThenInclude(j => j!.ShippingLine)
-                .Include(x => x.DepotJob).ThenInclude(j => j!.RepairOrder)
-                .Where(x => x.Status == "APPROVED" && x.DepotJob != null && x.DepotJob!.RepairOrder != null && x.DepotJob!.RepairOrder!.CompletedAt != null)
-                .ToListAsync();
+            // Estimate/DepotJob/RepairOrder không còn navigation — join rời theo FK (DepotJobId) thay vì
+            // Include/ThenInclude (xem docs/backend-progress/00-quy-tac-backend.md mục Entity/ViewModel).
+            var estimates = await db.Estimates.AsNoTracking().Where(x => x.Status == "APPROVED").ToListAsync();
+            var jobIds = estimates.Select(e => e.DepotJobId).Distinct().ToList();
+            var jobs = await db.DepotJobs.AsNoTracking().Where(j => jobIds.Contains(j.Id)).ToDictionaryAsync(j => j.Id);
+            var repairOrders = await db.RepairOrders.AsNoTracking().Where(r => jobIds.Contains(r.DepotJobId)).ToDictionaryAsync(r => r.DepotJobId);
+            var shippingLineIds = jobs.Values.Select(j => j.ShippingLineId).Distinct().ToList();
+            var shippingLines = await db.ShippingLines.AsNoTracking().Where(s => shippingLineIds.Contains(s.Id)).ToDictionaryAsync(s => s.Id);
 
             return estimates
-                .Where(e => !syncedJobNos.Contains(e.JobNo))
-                .Select(e => new DebtSyncCandidateDto
+                .Where(e => !syncedJobNos.Contains(e.JobNo)
+                    && jobs.ContainsKey(e.DepotJobId)
+                    && repairOrders.TryGetValue(e.DepotJobId, out var ro) && ro.CompletedAt != null)
+                .Select(e =>
                 {
-                    JobNo = e.JobNo,
-                    ContainerNo = e.DepotJob!.ContainerNo,
-                    ShippingLineCode = e.DepotJob!.ShippingLineCode ?? string.Empty,
-                    ShippingLineName = e.DepotJob!.ShippingLine?.Name ?? string.Empty,
-                    QuotationNo = e.EstimateNo,
-                    RepairNo = e.JobNo,
-                    CompletedDate = e.DepotJob!.RepairOrder!.CompletedAt!.Value,
-                    Description = $"Sửa chữa container {e.DepotJob!.ContainerNo} theo báo giá {e.EstimateNo}",
-                    Amount = e.GrandTotal,
-                    ApprovalRef = e.ApprovedBy
+                    var job = jobs[e.DepotJobId];
+                    var repairOrder = repairOrders[e.DepotJobId];
+                    var shippingLine = shippingLines.GetValueOrDefault(job.ShippingLineId);
+                    return new DebtSyncCandidateDto
+                    {
+                        JobNo = e.JobNo,
+                        ContainerNo = job.ContainerNo,
+                        ShippingLineCode = shippingLine?.Code ?? string.Empty,
+                        ShippingLineName = shippingLine?.Name ?? string.Empty,
+                        QuotationNo = e.EstimateNo,
+                        RepairNo = e.JobNo,
+                        CompletedDate = repairOrder.CompletedAt!.Value,
+                        Description = $"Sửa chữa container {job.ContainerNo} theo báo giá {e.EstimateNo}",
+                        Amount = e.GrandTotal,
+                        ApprovalRef = e.ApprovedBy
+                    };
                 })
                 .ToList();
         }
@@ -209,6 +220,20 @@ namespace Depot.Application.Services
             if (period.Status == "CLOSED") return ApiResult<DebtPeriod>.Failure("Kỳ công nợ đã được khoá sổ trước đó.");
 
             var now = DateTime.UtcNow;
+            // Bấm "Khoá sổ" 2 lần liên tiếp (double-click / 2 tab) trước đây có thể lọt qua check
+            // period.Status == "CLOSED" ở trên (đọc-rồi-ghi kinh điển) và cả 2 request cùng tạo kỳ kế
+            // tiếp — dù Code kỳ mới có unique index chặn ở DB, request thua cuộc vẫn văng lỗi 500 khó
+            // hiểu thay vì thông báo nghiệp vụ rõ ràng. Chốt trạng thái CLOSED bằng ExecuteUpdateAsync có
+            // điều kiện WHERE ngay từ đầu để phát hiện thua cuộc sớm và trả lỗi sạch.
+            var claimedRows = await db.DebtPeriods
+                .Where(x => x.Code == periodCode && x.Status != "CLOSED")
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(x => x.Status, "CLOSED")
+                    .SetProperty(x => x.ClosedAt, now)
+                    .SetProperty(x => x.ClosedBy, request.ClosedBy)
+                    .SetProperty(x => x.ClosingNotes, request.ClosingNotes));
+            if (claimedRows == 0) return ApiResult<DebtPeriod>.Failure("Kỳ công nợ đã được khoá sổ trước đó.");
+
             period.Status = "CLOSED";
             period.ClosedAt = now;
             period.ClosedBy = request.ClosedBy;
@@ -242,6 +267,20 @@ namespace Depot.Application.Services
             var payment = await db.ArPayments.Include(x => x.Allocations).FirstOrDefaultAsync(x => x.Code == paymentCode);
             if (payment == null) return ApiResult<ArPayment>.Failure("Không tìm thấy khoản thanh toán.");
             if (payment.Status == "REVERSED") return ApiResult<ArPayment>.Failure("Khoản thanh toán này đã bị huỷ trước đó.");
+
+            // Bấm "Huỷ thanh toán" 2 lần gần như đồng thời trước đây có thể cùng lọt qua check phía trên
+            // (đọc-rồi-ghi) — KHÔNG có unique index nào chặn ở DB (khác ClosePeriodAsync), nên cả 2 request
+            // sẽ cùng chạy vòng lặp trừ debt.PaidAmountVnd bên dưới, trừ tiền NỢ 2 LẦN cho 1 lần huỷ thật.
+            // Chốt trạng thái REVERSED bằng ExecuteUpdateAsync có điều kiện WHERE trước khi làm bất cứ điều
+            // chỉnh số tiền nào, đảm bảo chỉ đúng 1 request thắng cuộc được đi tiếp.
+            var claimedRows = await db.ArPayments
+                .Where(x => x.Code == paymentCode && x.Status != "REVERSED")
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(x => x.Status, "REVERSED")
+                    .SetProperty(x => x.ReversedBy, request.ReversedBy)
+                    .SetProperty(x => x.ReversedAt, DateTime.UtcNow)
+                    .SetProperty(x => x.ReversalReason, request.Reason));
+            if (claimedRows == 0) return ApiResult<ArPayment>.Failure("Khoản thanh toán này đã bị huỷ trước đó.");
 
             var debtCodes = payment.Allocations.Select(a => a.ShippingLineDebtCode).ToList();
             var debts = await db.ShippingLineDebts.Where(x => debtCodes.Contains(x.Code)).ToListAsync();

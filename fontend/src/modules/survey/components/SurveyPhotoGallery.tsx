@@ -4,16 +4,12 @@ import {
   Image as ImageIcon,
   Camera,
   Search,
-  Filter,
-  Eye,
-  Trash2,
-  Upload,
-  Calendar,
   User,
   Tag,
   Maximize2,
   X
 } from 'lucide-react';
+import { useShippingLineOptions } from '../../../hooks/useShippingLineOptions';
 
 interface SurveyPhotoGalleryProps {
   surveys: SurveyItemRecord[];
@@ -26,6 +22,7 @@ interface SurveyPhotoGalleryProps {
 export const SurveyPhotoGallery: React.FC<SurveyPhotoGalleryProps> = ({
   surveys
 }) => {
+  const shippingLineOptions = useShippingLineOptions();
   const [searchTerm, setSearchTerm] = useState('');
   const [lineFilter, setLineFilter] = useState('ALL');
   const [typeFilter, setTypeFilter] = useState('ALL');
@@ -95,12 +92,9 @@ export const SurveyPhotoGallery: React.FC<SurveyPhotoGalleryProps> = ({
             className="px-3 py-2 bg-white border border-slate-200 text-xs text-slate-700 rounded-xl focus:outline-none"
           >
             <option value="ALL">Tất cả hãng tàu</option>
-            <option value="MAERSK">MAERSK</option>
-            <option value="MSC">MSC</option>
-            <option value="ONE">ONE</option>
-            <option value="CMA-CGM">CMA-CGM</option>
-            <option value="COSCO">COSCO</option>
-            <option value="EVERGREEN">EVERGREEN</option>
+            {shippingLineOptions.map((l) => (
+              <option key={l.code} value={l.code}>{l.name} ({l.code})</option>
+            ))}
           </select>
 
           <select

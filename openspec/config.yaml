@@ -1,0 +1,60 @@
+schema: spec-driven
+
+context: |
+  Language: Vietnamese
+  All artifacts must be written in Vietnamese.
+  Keep OpenSpec structural headings and SHALL/MUST keywords in English.
+
+  # Dự án: SolutionDepot — hệ thống quản lý depot container (ERP bãi rỗng / M&R)
+  Vòng đời container (khép kín, mỗi bước ghi nhật ký kèm người thực hiện thật):
+  Gate-In → Giám định → Vệ sinh (bắt buộc) → Xe nâng đưa từ khu vệ sinh vào bãi → Khai thác lập phiếu dịch vụ
+  → Thu tiền (tiền mặt / VietQR) → Báo giá sửa chữa (chuẩn Maersk AEMS) → Xác nhận báo giá → Ghi nhận hãng tàu duyệt
+  → Lệnh sửa chữa → QC nghiệm thu → Gate-Out. Mô tả chi tiết: docs/quy-trinh-van-hanh-depot.md
+
+  Công nghệ:
+  - Backend: .NET 8, solution SolutionDepot/ — Depot.BackendApi (API chính, :50210), Depot.FileServer (lưu ảnh, :50211),
+    Depot.ApiIntegration (cổng tích hợp hãng tàu / ngân hàng), Depot.Application (service), Depot.Data (EF Core + PostgreSQL,
+    migration tự chạy khi BackendApi khởi động), Depot.ViewModels (DTO).
+  - Frontend: React 19 + Vite + TypeScript + Tailwind, thư mục fontend/ (Express server.ts, :3000, tự chuyển /api sang backend).
+  - Deploy: docker compose trên VPS (depot-backend, depot-frontend, depot-fileserver), tên miền depot.matran.com.vn.
+
+  Quy tắc bắt buộc:
+  - Mọi dữ liệu lấy từ database: không mock, không số gõ cứng, không preset / fallback bịa. Danh mục dùng chung qua API danh mục.
+  - Phân quyền: RolePermissions (backend) là nguồn duy nhất cho cả menu và API — thêm màn / endpoint mới phải gắn
+    [RequirePermission] và cập nhật fontend/src/constants/menuPermissions.ts.
+  - Mỗi thao tác nghiệp vụ ghi JobAuditLog; người thực hiện do AuditActorInterceptor tự điền từ tài khoản đăng nhập.
+  - Tiền / giờ công tính lại ở server, không tin số trình duyệt gửi lên.
+  - Khoá API (Maersk, ngân hàng…) chỉ khai báo trên server (biến môi trường), không đưa vào code / Git.
+  - Chỉ làm trên local; KHÔNG deploy VPS khi người dùng chưa yêu cầu. Test bằng http://127.0.0.1:3000.
+  - Giao diện tiếng Việt, theme sáng theo chuẩn Dashboard ERP.
+
+  Tích hợp Maersk AEMS: đặc tả chính thức ở docs/maersk/, tóm tắt + đối chiếu ở docs/maersk-aems-api.md;
+  cấu hình ở SolutionDepot/3. Hosts/Depot.ApiIntegration/appsettings.json (CarrierIntegrations, chưa có khoá).
+
+  Quy ước đặt tên change (chi tiết: openspec/AGENTS.md):
+  - depot-api-<tinh-nang>: chỉ backend (SolutionDepot/)
+  - depot-fe-<tinh-nang>: chỉ frontend (fontend/)
+  - depot-fullstack-<tinh-nang>: cả backend và frontend
+  - depot-integration-<tinh-nang>: tích hợp hãng tàu / ngân hàng (Depot.ApiIntegration, ShippingIntegrationService)
+  - depot-ops-<tinh-nang>: Docker / VPS / hạ tầng
+  - baseline-<nhom>: ghi đặc tả nền cho hành vi đang có, không đổi code
+
+rules:
+  proposal:
+    - Nêu rõ màn hình / API / bảng dữ liệu bị ảnh hưởng và phần nằm ngoài phạm vi
+    - Nếu cần migration EF Core thì ghi rõ tên migration và có sửa dữ liệu cũ hay không
+  tasks:
+    - Mỗi việc nhỏ, kiểm chứng được (build backend, type-check frontend, test trên giao diện local)
+    - Có bước dọn dữ liệu test sau khi kiểm thử
+    - "Nhóm việc theo phần: Backend (SolutionDepot/), Frontend (fontend/), Kiểm thử"
+
+operations:
+  apply:
+    guidance:
+      - "Dừng Depot.BackendApi trước khi build: dotnet build SolutionDepot/SolutionDepot.sln; frontend: cd fontend && npx tsc --noEmit -p ."
+      - "Migration: dotnet ef migrations add <Ten> --project \"2. Domain/Depot.Data\" --startup-project \"3. Hosts/Depot.BackendApi\" (chạy trong SolutionDepot/), build lại sau khi thêm migration."
+      - "Kiểm thử trên http://127.0.0.1:3000, không deploy VPS."
+      - "Deploy chỉ khi người dùng yêu cầu: build + push image Docker Hub (tag latest + YYYYMMDD) rồi sao lưu và docker compose pull && up -d trên VPS — theo docs/deploy-vps.md."
+  archive:
+    guidance:
+      - "Kiểm tra openspec/specs/ phản ánh đúng hành vi mới; cập nhật docs/quy-trinh-van-hanh-depot.md nếu quy trình đổi."

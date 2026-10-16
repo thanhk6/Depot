@@ -1,0 +1,250 @@
+components:
+    responses:
+        Forbidden:
+            content:
+                application/json:
+                    example:
+                        correlationIdentifier: 0HN749INE7DQL:00000002
+                        detailedErrors: null
+                        errorMessage: User 'osi022' does not have access to the shop 'XYZ'
+                        errorTimestamp: "2024-10-04T08:15:27.230916+00:00"
+                        httpMethod: POST
+                        requestUri: /api/maintenance-orders
+                        status: null
+                        statusCode: 403
+                        statusText: Forbidden
+                    schema:
+                        additionalProperties: {}
+                        description: Default error model used to respond to requests that went in to error. This error model is used for all HTTP code errors instead of individually declaring HTTP responses for errors.
+                        properties:
+                            correlationIdentifier:
+                                description: Correlation identifier, e.g. a UUID
+                                minLength: 1
+                                type: string
+                            detailedErrors:
+                                description: List of detailed errors, e.g. fields that could not pass validation
+                                items:
+                                    additionalProperties: false
+                                    description: Detailed error message of fields that caused errors to occur
+                                    properties:
+                                        errorCode:
+                                            description: 'Standard error code, examples: 7003 – out or range value, 7004 - invalid type'
+                                            format: int32
+                                            nullable: true
+                                            type: integer
+                                        field:
+                                            description: The field that caused the error, e.g. a failed validation.
+                                            nullable: true
+                                            type: string
+                                        message:
+                                            description: The reason and advice for why the error occured.
+                                            minLength: 1
+                                            type: string
+                                        value:
+                                            description: The value that of the field that caused the error.
+                                            nullable: true
+                                            type: string
+                                    required:
+                                        - message
+                                    type: object
+                                nullable: true
+                                type: array
+                            errorMessage:
+                                description: Other error information
+                                maxLength: 200
+                                nullable: true
+                                type: string
+                            errorTimestamp:
+                                description: The date and time (in ISO 8601 UTC format) the error occurred.
+                                format: date-time
+                                type: string
+                            httpMethod:
+                                description: The request method type e.g. GET, POST.
+                                minLength: 1
+                                type: string
+                            requestUri:
+                                description: The request URI as it was sent by the consumer. May not always be available, depending on infrastructure.
+                                nullable: true
+                                type: string
+                            status:
+                                description: The textual representation of the response status.
+                                nullable: true
+                                type: string
+                            statusCode:
+                                description: The HTTP status code e.g. 401
+                                format: int32
+                                readOnly: true
+                                type: integer
+                            statusText:
+                                description: The HTTP status text
+                                minLength: 1
+                                readOnly: true
+                                type: string
+                        required:
+                            - correlationIdentifier
+                            - errorTimestamp
+                            - httpMethod
+                            - statusCode
+                            - statusText
+                        type: object
+            description: <b>Forbidden</b> <br/> The server understood the request, but is refusing to fulfill it.
+        InternalServerError:
+            content:
+                application/json:
+                    example:
+                        correlationIdentifier: 0HN749EUK7OAF:00000004
+                        detailedErrors: null
+                        errorMessage: An unexpected error occurred.
+                        errorTimestamp: "2024-10-04T08:08:41.094686+00:00"
+                        httpMethod: POST
+                        requestUri: /api/maintenance-orders
+                        status: Internal Server Error
+                        statusCode: 500
+                        statusText: Internal Server Error
+                    schema:
+                        $ref: '#/components/responses/Forbidden/content/application~1json/schema'
+            description: <b>Internal Server Error</b> <br/> An unexpected error occurred.
+        ServiceUnavailable:
+            content:
+                application/json:
+                    example:
+                        correlationIdentifier: 0HN6S555O4MA8:00000002
+                        detailedErrors: null
+                        errorMessage: One or more rule validation errors occurred.
+                        errorTimestamp: "2024-09-24T08:02:15+00:00"
+                        httpMethod: GET
+                        requestUri: /api/v1/equipment/MCAU6024920
+                        status: AEMS API unavailable
+                        statusCode: 503
+                        statusText: Service Unavailable
+                    schema:
+                        $ref: '#/components/responses/Forbidden/content/application~1json/schema'
+            description: <b>Service Unavailable</b> <br/> The database server or external system is currently unable to handle the request.
+        Unauthorized:
+            content:
+                application/json:
+                    example:
+                        correlationIdentifier: 0HN749U0FM5K7:00000002
+                        detailedErrors: null
+                        errorMessage: Failed authenticating using the parsed bearer token.
+                        errorTimestamp: "2024-10-04T08:36:40.023753+00:00"
+                        httpMethod: POST
+                        requestUri: /api/maintenance-orders
+                        status: null
+                        statusCode: 401
+                        statusText: Unauthorized
+                    schema:
+                        $ref: '#/components/responses/Forbidden/content/application~1json/schema'
+            description: <b>Unauthorized</b> <br/> The request has not been applied because it lacks valid authentication credentials for the target resource.
+    securitySchemes:
+        Bearer:
+            description: "JWT Authorization header using the Bearer scheme. \n                      Enter 'Bearer' [space] and then your token in the text input below.\n                      Example: 'Bearer 12345abcdef'"
+            in: header
+            name: Authorization
+            type: apiKey
+        ConsumerKey:
+            description: Consumer key used for authorisation to the API
+            in: header
+            name: Consumer-Key
+            type: apiKey
+info:
+    contact:
+        email: AEMS@maersk.com
+        name: AMStrong Team
+        url: https://www.maersk.com/contactus
+    description: Endpoints for managing user details in AEMS.
+    license:
+        name: Maersk 1.0
+        url: https://terms.maersk.com/api-license-terms
+    title: AEMS Identity API
+    version: v1
+openapi: 3.0.1
+paths:
+    /api/identity/user-details:
+        get:
+            description: Gets the basic user details for the signed in user using bearer token.
+            operationId: get-user-details
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            example:
+                                companyName: My Company
+                                emailAddress: kim.jensen@mycompany.com
+                                firstName: Kim
+                                isExternal: true
+                                lastName: Jensen
+                                maintenanceShops:
+                                    - maintenanceShopCode: XYZ
+                                      maintenanceShopName: Aarhus Terminal Shop
+                                roles:
+                                    - Shop
+                                userId: 10
+                                username: xyz-client
+                            schema:
+                                additionalProperties: false
+                                properties:
+                                    companyName:
+                                        nullable: true
+                                        type: string
+                                    emailAddress:
+                                        nullable: true
+                                        type: string
+                                    firstName:
+                                        nullable: true
+                                        type: string
+                                    isExternal:
+                                        type: boolean
+                                    lastName:
+                                        nullable: true
+                                        type: string
+                                    maintenanceShops:
+                                        items:
+                                            additionalProperties: false
+                                            properties:
+                                                maintenanceShopCode:
+                                                    nullable: true
+                                                    type: string
+                                                maintenanceShopName:
+                                                    nullable: true
+                                                    type: string
+                                            type: object
+                                        nullable: true
+                                        type: array
+                                    roles:
+                                        items:
+                                            type: string
+                                        nullable: true
+                                        type: array
+                                    userId:
+                                        format: int32
+                                        type: integer
+                                    username:
+                                        nullable: true
+                                        type: string
+                                type: object
+                    description: <b>OK</b><br/>Authentication succeeded and user details are returned
+                "401":
+                    $ref: '#/components/responses/Unauthorized'
+                "403":
+                    $ref: '#/components/responses/Forbidden'
+                "500":
+                    $ref: '#/components/responses/InternalServerError'
+                "503":
+                    $ref: '#/components/responses/ServiceUnavailable'
+            summary: Get client details
+            tags:
+                - Identity
+security:
+    - ConsumerKey: []
+    - Bearer: []
+servers:
+    - description: CDT environment
+      url: https://api-cdt.maersk.com/aems/identity
+    - description: Pre-Production Environment
+      url: https://api-stage.maersk.com/aems/identity
+    - description: Production Environment
+      url: https://api.maersk.com/aems/identity
+tags:
+    - description: Endpoints for getting user details in AEMS.
+      name: Identity

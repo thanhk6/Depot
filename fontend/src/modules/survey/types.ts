@@ -152,15 +152,6 @@ export interface SurveyPhoto {
   fileSizeKb: number;
 }
 
-export type SurveyType = 
-  | 'GATE_IN'
-  | 'PRE_SURVEY'
-  | 'GATE_OUT'
-  | 'YARD_PERIODIC'
-  | 'POST_REPAIR'
-  | 'ON_HIRE'
-  | 'OFF_HIRE';
-
 export interface SurveyItemRecord {
   id: string;
   surveyNo: string;
@@ -172,8 +163,6 @@ export interface SurveyItemRecord {
   owner: string;
   shippingLine: string;
   isReefer: boolean;
-  isPreSurveyBeforeGateIn?: boolean;
-  surveyType?: SurveyType;
   gateInTime: string;
   surveyDate: string;
   surveyor: string;
@@ -184,7 +173,7 @@ export interface SurveyItemRecord {
   surveyClaimedByStaffId?: number;
   surveyClaimedByName?: string;
   surveyClaimedAt?: string;
-  standard: 'IICL-6' | 'MCIC' | 'MRIC' | 'CARRIER_CUSTOM';
+  standard: string; // mã trong DM Tiêu Chuẩn Giám Định
   standardNotes?: string;
   condition: ContainerConditionGrade;
   
@@ -218,7 +207,7 @@ export interface SurveyItemRecord {
   ventilationCmh?: number;
   
   // AV Grade details
-  qualityGrade?: QualityGradeType;
+  qualityGrade?: QualityGradeType | string; // mã trong DM Hạng (GRADE_A...)
   
   // CL details
   cleaningReason?: CleaningReasonType[];

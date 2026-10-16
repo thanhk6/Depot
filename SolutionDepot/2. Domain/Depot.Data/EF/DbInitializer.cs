@@ -9,7 +9,7 @@ namespace Depot.Data.EF
     /// </summary>
     public static class DbInitializer
     {
-        public static async Task InitializeAsync(DepotDbContext context)
+        public static async Task InitializeAsync(DepotDbContext context, string defaultUserPassword = "123456")
         {
             var migrations = context.Database.GetMigrations();
 
@@ -22,7 +22,7 @@ namespace Depot.Data.EF
                 await context.Database.EnsureCreatedAsync();
             }
 
-            await DbSeeder.SeedAsync(context);
+            await DbSeeder.SeedAsync(context, defaultUserPassword);
         }
     }
 }

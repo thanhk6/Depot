@@ -1,3 +1,4 @@
+
 # 01 — Tổng quan Executive (Dashboard)
 
 Menu: `dashboard` → route `/dashboard` → `fontend/src/modules/dashboard/pages/DashboardPage.tsx`

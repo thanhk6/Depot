@@ -9,8 +9,8 @@ export const WAREHOUSE_INFO = {
   code: 'EMR-MAIN-WH',
   name: 'KHO VẬT TƯ SỬA CHỮA EMR',
   location: 'Khu Xưởng Cơ Khí Sửa Chữa Depot EMR - Bãi Container ICD',
-  managedBy: 'Trần Văn Mạnh (Thủ kho EMR)',
-  contactPhone: '0912.888.999'
+  managedBy: '',
+  contactPhone: ''
 } as const;
 
 export type MaterialGroupCode =

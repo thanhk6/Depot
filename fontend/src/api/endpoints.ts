@@ -6,8 +6,9 @@ export const API_ENDPOINTS = {
   },
   AUTH: {
     LOGIN: '/Users/authenticate',
-    REFRESH_TOKEN: '/auth/refresh-token',
-    ME: '/auth/me',
+    // Backend không cấp refresh token (JWT 8 giờ) — bỏ endpoint /auth/refresh-token trước đây trỏ vào 404.
+    ME: '/Users/me',
+    LOGOUT: '/Users/logout',
   },
   DEPOT_JOBS: {
     BASE: '/DepotJobs',
@@ -21,14 +22,17 @@ export const API_ENDPOINTS = {
     SURVEY_CLAIM: (id: string) => `/DepotJobs/${id}/survey/claim`,
     SURVEY_RELEASE: (id: string, staffId: number) => `/DepotJobs/${id}/survey/release?staffId=${staffId}`,
     ESTIMATE: (id: string) => `/DepotJobs/${id}/estimate`,
-    APPROVE_ESTIMATE: (id: string, approverName = "Hãng Tàu Phê Duyệt") =>
-      `/DepotJobs/${id}/approve-estimate?approverName=${encodeURIComponent(approverName)}`,
+    APPROVE_ESTIMATE: (id: string) => `/DepotJobs/${id}/approve-estimate`,
     REJECT_ESTIMATE: (id: string) => `/DepotJobs/${id}/reject-estimate`,
     QC_COMPLETE: (id: string) => `/DepotJobs/${id}/qc-complete`,
     FORKLIFT_MOVE: (id: string) => `/DepotJobs/${id}/forklift-move`,
+    FORKLIFT_CLAIM: (id: string) => `/DepotJobs/${id}/forklift/claim`,
+    FORKLIFT_START: (id: string, operatorId: string) => `/DepotJobs/${id}/forklift/start?operatorId=${encodeURIComponent(operatorId)}`,
+    FORKLIFT_CANCEL_CLAIM: (id: string, operatorId: string) => `/DepotJobs/${id}/forklift/cancel-claim?operatorId=${encodeURIComponent(operatorId)}`,
     REPAIR_ASSIGN: (id: string) => `/DepotJobs/${id}/repair/assign`,
     REPAIR_START: (id: string) => `/DepotJobs/${id}/repair/start`,
     REPAIR_COMPLETE: (id: string) => `/DepotJobs/${id}/repair/complete`,
+    REPAIR_PHOTOS: (id: string) => `/DepotJobs/${id}/repair/photos`,
     GATE_OUT: (id: string) => `/DepotJobs/${id}/gate-out`,
     PAYMENT: (id: string) => `/depot/jobs/${id}/payment`,
   },
@@ -45,12 +49,15 @@ export const API_ENDPOINTS = {
     SERVICE_TARIFFS: '/MasterData/service-tariffs',
     STORAGE_TARIFFS: '/MasterData/storage-tariffs',
   },
+
   WEBHOOKS: {
     BANK_VIETQR: '/Webhooks/bank-vietqr',
     PAYMENT: '/Webhooks/payment',
   },
   SHIPPING: {
     SYNC: '/shipping/sync',
+    CARRIERS: '/shipping/carriers',
+    LOGS: '/shipping/logs',
   },
   SYSTEM: {
     USERS: '/system/users',

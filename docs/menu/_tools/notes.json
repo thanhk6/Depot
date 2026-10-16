@@ -1,0 +1,274 @@
+{
+ "dashboard": {
+  "purpose": "Trang tổng quan: KPI container trong bãi, luồng trạng thái, số liệu hôm nay.",
+  "progress": "01-dashboard.md"
+ },
+ "workflow": {
+  "purpose": "Sơ đồ vòng đời nghiệp vụ container (Gate-In → … → Gate-Out). Không phải trang riêng: bấm menu sẽ mở modal `BusinessWorkflowModal` (App.tsx `handleSelectTab`), tab đang xem giữ nguyên.",
+  "progress": "02-workflow.md"
+ },
+ "gate": {
+  "purpose": "Tiếp nhận container hạ vỏ rỗng tại cổng: nhập số container (kiểm tra check-digit ISO 6346), loại container (lấy từ DM Loại Container), hãng tàu, nhà xe, tài xế; tạo hồ sơ `depot_jobs` + e-EIR nhập.",
+  "notes": [
+   "Loại container hợp lệ = các dòng đang áp dụng trong catalog `CONTAINER_TYPE` (cột `Name`); backend kiểm tra lại trong `CreateGateInJobAsync`.",
+   "Tab \"2. Biểu Phí Dịch Vụ Cổng\" trong cùng trang hiển thị bảng cước."
+  ],
+  "progress": "03-gate-in.md"
+ },
+ "survey": {
+  "purpose": "Giám định container sau Gate-In theo IICL-6: checklist, hư hỏng, phân hạng, ảnh hiện trường, chỉ định vệ sinh; nộp phiếu chuyển hồ sơ sang `ESTIMATING`.",
+  "notes": [
+   "Ảnh upload thật qua `depotFileApi.upload` (FileServer + bảng `DepotFiles`, gắn `DepotJob`).",
+   "Nhận việc / trả việc giám định (`survey/claim`, `survey/release`) để 2 giám định viên không làm trùng 1 container.",
+   "Các tab danh mục (vị trí, mã hư hỏng, phương án sửa, phân hạng, tiêu chuẩn, biểu phí vệ sinh) trong trang này dùng chung API catalog với nhóm Master Data."
+  ],
+  "progress": "04-survey.md"
+ },
+ "cleaning": {
+  "purpose": "Tổ vệ sinh: hàng đợi container cần vệ sinh (sinh tự động khi giám định chọn vệ sinh), tiếp nhận thủ công, thực hiện từng hạng mục, bàn giao cho khai thác.",
+  "notes": [
+   "Danh sách dịch vụ + đơn giá khi tiếp nhận lấy từ Biểu Phí Vệ Sinh (`CLEANING_TARIFF`), giá theo loại container."
+  ],
+  "progress": "05-cleaning.md"
+ },
+ "operation": {
+  "purpose": "Khai thác Gate-In: lập phiếu dịch vụ (Service Order) cho container — nâng hạ, lưu bãi, vệ sinh, PTI… — tính tiền theo biểu cước thật.",
+  "progress": "06-operation.md"
+ },
+ "payment": {
+  "purpose": "Thu phí dịch vụ Gate-In bằng VietQR / tiền mặt; ngân hàng gọi webhook xác nhận thanh toán.",
+  "notes": [
+   "Webhook ngân hàng: `POST /api/integration/vietqr/webhook` và `POST /api/Webhooks/bank-vietqr` (không do giao diện gọi)."
+  ],
+  "progress": "07-payment.md"
+ },
+ "estimate": {
+  "purpose": "Lập báo giá sửa chữa (Estimate) từ hư hỏng giám định theo mã IICL/CEDEX, gửi hãng tàu duyệt.",
+  "progress": "12-estimate.md"
+ },
+ "approval": {
+  "purpose": "Hãng tàu phê duyệt / từ chối báo giá; duyệt xong hồ sơ chuyển `APPROVED` để mở lệnh sửa chữa.",
+  "notes": [
+   "Trang không tự gọi API: nút Duyệt/Từ chối gọi callback, `App.tsx` gọi `estimateApi.approveEstimate` / `rejectEstimate`."
+  ],
+  "progress": "13-approval.md"
+ },
+ "repair": {
+  "purpose": "Lệnh sửa chữa (Work Order): bắt đầu thi công, cập nhật hạng mục, chụp ảnh sau sửa, hoàn tất chuyển QC.",
+  "notes": [
+   "Ảnh sau sửa lưu thật ngay khi chụp: `POST /api/DepotJobs/{id}/repair/photos` (FileServer + `DepotFiles`, `TableName=RepairOrder`, số hạng mục ghi trong tên file `ITEM-{n}__…`).",
+   "Hạng mục sửa chữa dựng từ hư hỏng giám định thật; tiến độ từng hạng mục/vật tư hiện chưa có bảng backend riêng."
+  ],
+  "progress": "14-repair.md"
+ },
+ "qc": {
+  "purpose": "QC nghiệm thu sau sửa chữa: đạt → `READY_FOR_OUT` (hoặc `CLEANING` nếu còn lệnh vệ sinh), không đạt → quay lại `REPAIRING`.",
+  "progress": "15-qc.md"
+ },
+ "shipping_api": {
+  "purpose": "Truyền kết quả (container đạt QC) sang API hãng tàu; lưu nhật ký truyền trong phiên.",
+  "progress": "16-shipping-api.md"
+ },
+ "container": {
+  "purpose": "Danh sách toàn bộ hồ sơ container, lọc/tìm kiếm, cập nhật trạng thái thủ công.",
+  "noApi": "Danh sách đọc từ dữ liệu `App.tsx` nạp sẵn (`containerApi.getAll`); cập nhật trạng thái đi qua callback của `App.tsx`.",
+  "progress": "02-container-list.md"
+ },
+ "yard_map": {
+  "purpose": "Sơ đồ bãi 2D (Konva): khu, block, vị trí container, xe nâng; di chuyển container giữa các ô.",
+  "notes": [
+   "Chỉ hiển thị dữ liệu `GET /api/yard/overview`; chưa tải xong/không có dữ liệu thì sơ đồ trống."
+  ],
+  "progress": "09-yard-map.md"
+ },
+ "yard_blocks": {
+  "purpose": "Quản lý block bãi: sức chứa, trạng thái bảo trì, cấu hình layout bay/row/tier.",
+  "notes": [
+   "Chính sách xếp bãi theo block chưa có bảng backend — phần này để trống."
+  ],
+  "progress": "10-yard-blocks.md"
+ },
+ "forklift": {
+  "purpose": "Hàng đợi lệnh xe nâng cho tài xế trên tablet: nhận lệnh (khóa container), bắt đầu, xác nhận hạ vị trí.",
+  "notes": [
+   "Tài xế = tài khoản đang đăng nhập; mã xe nâng nhập tay (chưa có danh mục xe nâng ở backend)."
+  ],
+  "progress": "11-forklift.md"
+ },
+ "gate_out": {
+  "purpose": "Tổng quan cổng xuất: container sẵn sàng cấp (`READY_FOR_OUT`), làn cổng, nhật ký xuất.",
+  "notes": [
+   "4 menu Gate-Out dùng chung `GateOutPage`, khác nhau ở tab con (`OVERVIEW` / `READY_LIST` / `GATE_LANE` / `HISTORY`).",
+   "Cấp vỏ gọi thẳng `apiClient.post('/DepotJobs/{id}/gate-out')` trong `GateOutPage`."
+  ],
+  "progress": "17-gate-out.md"
+ },
+ "gate_out_ready": {
+  "purpose": "Danh sách vỏ đạt chuẩn chờ cấp trong bãi.",
+  "progress": "17-gate-out.md"
+ },
+ "gate_out_lane": {
+  "purpose": "Tiếp nhận xe tại làn cổng xuất, chọn vỏ và cấp e-EIR xuất.",
+  "progress": "17-gate-out.md"
+ },
+ "gate_out_history": {
+  "purpose": "Nhật ký container đã Gate-Out và phiếu e-EIR xuất.",
+  "progress": "17-gate-out.md"
+ },
+ "billing": {
+  "purpose": "Công nợ hãng tàu (AR): đồng bộ công nợ từ báo giá/lệnh sửa đã duyệt, xuất hóa đơn, ghi nhận & phân bổ thanh toán, kỳ công nợ, tuổi nợ.",
+  "notes": [
+   "Ngân hàng nhận tiền nhập tay (chưa có danh mục tài khoản ngân hàng ở backend)."
+  ],
+  "progress": "21-billing.md"
+ },
+ "warehouse": {
+  "purpose": "Kho vật tư sửa chữa: tồn kho, phiếu nhập/xuất, thẻ kho; xuất vật tư theo container đang sửa chữa.",
+  "progress": "22-warehouse.md"
+ },
+ "master_data": {
+  "purpose": "Trang tổng hợp mọi danh mục Master Data; mặc định mở DM Loại Container.",
+  "progress": "23-master-data.md"
+ },
+ "departments": {
+  "purpose": "Danh mục phòng ban Depot (catalog `DEPARTMENT`).",
+  "progress": "23-master-data.md"
+ },
+ "tariff_lolo": {
+  "purpose": "Biểu cước nâng hạ (bảng `ServiceTariffs`): giá theo kích cỡ, VAT, phân loại dịch vụ (nâng hạ vỏ rỗng/có hàng, đảo chuyển, phụ phí đêm, PTI, hải quan, cân).",
+  "notes": [
+   "`Tạm ngưng` = `IsActive=false` (vẫn thấy ở màn quản trị), `Xóa` = `IsDeleted=true`.",
+   "Phụ phí ca đêm của Máy tính cước tìm theo `ApplicableShift = NIGHT_SURCHARGE` (tự suy từ phân loại)."
+  ],
+  "progress": [
+   "23-master-data.md",
+   "../frontend-tariff-catalog-split.md"
+  ]
+ },
+ "tariff_storage": {
+  "purpose": "Biểu cước lưu bãi lũy tiến theo ngày (bảng `StorageTariffRules` + `StorageTariffTiers`).",
+  "progress": [
+   "23-master-data.md",
+   "../frontend-tariff-catalog-split.md"
+  ]
+ },
+ "tariff_calculator": {
+  "purpose": "Máy tính cước nâng hạ + lưu bãi dựa trên 2 biểu cước trên.",
+  "progress": "23-master-data.md"
+ },
+ "cleaning_tariffs": {
+  "purpose": "Biểu phí vệ sinh container (catalog `CLEANING_TARIFF`): đơn giá theo loại container, hóa chất, thời gian.",
+  "progress": "23-master-data.md"
+ },
+ "container_types": {
+  "purpose": "DM Loại Container ISO 6346 (catalog `CONTAINER_TYPE`): `Code` = mã ISO (22G1…), `Name` = mã loại (20GP, 40HC…), thông số kích thước/tải trọng trong `JsonData`.",
+  "notes": [
+   "Gate-In chỉ nhận các mã loại đang áp dụng ở danh mục này."
+  ],
+  "progress": "23-master-data.md"
+ },
+ "damage_locations": {
+  "purpose": "Danh mục vị trí/cấu kiện container theo IICL-6 (catalog `DAMAGE_LOCATION`).",
+  "progress": "23-master-data.md"
+ },
+ "damage_codes": {
+  "purpose": "Danh mục mã hư hỏng IICL (catalog `DAMAGE_CODE`).",
+  "progress": "23-master-data.md"
+ },
+ "repair_codes": {
+  "purpose": "Danh mục phương án sửa chữa + đơn giá/giờ công (catalog `REPAIR_CODE`).",
+  "progress": "23-master-data.md"
+ },
+ "grades": {
+  "purpose": "Danh mục phân hạng vỏ (catalog `GRADE`).",
+  "progress": "23-master-data.md"
+ },
+ "standards": {
+  "purpose": "Danh mục tiêu chuẩn giám định theo hãng tàu/loại container (catalog `INSPECTION_STANDARD`).",
+  "progress": "23-master-data.md"
+ },
+ "customer_list": {
+  "purpose": "Khách hàng vận tải / forwarder (bảng `CustomerCompanies`) kèm tài khoản cổng khách hàng, tài xế, phương tiện, booking.",
+  "progress": "33-customer-list.md"
+ },
+ "customer_classifications": {
+  "purpose": "Danh mục phân loại khách hàng (catalog `CUSTOMER_CLASSIFICATION`).",
+  "progress": "34-customer-classifications.md"
+ },
+ "shipping_lines": {
+  "purpose": "Danh mục hãng tàu (bảng `ShippingLines`).",
+  "progress": "35-shipping-lines.md"
+ },
+ "notifications": {
+  "purpose": "Dashboard thông báo: KPI gửi, lịch sử gần đây.",
+  "progress": "41-notifications.md"
+ },
+ "notifications_send": {
+  "purpose": "Soạn & gửi thông báo mới theo mẫu tin tới nhân viên/khách hàng.",
+  "progress": "41-notifications.md"
+ },
+ "notifications_employees": {
+  "purpose": "Danh sách nhân viên nhận thông báo (đọc từ `Users`).",
+  "progress": "41-notifications.md"
+ },
+ "notifications_customers": {
+  "purpose": "Danh sách khách hàng nhận thông báo (đọc từ `CustomerCompanies`).",
+  "progress": "41-notifications.md"
+ },
+ "notifications_templates": {
+  "purpose": "Thư viện mẫu tin thông báo (CRUD thật).",
+  "progress": "41-notifications.md"
+ },
+ "notifications_history": {
+  "purpose": "Lịch sử gửi toàn hệ thống.",
+  "progress": "41-notifications.md"
+ },
+ "notifications_queue": {
+  "purpose": "Hàng đợi gửi: gửi lại / hủy bản ghi đang chờ.",
+  "progress": "41-notifications.md"
+ },
+ "zalo_overview": {
+  "purpose": "Tổng quan Zalo OA — **demo/simulator**, chưa tích hợp Zalo OA thật (quyết định có chủ đích).",
+  "progress": "36-zalo-overview.md"
+ },
+ "zalo_simulator": {
+  "purpose": "Mô phỏng khung chat Zalo — **demo**, không gọi backend.",
+  "progress": "36-zalo-overview.md"
+ },
+ "zalo_templates": {
+  "purpose": "Mẫu tin ZNS & OA — dùng chung thư viện mẫu tin thông báo.",
+  "progress": "36-zalo-overview.md"
+ },
+ "zalo_settings": {
+  "purpose": "Cấu hình Zalo OA & token — **demo**, chỉ giữ trong bộ nhớ phiên (biến trong `notificationService`), mất khi tải lại trang; không có backend.",
+  "progress": "36-zalo-overview.md"
+ },
+ "zalo_logs": {
+  "purpose": "Nhật ký webhook & API gửi tin.",
+  "progress": "36-zalo-overview.md"
+ },
+ "report_staff_realtime": {
+  "purpose": "Công việc từng người theo thời gian thực, dựng từ dữ liệu thật (giám định viên, thợ, tổ vệ sinh, tài xế…).",
+  "progress": "48-report.md"
+ },
+ "report": {
+  "purpose": "Tổng quan & thông lượng bãi (throughput, sức chứa block…).",
+  "progress": "48-report.md"
+ },
+ "report_emr": {
+  "purpose": "Năng suất sửa chữa EMR, cơ cấu hư hỏng IICL.",
+  "progress": "48-report.md"
+ },
+ "report_dwell_time": {
+  "purpose": "Thời gian lưu bãi của container.",
+  "progress": "48-report.md"
+ },
+ "report_revenue": {
+  "purpose": "Doanh thu theo nhóm dịch vụ và biểu cước.",
+  "progress": "48-report.md"
+ },
+ "system": {
+  "purpose": "Phân quyền RBAC: người dùng, vai trò, ma trận quyền, nhật ký kiểm toán, chính sách bảo mật.",
+  "progress": "53-system.md"
+ }
+}

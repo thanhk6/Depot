@@ -1,103 +1,143 @@
-# Đồng bộ giao diện toàn app theo mẫu "THÔNG BÁO & ZALO GATEWAY"
+# Đồng bộ giao diện toàn app theo chuẩn "Dashboard ERP Tổng Quan"
 
-Theo yêu cầu người dùng ngày 2026-08-24: lấy đúng phong cách banner của
-`fontend/src/modules/notifications/components/NotificationHeader.tsx` (màn "THÔNG BÁO & ZALO GATEWAY")
-làm chuẩn, áp dụng cho toàn bộ banner đầu trang của các màn khác trong app. Người dùng đã xác nhận 2 quyết
-định quan trọng — **đọc kỹ trước khi sửa tiếp**:
+> **HOÀN TẤT 2026-09-07.** Toàn bộ ~40 màn thật (mọi thứ App.tsx render được qua Sidebar) đã chuyển từ
+> theme tối `slate-900/950` sang theme sáng theo chuẩn `dashboard/pages/DashboardPage.tsx`. Chi tiết quá
+> trình + phát hiện quan trọng ở cuối file.
 
-1. **Cách làm:** tự sửa tuần tự từng đợt qua nhiều lượt hội thoại (không dùng Workflow đa-agent).
-2. **Bảng màu chuẩn:** giữ nguyên **y hệt** 2 tầng màu của trang tham chiếu — banner trên cùng nền
-   **trắng** (`bg-white`) với icon logo trong khối gradient **xanh dương → sky → chàm**
-   (`bg-gradient-to-tr from-blue-600 via-sky-600 to-indigo-600`), dải sub-tab ngay bên dưới đổi hẳn sang
-   nền **tối** (`slate-800/900`). Kể cả 1 lỗi tương phản nhỏ có sẵn trong trang tham chiếu (dải tab dùng
-   chữ sáng `text-slate-400`/hover `bg-slate-800/40` nhưng nằm ngay dưới banner trắng, và dòng trạng thái
-   kết nối dùng `text-emerald-400` hơi khó đọc trên nền `bg-slate-50` gần trắng) — **không tự ý sửa các
-   lỗi này**, chỉ nhân bản đúng y hệt sang các màn khác.
+## Chuẩn tham chiếu (rút ra trực tiếp từ `DashboardPage.tsx`)
 
-## Khuôn mẫu chuẩn (copy đúng cấu trúc này, chỉ đổi icon/tiêu đề/nút hành động/danh sách tab riêng từng màn)
+### Banner đầu trang
 
 ```tsx
-<div className="bg-white border-b border-slate-200 -mt-3 -mx-3 sm:-mt-4 sm:-mx-4 md:-mt-6 md:-mx-6 mb-6 px-4 sm:px-6 pt-5 pb-0 shadow-sm">
-  {/* Top Banner (nền trắng) */}
-  <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 pb-4 border-b border-slate-200">
-    <div className="flex items-center gap-3">
-      <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-600 via-sky-600 to-indigo-600 p-0.5 flex items-center justify-center shadow-lg shadow-blue-500/20">
-        <div className="w-full h-full bg-white rounded-[14px] flex items-center justify-center">
-          <IconRiêngCủaMàn className="w-6 h-6 text-sky-400" />
-        </div>
-      </div>
-      <div>
-        <div className="flex items-center gap-2">
-          <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">TIÊU ĐỀ MÀN</h1>
-          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-sky-50 text-sky-700 border border-sky-200">Badge phụ</span>
-        </div>
-        <p className="text-xs text-slate-500 mt-0.5">Mô tả ngắn chức năng màn</p>
-      </div>
+<div className="p-6 bg-gradient-to-r from-blue-50 via-white to-indigo-50 border border-blue-200 rounded-3xl shadow-sm relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4">
+  <div className="space-y-2 relative z-10">
+    <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-700 rounded-full border border-blue-200 text-xs font-bold font-mono">
+      <IconRiêngCủaMàn className="w-3.5 h-3.5" />
+      <span>NHÃN PHỤ VIẾT HOA</span>
     </div>
-    {/* Nút hành động / trạng thái riêng của màn — giữ nguyên màu nghiệp vụ (emerald=thành công,
-        rose=nguy hiểm, amber=cảnh báo...), chỉ đổi khung bố cục cho khớp */}
-    <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-between lg:justify-end">
-      ...
-    </div>
+    <h2 className="text-2xl font-black text-slate-900 tracking-tight">TIÊU ĐỀ MÀN</h2>
+    <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">Mô tả ngắn chức năng màn.</p>
   </div>
-
-  {/* Navigation Sub-Tabs (nền tối) */}
-  <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-2 mt-1">
-    {tabs.map((tab) => {
-      const isActive = ...;
-      return (
-        <button className={`flex items-center gap-2 px-3.5 py-2.5 rounded-t-xl text-xs font-bold transition whitespace-nowrap cursor-pointer border-b-2 ${
-          isActive ? 'bg-slate-800/80 text-white border-blue-500 shadow-sm' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border-transparent'
-        }`}>
-          {tab.icon}<span>{tab.label}</span>
-          {tab.badge && (
-            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold ${
-              isActive ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300 border border-slate-700'
-            }`}>{tab.badge}</span>
-          )}
-        </button>
-      );
-    })}
+  <div className="flex items-center gap-3 relative z-10">
+    <button className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-2xl shadow-sm transition flex items-center gap-2 cursor-pointer">...</button>
+    <button className="px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-2xl border border-slate-200 shadow-sm transition flex items-center gap-2 cursor-pointer">...</button>
   </div>
 </div>
 ```
 
-Ghi chú: `-mt-3 -mx-3 sm:-mt-4 sm:-mx-4 md:-mt-6 md:-mx-6` là margin âm để banner tràn sát mép layout cha
-(bù lại padding của khung `<main>` bên ngoài) — chỉ copy đúng nếu component khác cũng nằm trực tiếp trong
-cùng 1 kiểu layout cha như `NotificationModule.tsx`/`ZaloModule.tsx` (`<div className="space-y-6">` phẳng,
-không lồng thêm padding riêng). Nếu màn đích có layout cha khác, kiểm tra lại margin âm cho khớp trước khi
-copy y nguyên.
+Áp dụng đầy đủ cho các màn làm **tay** (Gate-In, Gate-Out, Survey, Operation, Notification/Zalo,
+Warehouse). Các màn làm bằng **bulk sed** (xem phương pháp bên dưới) giữ nguyên bố cục banner gốc của
+từng màn, chỉ đổi màu nền/chữ/viền — không ép về đúng khuôn JSX này, vì khối lượng quá lớn để viết lại
+tay từng banner. Kết quả vẫn đạt đúng mục tiêu "toàn bộ nội dung nền sáng", chỉ khác đôi chỗ về bố cục
+banner chi tiết so với khuôn mẫu ở trên.
 
-## Tiến độ (cập nhật mỗi lần "làm tiếp")
+### Nội dung bên trong
 
-Ký hiệu: ✅ Xong · 🔜 Chưa làm
+- Panel: `bg-slate-900/950` → `bg-white`/`bg-slate-50`; border: `border-slate-800/700` → `border-slate-200`
+- Chữ: `text-white` → `text-slate-900` **CHỈ trên nền sáng** — KHÔNG đổi trên nút nền màu bão hòa
+  (`bg-blue-600`, gradient...)
+- Badge 3 lớp: `bg-{color}-950 text-{color}-300 border-{color}-800` → `bg-{color}-50 text-{color}-700
+  border-{color}-200`
+- Icon giữ nguyên độ đậm `-400/-500`; chữ số liệu chính tăng từ `-400` lên `-600/-700`
+- **2 ngoại lệ giữ tối ở MỌI màn:** backdrop modal (`bg-slate-900/70 backdrop-blur-sm`) và overlay/badge
+  nằm trên ảnh chụp thật (`bg-black/70`, `bg-slate-950/80`) — không đổi theo theme sáng.
+- **Sidebar chính** (`components/layout/Sidebar.tsx`, nền `#0B2A43` xanh navy đậm) là **ngoại lệ cố ý**,
+  không thuộc phạm vi dự án này — đây là thanh điều hướng thương hiệu cố định, thiết kế "sidebar tối +
+  nội dung sáng" là chủ đích, không phải tàn dư theme cũ.
 
-| # | Component / file | Trạng thái | Ghi chú |
+## Phương pháp (2 giai đoạn)
+
+**Giai đoạn 1 (Gate-In, Gate-Out, Notification/Zalo banner, Warehouse banner, Survey/Operation banner):**
+sửa tay từng khối JSX bằng `Edit`, viết lại đúng khuôn banner chuẩn ở trên. Phù hợp khi cần bố cục banner
+đẹp, nhất quán tuyệt đối — nhưng chậm, không khả thi cho ~120 file còn lại.
+
+**Giai đoạn 2 (toàn bộ phần còn lại — Warehouse content, Customer, Master Data, System, Billing, Report,
+Cleaning, Payment, Container, Yard, Forklift, Estimate, Repair, QC, Shipping API, Notification pages con,
+Zalo pages con):** dùng script bulk `sed` (`light-theme-convert.sh`, xem quy tắc dưới) áp cho từng thư
+mục module, sau đó `tsc --noEmit` + `grep` quét lại để bắt lỗi, sửa tay các trường hợp sót.
+
+### Quy tắc sed (rút ra qua nhiều lần vấp lỗi thật, xem lịch sử bug bên dưới)
+
+```
+KEEP_WHITE = cursor-pointer | bg-gradient | bg-(ACCENT_COLOR)-[6-9]00   # ACCENT_COLOR KHÔNG gồm slate/gray/zinc/neutral/stone!
+
+1. Trên dòng có bg-slate-900|950  → LUÔN đổi text-white thành text-slate-900 (bất kể có cursor-pointer)
+2. Trên các dòng còn lại          → chỉ đổi text-white thành text-slate-900 nếu KHÔNG khớp KEEP_WHITE
+3. bg-slate-900 → bg-white ; bg-slate-950 → bg-slate-50 ; bg-slate-800/700 → bg-slate-100/200
+4. border-slate-800/700 → border-slate-200 ; divide-slate-800 → divide-slate-200
+5. text-slate-300 → text-slate-700 ; text-slate-400 → text-slate-500 ; text-slate-200 → text-slate-700
+6. Badge màu (không phải slate): -950→-50, -900→-100, -300→-700, -400→-600 (giữ nguyên tên màu)
+7. shadow-{màu}-nnn (glow tối) → xoá hẳn
+```
+
+**Sau MỖI module bắt buộc:**
+1. `cd fontend && npx tsc --noEmit` — phải 0 lỗi.
+2. `grep` quét lại `bg-white.*text-white|text-white.*bg-white` (và biến thể `bg-slate-50`) — bắt các ô
+   `<select>`/input có `cursor-pointer` mà KEEP_WHITE lỡ giữ nhầm `text-white` trên nền đã sáng (bug lặp
+   lại 3 lần: `StaffRealtimeReportTab.tsx`, `MoveContainerModal.tsx`/`ForkliftDispatchModal.tsx`,
+   `StockTransactionsTab.tsx`/`StockBalanceTab.tsx` — luôn là `<select>` có class
+   `bg-white border border-slate-200 rounded-xl ... cursor-pointer` bị hiểu nhầm là nút solid).
+3. `grep` quét lại toàn bộ token tối còn sót (`bg-slate-900|950|800`, `border-slate-800|700`) — vá thêm
+   nếu sed bỏ sót biến thể lạ.
+
+## Phát hiện quan trọng: 1 cây thư mục lớn là DEAD CODE, đã loại khỏi phạm vi
+
+Khi quét lần cuối `src/components/`, phát hiện **`src/components/tabs/*` (18 file) + toàn bộ
+`src/features/*` (16 file `index.ts` chỉ re-export từ `components/tabs/`)** hoàn toàn KHÔNG được
+`App.tsx` import — đây là 1 bản triển khai cũ/song song, đã bị thay thế hoàn toàn bởi `src/modules/*`
+nhưng chưa từng bị xoá. Đã xác nhận qua `grep` tìm import trong `App.tsx` và toàn bộ `src/modules/`,
+không có bất kỳ tham chiếu nào. **Không đụng vào các file này** — chuyển màu cho code không ai nhìn thấy
+là lãng phí công sức, không mang lại giá trị gì cho người dùng.
+
+Cùng nhóm "orphaned, không đổi màu" (đã xác nhận qua grep, không ai import): `components/Sidebar.tsx`
+(bản trùng tên với `components/layout/Sidebar.tsx` — file `layout/` mới là bản thật đang chạy),
+`AccessDeniedScreen.tsx`, `RoleBanner.tsx` (đã ghi nhận từ trước, xem `project-backend-audit`),
+`Button/Button.tsx`, `Card/Card.tsx`, `Modal/Modal.tsx` (bản gốc, khác `common/Modal/Modal.tsx`),
+`common/FileUpload/FileUpload.tsx`, `HeaderNavbar.tsx`, `ToolbarSubheader.tsx`, `JobLifecycleBar.tsx`,
+`layout/UserMenu.tsx`, `layout/Breadcrumb.tsx`, `common/Drawer/Drawer.tsx`, `common/EmptyState/EmptyState.tsx`.
+
+**2 component chung THẬT SỰ có dùng** (đã kiểm tra qua `App.tsx`/`src/modules` import): `layout/Sidebar.tsx`
+(cố ý giữ tối, xem trên), `LoginScreen.tsx` + `UserAccountMenu.tsx` (đã sạch, không có token tối thật —
+chỉ vài icon `-400` hợp lệ), `common/WorkflowDiagram/GateInSurveyWorkflowDiagram.tsx` (dùng trong
+Dashboard, đã sạch), `common/ImageViewer/ImageViewer.tsx` (dùng trong `ContainerDetailPage.tsx` — **cố ý
+giữ chrome tối** vì đây là lightbox xem ảnh, cùng quy tắc "overlay trên ảnh thật giữ tối"),
+`common/DataTable/DataTable.tsx` (dùng trong `ContainerListPage.tsx`, đã sạch).
+
+## Bảng tiến độ cuối cùng — 100% các màn thật đã xong
+
+| Nhóm | Màn | Phương pháp | Ghi chú |
 |---|---|---|---|
-| 0 | `notifications/components/NotificationHeader.tsx` | ✅ | Đây là trang **chuẩn tham chiếu**, không cần đổi. |
-| 1 | ~~`zalo/components/ZaloHeader.tsx`~~ | ✅ | Đã đổi màu 2026-08-24, sau đó **gộp hẳn vào `NotificationHeader.tsx`** cùng ngày theo yêu cầu người dùng (2 màn Zalo Gateway trùng lặp) — file đã bị xoá, không còn tồn tại. Xem `docs/frontend-zalo-notifications-merge.md`. |
-| 2 | `warehouse/components/WarehouseHeader.tsx` | ✅ | Đã đổi 2026-08-24. Giữ nguyên 3 nút hành động màu nghiệp vụ (emerald/amber/sky). |
-| 3 | `gate/pages/GateInPage.tsx` (banner nội tuyến, không phải component Header riêng) | 🔜 | Banner + dải sub-tab viết thẳng trong file trang (không tách Header riêng như các màn khác) — cần đọc kỹ trước khi tách sửa. |
-| 4 | `gate_out/pages/GateOutPage.tsx` | 🔜 | |
-| 5 | `survey/pages/SurveyModulePage.tsx` | ✅ | Đã đổi 2026-08-26. Banner nội tuyến (không tách Header riêng, giống Gate-In). Giữ nguyên 12 tab + badge và nút "+ Tạo Mới Giám Định Đầy Đủ" (amber). |
-| 6 | `cleaning/pages/CleaningModulePage.tsx` | 🔜 | |
-| 7 | `operation/pages/OperationPage.tsx` | ✅ | Đã đổi 2026-08-27 — làm luôn TOÀN BỘ nội dung (không chỉ banner) sang nền trắng theo yêu cầu người dùng "giống Giám Định", cùng phạm vi với dự án nền trắng riêng ở Survey. Đổi cả 5 component con: `GateInQueueTable.tsx`, `QuickQrModal.tsx`, `ServiceOrderListTable.tsx`, `ServiceOrderDetailModal.tsx`, `ServiceOrderFormModal.tsx`. |
-| 8 | `payment/pages/PaymentPage.tsx` | 🔜 | |
-| 9 | `container/pages/ContainerListPage.tsx` | 🔜 | |
-| 10 | `yard/pages/YardMapPage.tsx` (`yard_map`) + `yard/pages/YardBlocksPage.tsx` (`yard_blocks`) | 🔜 | 2 file riêng biệt, sửa cả 2. |
-| 11 | `forklift/pages/ForkliftPage.tsx` | 🔜 | |
-| 12 | `estimate/pages/EstimatePage.tsx` | 🔜 | |
-| 13 | `approval/pages/ApprovalPage.tsx` | 🔜 | |
-| 14 | `repair/pages/RepairPage.tsx` | 🔜 | |
-| 15 | `qc/pages/QCPage.tsx` | 🔜 | |
-| 16 | `shipping_api/pages/ShippingApiPage.tsx` | 🔜 | |
-| 17 | `billing/pages/BillingPage.tsx` | 🔜 | |
-| 18 | `report/pages/ReportPage.tsx` | 🔜 | |
-| 19 | `customer/pages/CustomerPage.tsx` | 🔜 | |
-| 20 | `masterdata/pages/MasterDataPage.tsx` | 🔜 | Dùng chung cho 10 tab con Master Data. |
-| 21 | `system/pages/SystemPage.tsx` | 🔜 | |
-| 22 | `dashboard/pages/DashboardPage.tsx` | 🔜 | |
+| — | Dashboard | Chuẩn gốc | Không đổi |
+| Thông Báo/Zalo | Dashboard, 6 tab Thông Báo con, 5 trang Zalo, `NotificationHeader` | Tay (banner) + sed (nội dung) | Phát hiện: chỉ banner + Dashboard tab đã sáng sẵn, 15 trang con còn lại vẫn tối — đã sed xong toàn bộ |
+| Warehouse | Header + 5 tab + ~19 modal (24 file) | Tay (banner) + sed (24 file nội dung) | Module lớn thứ 2, đã xong trọn vẹn |
+| Survey | 13 file | Đã xong từ dự án trước (`project-survey-full-light-theme`) | Chỉ làm lại banner lần này |
+| Operation | 6 file | Đã xong từ dự án trước | Chỉ làm lại banner lần này |
+| Gate-In | 1 file (1795 dòng) | Tay hoàn toàn | Banner + 5 sub-tab + 2 modal |
+| Gate-Out | 3 file (~1600 dòng) | Tay hoàn toàn | Banner + 4 tab + 2 modal, giữ nguyên "chứng từ in ấn" nền trắng gốc |
+| Cleaning | 5 file | Sed | |
+| Payment | 1 file | Sed | |
+| Container | 2 file | Sed | |
+| Yard | 15 file | Sed | Canvas Konva (`YardCanvasKonva.tsx`) dùng `fill` hex riêng, không phải Tailwind — giữ nguyên nền tối cố ý cho hiệu ứng bản đồ, ngoài phạm vi sed |
+| Forklift | 5 file | Sed | |
+| Estimate | 5 file | Sed | |
+| Approval | 1 file | Không cần đổi | Đã sáng sẵn từ trước |
+| Repair | 7 file | Sed | 2 modal ảnh (`CaptureAfterPhotoModal`, `PhotoCompareModal`) giữ nguyên overlay tối trên ảnh |
+| QC | 4 file | Sed | |
+| Shipping API | 2 file | Sed | |
+| Billing | 12 file | Sed | |
+| Report | 3 file | Sed | |
+| Customer | 27 file | Sed | Module lớn nhất (1175 chỗ ban đầu) |
+| Master Data | 9 file | Sed | 5 file khác (Damage/Grade/Standard/RepairCode Master) đã sáng sẵn từ dự án Survey |
+| System | 7 file | Sed | |
 
-**Cách tiếp tục ở lượt sau:** mở file này, tìm dòng 🔜 đầu tiên, đọc file component tương ứng, áp khuôn
-mẫu ở trên (giữ nguyên icon/tiêu đề/nút hành động/danh sách tab riêng của màn đó), chạy `tsc --noEmit` xác
-nhận 0 lỗi, rồi đánh dấu ✅ + ghi chú ngắn gọn tương tự các dòng đã xong.
+`tsc --noEmit` toàn dự án: **0 lỗi** sau khi hoàn tất tất cả các module trên.
+
+## Nếu cần làm tiếp trong tương lai
+
+Không còn màn thật nào cần đổi. Nếu muốn nâng cấp thêm:
+1. Đưa banner của các màn làm bằng sed (Cleaning, Payment, Yard...) về đúng khuôn JSX chuẩn Dashboard ở
+   đầu file này (hiện chúng chỉ đổi màu, chưa đổi bố cục banner) — việc này KHÔNG bắt buộc, chỉ để đồng
+   bộ tuyệt đối 100% bố cục.
+2. Nếu người dùng xác nhận `src/components/tabs/*` + `src/features/*` thật sự không cần giữ lại nữa, có
+   thể xoá hẳn (đã xác nhận orphaned qua grep, nhưng KHÔNG tự ý xoá khi chưa hỏi — xem quy tắc an toàn
+   chung của phiên làm việc).

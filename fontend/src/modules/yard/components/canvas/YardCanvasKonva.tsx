@@ -168,7 +168,7 @@ export const YardCanvasKonva: React.FC<YardCanvasKonvaProps> = ({
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-[650px] lg:h-[750px] bg-[#0b1120] rounded-3xl overflow-hidden border border-slate-800 shadow-2xl cursor-grab active:cursor-grabbing select-none"
+      className="relative w-full h-[650px] lg:h-[750px] bg-[#0b1120] rounded-3xl overflow-hidden border border-slate-200 shadow-2xl cursor-grab active:cursor-grabbing select-none"
     >
       <Stage
         ref={stageRef}

@@ -8,8 +8,6 @@ import {
   Trash2,
   CheckCircle2,
   XCircle,
-  DollarSign,
-  Clock,
   Hammer,
   AlertTriangle
 } from 'lucide-react';
@@ -41,9 +39,9 @@ export const RepairCodeMaster: React.FC<RepairCodeMasterProps> = ({
   const [vietnameseName, setVietnameseName] = useState('');
   const [repairType, setRepairType] = useState<any>('PATCH');
   const [description, setDescription] = useState('');
-  const [labourRate, setLabourRate] = useState('250000');
-  const [labourHours, setLabourHours] = useState('1.5');
-  const [materialEstimatedCost, setMaterialEstimatedCost] = useState('450000');
+  const [labourRate, setLabourRate] = useState('');
+  const [labourHours, setLabourHours] = useState('');
+  const [materialEstimatedCost, setMaterialEstimatedCost] = useState('');
 
   const filtered = repairCodes.filter((item) => {
     const matchesSearch =
@@ -75,9 +73,9 @@ export const RepairCodeMaster: React.FC<RepairCodeMasterProps> = ({
       setVietnameseName('');
       setRepairType('PATCH');
       setDescription('');
-      setLabourRate('250000');
-      setLabourHours('1.0');
-      setMaterialEstimatedCost('300000');
+      setLabourRate('');
+      setLabourHours('');
+      setMaterialEstimatedCost('');
     }
     setShowModal(true);
   };

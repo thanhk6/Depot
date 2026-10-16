@@ -375,11 +375,35 @@ namespace Depot.Data.Migrations
                     b.Property<string>("DeletedBy")
                         .HasColumnType("text");
 
+                    b.Property<string>("ForkliftAssignedVehicleCode")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime?>("ForkliftClaimedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ForkliftClaimedByOperatorId")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("ForkliftClaimedByOperatorName")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<DateTime?>("ForkliftStartedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("GateInBookingNo")
+                        .HasColumnType("text");
+
+                    b.Property<string>("GateInCustomsSealNo")
                         .HasColumnType("text");
 
                     b.Property<DateTime>("GateInDate")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("GateInDriverLicense")
+                        .HasColumnType("text");
 
                     b.Property<string>("GateInDriverName")
                         .HasColumnType("text");
@@ -491,6 +515,10 @@ namespace Depot.Data.Migrations
 
                     b.HasIndex("Status");
 
+                    b.HasIndex(new[] { "ContainerNo" }, "UX_depot_jobs_ContainerNo_Active")
+                        .IsUnique()
+                        .HasFilter("\"Status\" <> 'GATE_OUT' AND \"IsDeleted\" = false");
+
                     b.ToTable("depot_jobs", (string)null);
                 });
 
@@ -502,10 +530,38 @@ namespace Depot.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("ApprovalChannel")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ApprovalNotes")
+                        .HasColumnType("text");
+
+                    b.Property<decimal?>("ApprovedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<DateTime?>("ApprovedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("ApprovedBy")
+                        .HasColumnType("text");
+
+                    b.Property<string>("CarrierApproverName")
+                        .HasColumnType("text");
+
+                    b.Property<string>("CarrierAuthCode")
+                        .HasColumnType("text");
+
+                    b.Property<string>("CarrierWorkOrderNo")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Cause")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("ConfirmedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ConfirmedBy")
                         .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
@@ -535,6 +591,9 @@ namespace Depot.Data.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<string>("InspectionPhotoUrlsJson")
+                        .HasColumnType("text");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
@@ -543,17 +602,57 @@ namespace Depot.Data.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
+                    b.Property<decimal>("LaborRate")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<DateTime?>("LastModifiedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("LastModifiedBy")
                         .HasColumnType("text");
 
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("OrdinaryHours")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("Ot1Hours")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("Ot2Hours")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("Ot3Hours")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("PreparationHours")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("RepairMode")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ShopCode")
+                        .HasColumnType("text");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("SurveyReference")
+                        .HasColumnType("text");
+
                     b.Property<decimal>("TotalLaborCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("TotalManHours")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
@@ -564,6 +663,9 @@ namespace Depot.Data.Migrations
                     b.Property<decimal>("TotalTax")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("VendorRefNo")
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
@@ -594,6 +696,12 @@ namespace Depot.Data.Migrations
                     b.Property<string>("CreatedBy")
                         .HasColumnType("text");
 
+                    b.Property<string>("DamageCode")
+                        .HasColumnType("text");
+
+                    b.Property<string>("DamageName")
+                        .HasColumnType("text");
+
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -616,13 +724,38 @@ namespace Depot.Data.Migrations
                     b.Property<string>("LastModifiedBy")
                         .HasColumnType("text");
 
+                    b.Property<string>("LocationCode")
+                        .HasColumnType("text");
+
+                    b.Property<string>("LocationName")
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("ManHoursPerPiece")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<decimal>("Quantity")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<string>("RepairCode")
+                        .HasColumnType("text");
+
+                    b.Property<string>("RepairMethod")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Tpi")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Unit")
+                        .HasColumnType("text");
+
                     b.Property<decimal>("UnitPrice")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("VatPercent")
+                        .HasColumnType("numeric");
 
                     b.HasKey("Id");
 
@@ -772,6 +905,14 @@ namespace Depot.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("ActionRequired")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("CargoStatus")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<string>("CleaningMethod")
                         .HasColumnType("text");
 
@@ -781,15 +922,26 @@ namespace Depot.Data.Migrations
                     b.Property<string>("CleaningRemarks")
                         .HasColumnType("text");
 
+                    b.Property<int?>("CompressorHours")
+                        .HasColumnType("integer");
+
                     b.Property<string>("ConditionRating")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<string>("ContainerTypeName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("CreatedBy")
                         .HasColumnType("text");
+
+                    b.Property<string>("CscPlateNo")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
@@ -799,6 +951,13 @@ namespace Depot.Data.Migrations
 
                     b.Property<long>("DepotJobId")
                         .HasColumnType("bigint");
+
+                    b.Property<string>("FloorType")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int?>("HumidityPercent")
+                        .HasColumnType("integer");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
@@ -814,11 +973,60 @@ namespace Depot.Data.Migrations
                     b.Property<string>("LastModifiedBy")
                         .HasColumnType("text");
 
+                    b.Property<string>("ManufactureMonthYear")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Material")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int?>("MaxGrossWeightKg")
+                        .HasColumnType("integer");
+
                     b.Property<string>("OverallNotes")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Owner")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("PtiStatus")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("QualityGrade")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("ReeferBrand")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("ReeferModel")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<int?>("ReeferSetTemperatureC")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Shift")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Standard")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("StandardNotes")
                         .HasColumnType("text");
 
                     b.Property<DateTime>("SurveyDate")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("SurveyNo")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
 
                     b.Property<string>("SurveyorId")
                         .IsRequired()
@@ -827,6 +1035,13 @@ namespace Depot.Data.Migrations
                     b.Property<string>("SurveyorName")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<int?>("VentilationCmh")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("YardLocationNote")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.HasKey("Id");
 
@@ -1288,6 +1503,10 @@ namespace Depot.Data.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<string>("TransactionRef")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("DepotJobId")
@@ -1364,6 +1583,110 @@ namespace Depot.Data.Migrations
                     b.HasIndex("ShippingLineDebtCode");
 
                     b.ToTable("PaymentAllocations");
+                });
+
+            modelBuilder.Entity("Depot.Data.Entities.Finance.PaymentLog", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal?>("CashReceived")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("CashierName")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<decimal?>("ChangeAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("ContainerNo")
+                        .HasMaxLength(15)
+                        .HasColumnType("character varying(15)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeletedBy")
+                        .HasColumnType("text");
+
+                    b.Property<long?>("DepotJobId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("InvoiceNo")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("JobNo")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime?>("LastModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("LoggedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Message")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<decimal?>("OrderTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("ServiceOrderNo")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("TransactionRef")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContainerNo");
+
+                    b.HasIndex("LoggedAt");
+
+                    b.HasIndex("TransactionRef");
+
+                    b.ToTable("PaymentLogs");
                 });
 
             modelBuilder.Entity("Depot.Data.Entities.Finance.ServiceOrder", b =>
@@ -2100,6 +2423,10 @@ namespace Depot.Data.Migrations
                     b.Property<long>("DepotJobId")
                         .HasColumnType("bigint");
 
+                    b.Property<string>("EndpointUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("ErrorMessage")
                         .HasColumnType("text");
 
@@ -2107,6 +2434,9 @@ namespace Depot.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(60)
                         .HasColumnType("character varying(60)");
+
+                    b.Property<int?>("HttpStatusCode")
+                        .HasColumnType("integer");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
@@ -2117,6 +2447,15 @@ namespace Depot.Data.Migrations
                     b.Property<string>("LastModifiedBy")
                         .HasColumnType("text");
 
+                    b.Property<int?>("LatencyMs")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("RequestBody")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ResponseBody")
+                        .HasColumnType("text");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -2124,6 +2463,10 @@ namespace Depot.Data.Migrations
 
                     b.Property<DateTime>("SyncedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TriggeredBy")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
 
                     b.HasKey("Id");
 
@@ -3301,6 +3644,79 @@ namespace Depot.Data.Migrations
                     b.ToTable("StorageTariffTier");
                 });
 
+            modelBuilder.Entity("Depot.Data.Entities.Storage.DepotFile", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeletedBy")
+                        .HasColumnType("text");
+
+                    b.Property<string>("FileType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<long>("IdTable")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("IpServer")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
+
+                    b.Property<string>("NameGuid")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("TableName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<byte>("Type")
+                        .HasColumnType("smallint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NameGuid")
+                        .IsUnique();
+
+                    b.HasIndex("TableName", "IdTable");
+
+                    b.ToTable("DepotFiles");
+                });
+
             modelBuilder.Entity("Depot.Data.Entities.System.Company", b =>
                 {
                     b.Property<long>("Id")
@@ -4170,123 +4586,101 @@ namespace Depot.Data.Migrations
 
             modelBuilder.Entity("Depot.Data.Entities.Depot.DamageItem", b =>
                 {
-                    b.HasOne("Depot.Data.Entities.Depot.Survey", "Survey")
-                        .WithMany("Damages")
+                    b.HasOne("Depot.Data.Entities.Depot.Survey", null)
+                        .WithMany()
                         .HasForeignKey("SurveyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Survey");
                 });
 
             modelBuilder.Entity("Depot.Data.Entities.Depot.DepotJob", b =>
                 {
-                    b.HasOne("Depot.Data.Entities.Master.ShippingLine", "ShippingLine")
-                        .WithMany("DepotJobs")
+                    b.HasOne("Depot.Data.Entities.Master.ShippingLine", null)
+                        .WithMany()
                         .HasForeignKey("ShippingLineId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("ShippingLine");
                 });
 
             modelBuilder.Entity("Depot.Data.Entities.Depot.Estimate", b =>
                 {
-                    b.HasOne("Depot.Data.Entities.Depot.DepotJob", "DepotJob")
-                        .WithOne("Estimate")
+                    b.HasOne("Depot.Data.Entities.Depot.DepotJob", null)
+                        .WithOne()
                         .HasForeignKey("Depot.Data.Entities.Depot.Estimate", "DepotJobId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("DepotJob");
                 });
 
             modelBuilder.Entity("Depot.Data.Entities.Depot.EstimateItem", b =>
                 {
-                    b.HasOne("Depot.Data.Entities.Depot.Estimate", "Estimate")
-                        .WithMany("Items")
+                    b.HasOne("Depot.Data.Entities.Depot.Estimate", null)
+                        .WithMany()
                         .HasForeignKey("EstimateId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Estimate");
                 });
 
             modelBuilder.Entity("Depot.Data.Entities.Depot.JobAuditLog", b =>
                 {
-                    b.HasOne("Depot.Data.Entities.Depot.DepotJob", "DepotJob")
-                        .WithMany("AuditLogs")
+                    b.HasOne("Depot.Data.Entities.Depot.DepotJob", null)
+                        .WithMany()
                         .HasForeignKey("DepotJobId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("DepotJob");
                 });
 
             modelBuilder.Entity("Depot.Data.Entities.Depot.RepairOrder", b =>
                 {
-                    b.HasOne("Depot.Data.Entities.Depot.DepotJob", "DepotJob")
-                        .WithOne("RepairOrder")
+                    b.HasOne("Depot.Data.Entities.Depot.DepotJob", null)
+                        .WithOne()
                         .HasForeignKey("Depot.Data.Entities.Depot.RepairOrder", "DepotJobId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("DepotJob");
                 });
 
             modelBuilder.Entity("Depot.Data.Entities.Depot.Survey", b =>
                 {
-                    b.HasOne("Depot.Data.Entities.Depot.DepotJob", "DepotJob")
-                        .WithOne("Survey")
+                    b.HasOne("Depot.Data.Entities.Depot.DepotJob", null)
+                        .WithOne()
                         .HasForeignKey("Depot.Data.Entities.Depot.Survey", "DepotJobId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("DepotJob");
                 });
 
             modelBuilder.Entity("Depot.Data.Entities.Depot.SurveyChecklistItem", b =>
                 {
-                    b.HasOne("Depot.Data.Entities.Depot.Survey", "Survey")
-                        .WithMany("ChecklistItems")
+                    b.HasOne("Depot.Data.Entities.Depot.Survey", null)
+                        .WithMany()
                         .HasForeignKey("SurveyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Survey");
                 });
 
             modelBuilder.Entity("Depot.Data.Entities.Depot.SurveyCleaningItem", b =>
                 {
-                    b.HasOne("Depot.Data.Entities.Depot.Survey", "Survey")
-                        .WithMany("CleaningItems")
+                    b.HasOne("Depot.Data.Entities.Depot.Survey", null)
+                        .WithMany()
                         .HasForeignKey("SurveyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Survey");
                 });
 
             modelBuilder.Entity("Depot.Data.Entities.Depot.SurveyPhotoItem", b =>
                 {
-                    b.HasOne("Depot.Data.Entities.Depot.Survey", "Survey")
-                        .WithMany("Photos")
+                    b.HasOne("Depot.Data.Entities.Depot.Survey", null)
+                        .WithMany()
                         .HasForeignKey("SurveyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Survey");
                 });
 
             modelBuilder.Entity("Depot.Data.Entities.Finance.Payment", b =>
                 {
-                    b.HasOne("Depot.Data.Entities.Depot.DepotJob", "DepotJob")
-                        .WithOne("Payment")
+                    b.HasOne("Depot.Data.Entities.Depot.DepotJob", null)
+                        .WithOne()
                         .HasForeignKey("Depot.Data.Entities.Finance.Payment", "DepotJobId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("DepotJob");
                 });
 
             modelBuilder.Entity("Depot.Data.Entities.Finance.PaymentAllocation", b =>
@@ -4306,7 +4700,7 @@ namespace Depot.Data.Migrations
                     b.HasOne("Depot.Data.Entities.Depot.DepotJob", "DepotJob")
                         .WithMany()
                         .HasForeignKey("DepotJobId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("DepotJob");
@@ -4325,13 +4719,11 @@ namespace Depot.Data.Migrations
 
             modelBuilder.Entity("Depot.Data.Entities.Master.Container", b =>
                 {
-                    b.HasOne("Depot.Data.Entities.Master.ShippingLine", "ShippingLine")
-                        .WithMany("Containers")
+                    b.HasOne("Depot.Data.Entities.Master.ShippingLine", null)
+                        .WithMany()
                         .HasForeignKey("ShippingLineId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("ShippingLine");
                 });
 
             modelBuilder.Entity("Depot.Data.Entities.Master.CustomerBooking", b =>
@@ -4384,35 +4776,6 @@ namespace Depot.Data.Migrations
                     b.Navigation("Items");
                 });
 
-            modelBuilder.Entity("Depot.Data.Entities.Depot.DepotJob", b =>
-                {
-                    b.Navigation("AuditLogs");
-
-                    b.Navigation("Estimate");
-
-                    b.Navigation("Payment");
-
-                    b.Navigation("RepairOrder");
-
-                    b.Navigation("Survey");
-                });
-
-            modelBuilder.Entity("Depot.Data.Entities.Depot.Estimate", b =>
-                {
-                    b.Navigation("Items");
-                });
-
-            modelBuilder.Entity("Depot.Data.Entities.Depot.Survey", b =>
-                {
-                    b.Navigation("ChecklistItems");
-
-                    b.Navigation("CleaningItems");
-
-                    b.Navigation("Damages");
-
-                    b.Navigation("Photos");
-                });
-
             modelBuilder.Entity("Depot.Data.Entities.Finance.ArPayment", b =>
                 {
                     b.Navigation("Allocations");
@@ -4421,13 +4784,6 @@ namespace Depot.Data.Migrations
             modelBuilder.Entity("Depot.Data.Entities.Finance.ServiceOrder", b =>
                 {
                     b.Navigation("Items");
-                });
-
-            modelBuilder.Entity("Depot.Data.Entities.Master.ShippingLine", b =>
-                {
-                    b.Navigation("Containers");
-
-                    b.Navigation("DepotJobs");
                 });
 
             modelBuilder.Entity("Depot.Data.Entities.Master.StorageTariffRule", b =>

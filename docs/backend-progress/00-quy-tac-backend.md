@@ -51,26 +51,55 @@ return Ok(new ResponseSingleContentModel<T> { StatusCode = 200, Message = "...",
   `Message`, chi tiết kỹ thuật ở `Data`) — giữ đúng pattern đang có trong `DepotJobsController`.
 - Lỗi nghiệp vụ dự đoán trước (thiếu dữ liệu, sai trạng thái) trả `BadRequest` (400), không ném exception.
 
-## 3. Entity = View Model
+## 3. Entity / ViewModel — quy ước MỚI (2026-09), áp dụng dần từng domain
 
-Project **không có lớp DTO/mapping riêng (AutoMapper...)** cho phần lớn API đọc dữ liệu — Controller trả
-thẳng entity EF Core ra JSON (xem `DepotJobsController.GetAllJobs`, `YardController.GetPositions`...).
+> **Lịch sử:** trước 2026-09, quy ước ở đây là "Controller trả thẳng entity EF Core ra JSON, không có
+> DTO/mapping riêng". Quy ước đó đã bị **đảo ngược có chủ đích** theo yêu cầu chuẩn hóa toàn Solution.
+> Domain **Job/Survey** (`DepotJob`, `Survey`, `DamageItem`, `SurveyCleaningItem`, `SurveyChecklistItem`,
+> `SurveyPhotoItem`, `Estimate`, `EstimateItem`, `RepairOrder`, `Payment`, `JobAuditLog`) đã refactor xong
+> theo quy ước mới bên dưới. **Các domain khác (Cleaning, Finance/Billing, Master Data, Yard, System)
+> CHƯA refactor — vẫn còn navigation property + trả entity trực tiếp, KHÔNG coi đó là vi phạm cho tới khi
+> tới lượt refactor.** Khi tạo domain mới hoặc chạm vào domain cũ, áp dụng quy ước mới, không áp cũ.
 
-Hệ quả và quy tắc đi kèm:
-- Khi frontend cần 1 field phẳng không có sẵn trên entity (vd. `shippingLineCode` thay vì object
-  `shippingLine.code`), thêm **computed property `[NotMapped]`** ngay trên entity thay vì tạo DTO mới:
+Nguyên tắc bắt buộc (quy ước mới):
+- **Entity chỉ chứa dữ liệu Domain/Database** — chỉ giữ FK dạng `long XxxId` (khớp kiểu `Id` thật của
+  entity cha, KHÔNG cứng `int`), **không khai báo navigation property** (`virtual Foo? Foo`,
+  `virtual ICollection<Foo> Foos`) dù ở phía "một" hay phía "nhiều" của quan hệ.
+- **Controller/Service không trả entity trực tiếp** cho API đọc — luôn map sang DTO trong `Depot.ViewModels`
+  (hậu tố `Dto`, vd `DepotJobDto`, `SurveyDto`). DTO giữ đúng tên field/casing như entity cũ để JSON trả
+  về frontend không đổi shape, tránh phải sửa lại toàn bộ consumer phía React.
+- **EF Core vẫn phải biết quan hệ FK** dù không còn navigation — khai báo tường minh trong
+  `EntityTypeConfiguration` bằng overload không-navigation, KHÔNG bỏ qua (nếu bỏ qua, migration sau sẽ
+  hiểu nhầm là cột rời và có thể sinh lệnh DROP constraint FK thật):
   ```csharp
-  [NotMapped]
-  public string? ShippingLineCode => ShippingLine?.Code;
+  // 1-nhiều, con giữ FK:
+  builder.HasMany<DamageItem>().WithOne().HasForeignKey(x => x.SurveyId).OnDelete(DeleteBehavior.Cascade);
+  // 1-1:
+  builder.HasOne<Survey>().WithOne().HasForeignKey<Survey>(x => x.DepotJobId).OnDelete(DeleteBehavior.Cascade);
+  // nhiều-1, entity hiện tại giữ FK:
+  builder.HasOne<ShippingLine>().WithMany().HasForeignKey(x => x.ShippingLineId).OnDelete(DeleteBehavior.Restrict);
   ```
-  (đã áp dụng ở `DepotJob.cs` — xem [02-container-list.md](02-container-list.md)).
-- Khi trả ra 1 navigation property, **phải `.Include()`** ở Service, nếu không sẽ luôn `null` dù entity
-  có quan hệ trong DB.
-- Chỉ tách sang ViewModel/DTO riêng (`Depot.ViewModels`) khi: (a) endpoint là ghi/nhận input (Request
-  models đã có sẵn dùng cách này — `CreateDepotJobRequest`, `SurveyRecordViewModel`...), hoặc (b) entity
-  chứa field nhạy cảm không được lộ ra API, hoặc (c) response cần tổng hợp từ nhiều entity (KPI, thống kê).
-- Đừng thêm AutoMapper/MediatR "cho chuẩn" nếu không ai yêu cầu — không khớp pattern hiện tại của dự án,
-  sẽ làm code không đồng nhất.
+  Sau khi sửa, **bắt buộc** chạy `dotnet ef migrations add __CheckNoDrift` để xác nhận `Up()/Down()` sinh
+  ra **rỗng** (không đổi schema thật), rồi `dotnet ef migrations remove` xóa file kiểm chứng — không migrate
+  thật.
+- **Đọc dữ liệu quan hệ:** không còn `.Include()/.ThenInclude()` qua navigation — Service tự query rời
+  từng bảng con theo FK (`Where(x => ids.Contains(x.XxxId))`, dùng `_db.Set<T>()` nếu bảng không có DbSet
+  riêng) rồi map thủ công sang DTO trong bộ nhớ. Hiệu năng tương đương `AsSplitQuery()` cũ (đều là nhiều
+  round-trip SQL riêng thay vì 1 JOIN khổng lồ) — không phải đánh đổi hiệu năng để đổi kiến trúc.
+- **Ghi dữ liệu quan hệ:** không còn gán qua navigation (`job.RepairOrder = new RepairOrder{...}`,
+  `survey.Damages.Add(...)`) — luôn `_db.Set<T>().Add(...)` tường minh với FK đã biết giá trị thật. **Lưu ý
+  quan trọng:** tạo Parent+Children mới cùng lúc mất cơ chế graph-fixup tự nối FK của EF (navigation từng
+  làm việc này ngầm) — phải lưu Parent trước (`SaveChangesAsync()`) để có `Id` thật rồi mới tạo Children,
+  bọc cả 2 bước trong 1 transaction tường minh (`_db.Database.BeginTransactionAsync()`) để giữ tính atomic
+  như cũ. Xem `DepotJobService.SubmitSurveyAsync`/`CreateOrUpdateEstimateAsync` làm mẫu.
+- Không AutoMapper/MediatR/Generic Repository/Unit Of Work — map tay trong Service, dùng đúng
+  `DepotDbContext` hiện có, không thêm abstraction mới.
+
+Domain chưa refactor (còn theo quy ước CŨ, tạm giữ nguyên cho tới lượt):
+- Khi frontend cần 1 field phẳng không có sẵn trên entity CŨ (vd. `shippingLineCode` thay vì object
+  `shippingLine.code`), pattern cũ dùng **computed property `[NotMapped]`** — KHÔNG áp dụng pattern này cho
+  domain đã refactor (DepotJob không còn `ShippingLine`/`ShippingLineCode`, Service tự join `ShippingLine`
+  theo `ShippingLineId` rồi gán thẳng field phẳng trên DTO).
 
 ## 3b. Dữ liệu đầu vào từ frontend → luôn định nghĩa trong `Depot.ViewModels`
 

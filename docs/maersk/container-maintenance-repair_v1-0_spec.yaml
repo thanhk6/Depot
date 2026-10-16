@@ -1,0 +1,1745 @@
+openapi: 3.0.1
+info:
+  title: Container Maintenance & Repair API
+  description: |
+    Create, validate and retrieve maintenance orders for Maersk containers.  
+    
+    # Overview
+
+    The AEMS (Advanced Equipment Maintenance System) team is making APIs available specifically for external depot and vendor systems to manage and monitor orders within the AEMS system. Access to these endpoints will be restricted to systems and applications approved and onboarded as external order providers.  
+    
+    # Who can get access?
+
+    Maersk’s suppliers creating maintenance and repair orders using the Maersk Advanced Equipment Management System (AEMS) can get access to the API.    
+    
+    # Getting started  
+    
+    Access to this API is limited to approved developers currently doing
+    business with Maersk. To request access, you need to **<a
+    href="https://developer.maersk.com/login" target="_blank"
+    style="font-weight: bold;"><u>login</u></a>** using your company email
+    address and create an App to enable this API product for your Consumer Key.
+    For step-by-step instructions, please refer to our **<a
+    href="https://developer.maersk.com/support/getting-started-api"
+    target="_blank" style="font-weight: bold;"><u>Getting Started
+    Guide</u></a>**.  
+
+    
+    # Technical specifications  
+    
+    The AEMS platform exposes the following three core APIs, each supporting distinct business functionalities, along with their respective OpenAPI Specification (OAS) files:
+    
+    1. **Maintenance Orders API** - Provides full CRUD (Create, Read, Update, Delete) functionality for managing maintenance orders. This includes tracking orders from submission to approval.  
+    **<a href="https://edpmediastorage.blob.core.windows.net/media/container-maintenance-repair_v1-0_13112024_spec.yaml" target="_blank" style="font-weight: bold;"><u>Download OpenAPI Document</u></a>**. 
+    
+    2. **Uploads and Attachments API** - Enables uploading and downloading of various file types (images, PDFs, etc.), which can be attached to orders as supporting documentation or evidence.  
+    **<a href="https://edpmediastorage.blob.core.windows.net/media/container-uploads-attachments_v1-0_11112024_spec.yaml" target="_blank" style="font-weight: bold;"><u>Download OpenAPI Document</u></a>**. 
+    
+    3. **User Identity API** - Used to verify client identity and confirm access permissions to the relevant shop resources. This API is primarily utilized for integration testing.  
+    **<a href="https://edpmediastorage.blob.core.windows.net/media/container-user-identity_v1-0_11112024_spec.yaml" target="_blank" style="font-weight: bold;"><u>Download OpenAPI Document</u></a>**. 
+    
+    Please note that all master data (such as repair codes, part numbers, and shop contracts) must be maintained independently by each depot system. These data elements are not provided through any of the APIs.    
+    
+
+    # OAuth 2.0
+
+    **<a href="https://developer.maersk.com/support/authorisation"
+    target="_blank" style="font-weight: bold;"><u>Authorisation Guide</u></a>**  
+    
+    
+    # Using the AEMS Container Maintenance & Repair APIs  
+
+    **<a href="https://edpmediastorage.blob.core.windows.net/media/aems-container-maintenance-repair-integration-guide_v3-0.pdf" target="_blank" style="font-weight: bold;"><u>Download the AEMS Integration Guide</u></a>** for detailed instructions how to interact with the API endpoints to manage and monitor orders.  
+
+    Also **<a href="https://edpmediastorage.blob.core.windows.net/media/AEMS%20API%20Integration.postman_collection_v2.json" target="_blank" style="font-weight: bold;"><u>download the accompanying Postman Collection</u></a>**. It includes scripts for all the steps needed for quick and efficient testing of each endpoint.  
+    
+    # How many calls can I make?
+
+    Traffic and spike arrest limits are configured at the consumer key level for
+    each API Product as detailed in the table below. If these limits are
+    exceeded, the request is rejected with a 429 Too Many Requests HTTP status
+    code.
+
+    | Quota per Consumer Key | Traffic Surge Rate Limit per Consumer Key |  
+    |------------------------|-------------------------------------------|  
+    | 5000 calls per hour    | 6000 calls per minute |  
+    
+    
+    # FAQs (Frequently Asked Questions) 
+    
+    
+    **Q: What should I do if I receive the following error:  "User [xyz] has not been added to the system."?**  
+
+     A: Your consumer key has been approved by the AEMS Team, but it has not yet been mapped to the shop(s) for which your consumer key can access.  Please send an email using the template in the **General Support** section below.  Be sure to include the email subject: **AEMS - Map consumer-key to shops**. 
+     
+         
+    **Q: What should I do if I receive any other errors while accessing/using your API?**  
+    
+    A: For any other errors received while accessing our API, please send an email using the template in the **General Support** section below, replacing the description, cURL request and response content with your actual errors.  
+    
+
+    # General Support
+    
+    Please use the following email template if you have additional questions or require technical assistance, replacing the required values with details specific to your inquiry.  
+    
+    **IMPORTANT:** Emails sent without the "AEMS -" subject prefix will not be routed to our team and will not be handled.  
+    
+    ```text
+    To: vitservicedesk@maersk.com  
+    Subject: AEMS - General vendor support integrating with APIs 
+    
+    Email Body:
+    
+    Environment: Stage  
+    Consumer Key: 9Opx2aDpSd2sFROrL2HZDhAXge9tdL7D  
+    Shop Code(s): [ABC, DEF]  
+    Description: I am trying to upload images using the upload API, but I am getting error 401 - Unauthorized in return.  
+   
+    cURL Request:
+    curl --request POST \  
+    --url https://api-stage.maersk.com/aems/blob-manager/api/manage/ABC/upload \  
+    --header 'Authorization: Bearer vErYLoNgAcCeSsToKeNGoEsHeRe123' \  
+    --header 'Consumer-Key: 9Opx2aDpSd2sFROrL2HZDhAXge9tdL7D' \  
+    --header 'accept: */*' \  
+    --header 'content-type: multipart/form-data' \  
+    --form 'file=@/Users/oliver/Desktop/CleanShot_2024-09-16_at_15.29.16@2x.png'  
+     
+    Response code: 401  
+    Response content:
+    {  
+     "httpMethod": "POST",  
+     "requestUri": "/api/manage/xyz/upload",  
+     "statusCode": 401,  
+     "statusText": "Unauthorized",  
+     "errorMessage": "Failed authenticating using the parsed bearer token.",  
+     "correlationIdentifier": "0HN749U0FM5K7:00000002",  
+     "status": null,  
+     "errorTimestamp": "2024-10-04T08:36:40.023753+00:00",  
+     "detailedErrors": null  
+    }  
+    ```
+
+    
+    
+  version: v1.0.0  
+  contact:
+    name: AMStrong Team
+    email: AEMS@maersk.com
+    url: https://www.maersk.com/contactus
+  license:
+    url: https://terms.maersk.com/api-license-terms
+    name: Maersk 1.0
+servers:
+  - url: https://api-stage.maersk.com/aems/orders
+    description: Pre-Production Environment
+  - url: https://api.maersk.com/aems/orders
+    description: Production Environment
+tags:
+  - name: Order
+    description: Endpoints related to Maintenance Order
+  - name: OrderList
+    description: Endpoints related to Maintenance Order List
+  - name: OrderRemarks
+    description: Endpoints related to Maintenance Order Remarks
+  - name: OrderStatus
+    description: Endpoints related to Maintenance Order Status
+paths:
+  /api/maintenance-orders:
+    post:
+      tags:
+        - Order
+      summary: Creates and validates a maintenance order.
+      description: "<b>Maintenance order status codes:</b><br/>Draft = 10,<br/>Rejected = 100,<br/>DeclaredAsTTL = 150,<br/>PendingApproval = 200,<br/>PendingSpecialistApproval = 330,<br/>SuspendForTTLCheck = 340,<br/>SuspendToCENELM = 320,<br/>Approved = 390,<br/>RepairCompleted = 400,<br/>PurchaseOrderInitiated = 500,<br/>PurchaseOrderFailed = 550,<br/>PurchaseOrderCreated = 600,<br/>PaymentFailed = 650,<br/>PaymentCompleted = 800,<br/>Processed = 900,<br/>Deleted = 9999<br/> \n\r\n<b>Maintenance order cause codes:</b><br/>CONFIRMED_3RD_PARTY<br/>HANDLING_DAMAGE<br/>UNCONFIRMED_3RD_PARTY<br/>WEAR_AND_TEAR<br/> \n\r\n<b>Third party indicator codes:</b><br/>INTERMODAL<br/>OWNER<br/>TERMINAL<br/>THIRD_PARTY<br/>WEAR_AND_TEAR<br/>MANUFACTURE_WARRANTY<br/>"
+      operationId: post-maintenance-orders
+      requestBody:
+        description: The maintenance order to create.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaintenanceOrderCreateRequest'
+            example:
+              maintenanceShopCode: 1VD
+              equipmentNumber: TEST0000209
+              reeferContainerCondition: BOX_OK
+              maintenanceOrderCause: CONFIRMED_3RD_PARTY
+              damagedAt: PORT123
+              maintenanceRepairModeCode: '41'
+              vendorsReference: V1234567
+              attachedImages:
+                - name: OrderAttachment.JPG
+                  path: 269e87d4-4ef5-47ee-b58f-0665ef847451.JPG
+                  extension: .JPG
+                  contentType: image/jpeg
+              maintenanceOrderLines:
+                - equipmentDamageCode: BK
+                  maintenanceTypeCode: '6382'
+                  maintenanceRepairLocationCode: XX00
+                  thirdPartyIndicator: THIRD_PARTY
+                  repairQuantity: 2
+                  manHoursPerPiece: 0.1
+                  materialCostPerPiece: 0
+                  maintenanceOrderParts:
+                    - partNumber: 41-2953
+                      unitQuantity: 1
+                      unitPrice: 0
+                      currentSerialNumbers:
+                        - PRKSLXYQ
+                  attachedImages:
+                    - name: OrderAttachment.JPG
+                      path: 869e87d4-4ef5-47ee-b58f-0665ef847459.JPG
+                      extension: .JPG
+                      contentType: image/jpeg
+              maintenanceOrderRemarks:
+                - maintenanceOrderRemarkText: Repair/Replace damaged wiring
+                  maintenanceOrderRemarkScope: 1
+              maintenanceOrderManHours:
+                - manHours: 0.2
+                  manHoursType: REGULAR
+                - manHours: 0
+                  manHoursType: OVERTIME
+                - manHours: 0
+                  manHoursType: DOUBLETIME
+                - manHours: 0
+                  manHoursType: MISCELLANEOUS
+      responses:
+        '200':
+          description: "<b>OK</b>\r\n\nThe maintenance order was successfully processed and stored in the system"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceOrder'
+              example:
+                maintenanceOrderNumber: 500005133
+                maintenanceShopCode: XYZ
+                isoCurrencyCode: AED
+                exchangeRate: 0.272264
+                locationCode: SLASTM
+                equipmentNumber: MAEU4666883
+                previousMaintenanceTimestamp: '0001-01-01T00:00:00'
+                previousLocationCode: DKCPH01
+                reeferContainerCondition: null
+                maintenanceOrderCause: WEAR_AND_TEAR
+                damagedAt: null
+                maintenanceRepairModeCode: '05'
+                vendorsReference: null
+                attachedImages:
+                  - name: OrderAttachment.JPG
+                    path: 269e87d4-4ef5-47ee-b58f-0665ef847451.JPG
+                    extension: .JPG
+                    contentType: image/jpeg
+                maintenanceOrderLines:
+                  - equipmentDamageCode: OD
+                    maintenanceTypeCode: '0909'
+                    maintenanceTypeName: CSC-INSPECTION
+                    maintenanceRepairLocationCode: XX00
+                    thirdPartyIndicator: OWNER
+                    repairQuantity: 1
+                    manHoursPerPiece: 0.2
+                    materialCostPerPiece: 19
+                    maintenanceOrderParts: []
+                    attachedImages: []
+                  - equipmentDamageCode: BK
+                    maintenanceTypeCode: '6382'
+                    maintenanceTypeName: null
+                    maintenanceRepairLocationCode: AF
+                    thirdPartyIndicator: THIRD_PARTY
+                    repairQuantity: 2
+                    manHoursPerPiece: 0.1
+                    materialCostPerPiece: 0
+                    maintenanceOrderParts:
+                      - partNumber: 41-2953
+                        partName: null
+                        unitQuantity: 1
+                        unitPrice: 0
+                        newSerialNumbers: null
+                        currentSerialNumbers:
+                          - PRKSLXYQ
+                    attachedImages:
+                      - name: OrderAttachment.JPG
+                        path: 869e87d4-4ef5-47ee-b58f-0665ef847459.JPG
+                        extension: .JPG
+                        contentType: image/jpeg
+                maintenanceOrderRemarks:
+                  - maintenanceOrderRemarkText: Repair/Replace damaged wiring
+                    createTimestamp: '2024-11-07T00:00:00+01:00'
+                    createUserId: John1992
+                maintenanceOrderStatusCode: 200
+                maintenanceOrderManHours:
+                  - manHours: 0.3
+                    manHoursType: REGULAR
+                  - manHours: 0
+                    manHoursType: OVERTIME
+                  - manHours: 0
+                    manHoursType: DOUBLETIME
+                  - manHours: 0
+                    manHoursType: MISCELLANEOUS
+                  - manHours: 0
+                    manHoursType: TOTALPREPARATION
+                importTax: 0
+                salesTaxParts: 1.45
+                salesTaxLabour: 0.825
+                totalLabourCostWithoutTax: 16.5
+                totalMaterialCostWithoutTax: 29
+                totalPartCostWithoutTax: 0
+                totalOrderCostWithoutTax: 45.5
+                totalOrderCostWithTax: 47.775
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableContent'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    get:
+      tags:
+        - OrderList
+      summary: Get orders list
+      description: "Get a paged collection of maintenance orders associated with the authenticated user \n\r\n<b>Maintenance order status codes:</b><br/>Draft = 10,<br/>Rejected = 100,<br/>DeclaredAsTTL = 150,<br/>PendingApproval = 200,<br/>PendingSpecialistApproval = 330,<br/>SuspendForTTLCheck = 340,<br/>SuspendToCENELM = 320,<br/>Approved = 390,<br/>RepairCompleted = 400,<br/>PurchaseOrderInitiated = 500,<br/>PurchaseOrderFailed = 550,<br/>PurchaseOrderCreated = 600,<br/>PaymentFailed = 650,<br/>PaymentCompleted = 800,<br/>Processed = 900,<br/>Deleted = 9999<br/>"
+      operationId: get-maintenance-orders
+      responses:
+        '200':
+          description: "<b>OK</b>\r\n\n"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MaintenanceOrderHeader'
+          headers:
+            First-Page:
+              $ref: '#/components/headers/First-Page'
+            Previous-Page:
+              $ref: '#/components/headers/Previous-Page'
+            Current-Page:
+              $ref: '#/components/headers/Current-Page'
+            Next-Page:
+              $ref: '#/components/headers/Next-Page'
+            Last-Page:
+              $ref: '#/components/headers/Last-Page'
+            Total-Item-Count:
+              $ref: '#/components/headers/Total-Item-Count'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Sort'
+        - name: maintenanceOrderNumber
+          in: query
+          description: Filter by maintenance order number (optional).
+          schema:
+            type: integer
+            format: int64
+        - name: equipmentNumber
+          in: query
+          description: Filter by equipment number (optional).
+          schema:
+            type: string
+        - name: maintenanceShopCodes
+          in: query
+          description: >-
+            Filter by maintenance order by the shop code (optional). Provide as
+            a comma-separated string.
+          schema:
+            type: string
+        - name: maintenanceOrderStatusTypes
+          in: query
+          description: >-
+            Filter by maintenance order status code (optional). Provide as a
+            comma-separated string.
+          schema:
+            type: string
+        - name: maintenanceRepairModes
+          in: query
+          description: >-
+            Filter by maintenance repair mode (optional). Provide as a
+            comma-separated string.
+          schema:
+            type: string
+        - name: fromDate
+          in: query
+          description: "The start date to filter maintenance orders by their creation date (optional). \r\nIf provided, only maintenance orders created on or after this date will be included."
+          schema:
+            type: string
+            format: date-time
+        - name: toDate
+          in: query
+          description: "The end date to filter maintenance orders by their creation date (optional). \r\nIf provided, only maintenance orders created on or before this date will be included."
+          schema:
+            type: string
+            format: date-time
+        - name: searchText
+          in: query
+          description: >-
+            Filter by maintenance order by either searching with equipment
+            number or the  maintenance order number (optional).
+          schema:
+            type: string
+  /api/maintenance-orders/{maintenanceOrderNumber}:
+    put:
+      tags:
+        - Order
+      summary: Updates and validates a maintenance order.
+      description: "<b>Maintenance order status codes:</b><br/>Draft = 10,<br/>Rejected = 100,<br/>DeclaredAsTTL = 150,<br/>PendingApproval = 200,<br/>PendingSpecialistApproval = 330,<br/>SuspendForTTLCheck = 340,<br/>SuspendToCENELM = 320,<br/>Approved = 390,<br/>RepairCompleted = 400,<br/>PurchaseOrderInitiated = 500,<br/>PurchaseOrderFailed = 550,<br/>PurchaseOrderCreated = 600,<br/>PaymentFailed = 650,<br/>PaymentCompleted = 800,<br/>Processed = 900,<br/>Deleted = 9999<br/> \n\r\n<b>Maintenance order cause codes:</b><br/>CONFIRMED_3RD_PARTY<br/>HANDLING_DAMAGE<br/>UNCONFIRMED_3RD_PARTY<br/>WEAR_AND_TEAR<br/> \n\r\n<b>Third party indicator codes:</b><br/>INTERMODAL<br/>OWNER<br/>TERMINAL<br/>THIRD_PARTY<br/>WEAR_AND_TEAR<br/>MANUFACTURE_WARRANTY<br/>"
+      operationId: put-maintenance-orders-by-id
+      requestBody:
+        description: The maintenance order to update.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaintenanceOrderUpdateRequest'
+      parameters:
+        - name: maintenanceOrderNumber
+          in: path
+          description: The unique identifier of the maintenance order.
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: "<b>OK</b>\r\n\nThe maintenance order was successfully processed and updated in the system"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableContent'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    get:
+      tags:
+        - Order
+      summary: Gets a maintenance order.
+      description: Gets a maintenance order based on the unique maintenance order number.
+      operationId: get-maintenance-orders-by-id
+      parameters:
+        - name: maintenanceOrderNumber
+          in: path
+          description: The unique identifier of the maintenance order.
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: <b>OK</b>
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MaintenanceOrder'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    delete:
+      tags:
+        - Order
+      summary: Deletes a maintenance order
+      description: Deletes a maintenance order based on maintenance order number.
+      operationId: delete-maintenance-orders-by-id
+      parameters:
+        - name: maintenanceOrderNumber
+          in: path
+          description: The unique identifier of the maintenance order.
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: <b>OK</b>.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/maintenance-orders/{maintenanceOrderNumber}/remarks:
+    post:
+      tags:
+        - OrderRemarks
+      summary: Creates a remark for a maintenance order.
+      description: "Creates a remark for a maintenance order.\n\r\n <b>Remark scope types:</b> <br/>1 = Remark for GSC <br/>2 = Remark for everyone<br/>"
+      operationId: post-maintenance-order-remarks
+      parameters:
+        - name: maintenanceOrderNumber
+          in: path
+          description: The unique identifier of the maintenance order.
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/MaintenanceOrderRemark'
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    get:
+      tags:
+        - OrderRemarks
+      summary: Get all remark based on a maintenance order number.
+      description: Get maintenance order remark
+      operationId: get-maintenance-order-remarks
+      parameters:
+        - name: maintenanceOrderNumber
+          in: path
+          description: The unique identifier of the maintenance order.
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MaintenanceOrderRemarkResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/maintenance-orders/{maintenanceOrderNumber}/complete-repair:
+    patch:
+      tags:
+        - OrderStatus
+      summary: Completes repair and updates the serial numbers.
+      description: >-
+        Marks the maintenance order as repair completed. Additionally, it
+        updates the serial numbers for any parts that were replaced during the
+        repair process.
+      operationId: patch-maintenance-order-complete-repair
+      parameters:
+        - name: maintenanceOrderNumber
+          in: path
+          description: The unique identifier of the maintenance order.
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        description: The maintenance order to update.
+        content:
+          application/json:
+            schema:
+              $ref: >-
+                #/components/schemas/MaintenanceOrderPartSerialNumberUpdateRequest
+      responses:
+        '200':
+          description: OK
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/maintenance-orders/{maintenanceOrderNumber}/status:
+    get:
+      tags:
+        - OrderStatus
+      summary: Gets maintenance order status
+      description: "Gets the current and historical statuses of a maintenance order including when they were applicable from.\n\r\n<b>Maintenance order status codes:</b><br/>Draft = 10,<br/>Rejected = 100,<br/>DeclaredAsTTL = 150,<br/>PendingApproval = 200,<br/>PendingSpecialistApproval = 330,<br/>SuspendForTTLCheck = 340,<br/>SuspendToCENELM = 320,<br/>Approved = 390,<br/>RepairCompleted = 400,<br/>PurchaseOrderInitiated = 500,<br/>PurchaseOrderFailed = 550,<br/>PurchaseOrderCreated = 600,<br/>PaymentFailed = 650,<br/>PaymentCompleted = 800,<br/>Processed = 900,<br/>Deleted = 9999<br/>"
+      operationId: get-maintenance-orders-status-by-id
+      parameters:
+        - name: maintenanceOrderNumber
+          in: path
+          description: The unique identifier of the maintenance order.
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: <b>OK</b>
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceOrderStatusHistory'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+components:
+  schemas:
+    MaintenanceOrderCreateRequest:
+      type: object
+      properties:
+        maintenanceShopCode:
+          type: string
+          description: Unique 3 character code used to identify a maintenance shop.
+          nullable: true
+        equipmentNumber:
+          type: string
+          description: >-
+            Unique identifier of the equipment e.g., ISO combined code for a
+            container. Currently, only container equipment numbers are
+            supported.
+          nullable: true
+        reeferContainerCondition:
+          type: string
+          description: "An upper snake case code provided by maintenance shop representing the condition of the reefer container.\r\nPossible values are 'BOX_OK' or 'MAC_OK' or 'NOT_PROVIDED'."
+          nullable: true
+        maintenanceOrderCause:
+          type: string
+          description: "An upper snake case code identifying what or who caused the need for maintenance or repair.\r\nPossible values are 'CONFIRMED_3RD_PARTY' or 'HANDLING_DAMAGE' or 'UNCONFIRMED_3RD_PARTY' or 'WEAR_AND_TEAR'"
+          nullable: true
+        damagedAt:
+          type: string
+          description: "Unique code which identifies the location of the facility or terminal where the equipment was damaged.\r\nRequired when the maintenance order cause is CONFIRMED_3RD_PARTY./>"
+          nullable: true
+        maintenanceRepairModeCode:
+          type: string
+          description: >-
+            2 character uppercase mode identifying the performed service of
+            maintenance/repair for the chosen equipment.
+          nullable: true
+        vendorsReference:
+          type: string
+          description: Reference number that identifies the vendor or maintenance shop.
+          nullable: true
+        attachedImages:
+          type: array
+          items:
+            $ref: >-
+              #/components/schemas/MaintenanceOrder/properties/attachedImages/items
+          description: "Collection of metadata details for images or other documents attached to the maintenance order,\r\nused as documentation of what needs to be repaired."
+          nullable: true
+        maintenanceOrderLines:
+          type: array
+          items:
+            type: object
+            properties:
+              equipmentDamageCode:
+                type: string
+                description: >-
+                  2 character uppercase code defining the type of damage or need
+                  of maintenance.
+                nullable: true
+              maintenanceTypeCode:
+                type: string
+                description: >-
+                  4 character repair code identifying what kind of maintenance
+                  or repair is performed to repair what is reported as damage
+                  code.
+                nullable: true
+              maintenanceRepairLocationCode:
+                type: string
+                description: >-
+                  4 character code identifying the physical location of where
+                  the damage occurred on the equipment.
+                nullable: true
+              thirdPartyIndicator:
+                type: string
+                description: "An upper snake case code indicating what or who caused the type of damage or need of maintenance. \r\n\r\nPossible values are ''INTERMODAL' or 'OWNER'or 'TERMINAL' or 'THIRD_PARTY' or 'WEAR_AND_TEAR'or 'MANUFACTURE_WARRANTY'"
+                nullable: true
+              repairQuantity:
+                type: number
+                description: >-
+                  The quantity or number of occurrences/repetitions performed to
+                  perform the reported repair or maintenance work.
+                format: double
+              manHoursPerPiece:
+                type: number
+                description: >-
+                  The number of man-hours required to perform the repair or
+                  maintenance work per quantity or repetition
+                  Aems.Domain.Models.Orders.MaintenanceOrderLine.RepairQuantity.
+                format: double
+              materialCostPerPiece:
+                type: number
+                description: >-
+                  The cost of the material used to perform the repair or
+                  maintenance work per quantity or repetition
+                  Aems.Domain.Models.Orders.MaintenanceOrderLine.RepairQuantity.
+                format: double
+              maintenanceOrderParts:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    partNumber:
+                      type: string
+                      description: >-
+                        Unique maersk defined code identifying the part or piece
+                        of equipment required for the maintenance work.
+                      nullable: true
+                    unitQuantity:
+                      type: number
+                      description: >-
+                        The quantity of the part or piece of equipment required
+                        for the maintenance work.
+                      format: double
+                    unitPrice:
+                      type: number
+                      description: >-
+                        The final per unit price of the part after applying all
+                        discount and markup.
+                      format: double
+                    currentSerialNumbers:
+                      type: array
+                      items:
+                        type: string
+                      description: >-
+                        Optional collection of serial numbers for the current
+                        part that needs to be replaced.
+                      nullable: true
+                  additionalProperties: false
+                description: >-
+                  Optional collection of parts used to perform the reported
+                  maintenance work.
+                nullable: true
+              attachedImages:
+                type: array
+                items:
+                  $ref: >-
+                    #/components/schemas/MaintenanceOrder/properties/attachedImages/items
+                description: "Collection of metadata details for images or other documents attached to the maintenance order,\r\nused as documentation of what needs to be repaired."
+                nullable: true
+            additionalProperties: false
+          description: >-
+            Collection of maintenance work items or repairs performed on the
+            equipment.
+          nullable: true
+        maintenanceOrderRemarks:
+          type: array
+          items:
+            $ref: '#/components/schemas/MaintenanceOrderRemark'
+          description: >-
+            Collection of remarks attached to the maintenance order, provided by
+            either the maintenance shop or GSE personnel.
+          nullable: true
+        maintenanceOrderManHours:
+          type: array
+          items:
+            $ref: >-
+              #/components/schemas/MaintenanceOrder/properties/maintenanceOrderManHours/items
+          description: Collection of maintenance order man hours spent on repair.
+          nullable: true
+      additionalProperties: false
+    MaintenanceOrder:
+      type: object
+      properties:
+        maintenanceOrderNumber:
+          type: integer
+          description: >-
+            Globally unique maintenance order identifier starting with 5
+            followed by an incremental number.
+          format: int64
+        maintenanceShopCode:
+          type: string
+          description: Unique 3 character code used to identify a maintenance shop.
+          nullable: true
+        isoCurrencyCode:
+          type: string
+          description: "3 character currency code applicable in the area where the maintenance shop operates. \r\n\r\nCurrency codes are in official ISO 4217 standards."
+          nullable: true
+        exchangeRate:
+          type: number
+          description: "Exchange rate used to convert from local maintenance shop currency to the US Dollar.\r\nThe value is applicable at the time of order creation and will never be updated."
+          format: double
+        locationCode:
+          type: string
+          description: >-
+            Unique code which identifies the location of the facility where the
+            maintenance shop operates.
+          nullable: true
+        equipmentNumber:
+          type: string
+          description: >-
+            Unique identifier of the equipment e.g., ISO combined code for a
+            container. Currently, only container equipment numbers are
+            supported.
+          nullable: true
+        previousMaintenanceTimestamp:
+          type: string
+          description: >-
+            The date and time (in ISO 8601 UTC format) of when the state of the
+            last maintenance order was changed to approve.
+          format: date-time
+        previousLocationCode:
+          type: string
+          description: >-
+            Unique code of the maintenance shop where the last maintenance was
+            performed.
+          nullable: true
+        reeferContainerCondition:
+          type: string
+          description: "An upper snake case code provided by maintenance shop representing the condition of the reefer container.\r\nPossible values are 'BOX_OK' or 'MAC_OK' or 'NOT_PROVIDED'."
+          nullable: true
+        maintenanceOrderCause:
+          type: string
+          description: "An upper snake case code identifying what or who caused the need for maintenance or repair.\r\nPossible values are 'CONFIRMED_3RD_PARTY' or 'HANDLING_DAMAGE' or 'UNCONFIRMED_3RD_PARTY' or 'WEAR_AND_TEAR'"
+          nullable: true
+        damagedAt:
+          type: string
+          description: "Unique code which identifies the location of the facility or terminal where the equipment was damaged.\r\nRequired when the maintenance order cause is CONFIRMED_3RD_PARTY./>"
+          nullable: true
+        maintenanceRepairModeCode:
+          type: string
+          description: >-
+            2 character uppercase mode identifying the performed service of
+            maintenance/repair for the chosen equipment.
+          nullable: true
+        vendorsReference:
+          type: string
+          description: Reference number that identifies the vendor or maintenance shop.
+          nullable: true
+        attachedImages:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                description: Name for the attachment used for display purposes only.
+                nullable: true
+              path:
+                type: string
+                description: "File path of the attachment used to locate where the image is stored, followed by the file extension.\r\nMust be unique per shop as attachments are stored in separate shop specific storage containers"
+                nullable: true
+              extension:
+                type: string
+                description: Optional file extension placeholder.
+                nullable: true
+              contentType:
+                type: string
+                description: "Type of the file which can be used to determine how to parse the content.\r\nAlso known as HTTP mime type. From https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types/Common_types"
+                nullable: true
+              identifier:
+                type: string
+                nullable: true
+                readOnly: true
+            additionalProperties: false
+          description: "Collection of metadata details for images or other documents attached to the maintenance order,\r\nused as documentation of what needs to be repaired."
+          nullable: true
+        maintenanceOrderLines:
+          type: array
+          items:
+            type: object
+            properties:
+              equipmentDamageCode:
+                type: string
+                description: >-
+                  2 character uppercase code defining the type of damage or need
+                  of maintenance.
+                nullable: true
+              maintenanceTypeCode:
+                type: string
+                description: >-
+                  4 character repair code identifying what kind of maintenance
+                  or repair is performed to repair what is reported as damage
+                  code.
+                nullable: true
+              maintenanceTypeName:
+                type: string
+                description: >-
+                  Description for the repair code identifying what kind of
+                  maintenance or repair is performed to repair what is reported
+                  as damage code.
+                nullable: true
+              maintenanceRepairLocationCode:
+                type: string
+                description: >-
+                  2 character code identifying the physical location of where
+                  the damage occurred on the equipment.
+                nullable: true
+              thirdPartyIndicator:
+                type: string
+                description: "An upper snake case code indicating what or who caused the type of damage or need of maintenance. \r\n\r\nPossible values are ''INTERMODAL' or 'OWNER'or 'TERMINAL' or 'THIRD_PARTY' or 'WEAR_AND_TEAR'or 'MANUFACTURE_WARRANTY'"
+                nullable: true
+              repairQuantity:
+                type: number
+                description: >-
+                  The quantity or number of occurrences/repetitions performed to
+                  perform the reported repair or maintenance work.
+                format: double
+              manHoursPerPiece:
+                type: number
+                description: >-
+                  The number of man-hours required to perform the repair or
+                  maintenance work per quantity or repetition
+                  Aems.Domain.Models.Orders.MaintenanceOrderLine.RepairQuantity.
+                format: double
+              materialCostPerPiece:
+                type: number
+                description: >-
+                  The cost of the material used to perform the repair or
+                  maintenance work per quantity or repetition
+                  Aems.Domain.Models.Orders.MaintenanceOrderLine.RepairQuantity.
+                format: double
+              maintenanceOrderParts:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    partNumber:
+                      type: string
+                      description: >-
+                        Unique maersk defined code identifying the part or piece
+                        of equipment required for the maintenance work.
+                      nullable: true
+                    partName:
+                      type: string
+                      description: >-
+                        The name of the part or piece of equipment required for
+                        the maintenance work.
+                      nullable: true
+                    unitQuantity:
+                      type: number
+                      description: >-
+                        The quantity of the part or piece of equipment required
+                        for the maintenance work.
+                      format: double
+                    unitPrice:
+                      type: number
+                      description: >-
+                        The final per unit price of the part after applying all
+                        discount and markup.
+                      format: double
+                    newSerialNumbers:
+                      type: array
+                      items:
+                        type: string
+                      description: >-
+                        Optional collection of serial numbers that replaces the
+                        current parts.
+                      nullable: true
+                    currentSerialNumbers:
+                      type: array
+                      items:
+                        type: string
+                      description: >-
+                        Optional collection of serial numbers for the current
+                        part that needs to be replaced.
+                      nullable: true
+                  additionalProperties: false
+                description: >-
+                  Optional collection of parts used to perform the reported
+                  maintenance work.
+                nullable: true
+              attachedImages:
+                type: array
+                items:
+                  $ref: >-
+                    #/components/schemas/MaintenanceOrder/properties/attachedImages/items
+                description: "Collection of metadata details for images or other documents attached to the maintenance order,\r\nused as documentation of what needs to be repaired."
+                nullable: true
+            additionalProperties: false
+          description: >-
+            Collection of maintenance work items or repairs performed on the
+            equipment.
+          nullable: true
+        maintenanceOrderRemarks:
+          type: array
+          items:
+            $ref: '#/components/schemas/MaintenanceOrderRemarkResponse'
+          description: >-
+            Collection of remarks attached to the maintenance order, provided by
+            either the maintenance shop or GSE personnel.
+          nullable: true
+        maintenanceOrderStatusCode:
+          enum:
+            - 10
+            - 100
+            - 150
+            - 200
+            - 320
+            - 330
+            - 340
+            - 390
+            - 400
+            - 500
+            - 550
+            - 600
+            - 650
+            - 800
+            - 900
+            - 9999
+          type: integer
+          format: int32
+        maintenanceOrderManHours:
+          type: array
+          items:
+            type: object
+            properties:
+              manHours:
+                type: number
+                description: >-
+                  number of man-hours spent by the shop to perform the reported
+                  maintenance work.
+                format: double
+              manHoursType:
+                type: string
+                description: >-
+                  Type of man-hours, indicating the classification of hours
+                  worked, such as REGULAR, OVERTIME, DOUBLETIME, or
+                  MISCELLANEOUS.
+                nullable: true
+            additionalProperties: false
+          description: Collection of maintenance order man hours spent on repair.
+          nullable: true
+        importTax:
+          type: number
+          description: >-
+            Import tax percentage applicable at the time of creation of the
+            maintenance order.
+          format: double
+        salesTaxParts:
+          type: number
+          description: >-
+            Sales tax percentage on parts applicable at the time of creation of
+            the maintenance order.
+          format: double
+        salesTaxLabour:
+          type: number
+          description: >-
+            Sales tax percentage on labour applicable at the time of creation of
+            the maintenance order.
+          format: double
+        totalLabourCostWithoutTax:
+          type: number
+          description: >-
+            Total cost of labour before tax is applied in the local currency
+            where the reporting maintenance shop operates.
+          format: double
+        totalMaterialCostWithoutTax:
+          type: number
+          description: >-
+            Total cost of material before tax is applied in the local currency
+            where the reporting maintenance shop operates.
+          format: double
+        totalPartCostWithoutTax:
+          type: number
+          description: >-
+            Total cost of all parts before tax is applied in the local currency
+            where the reporting maintenance shop operates.
+          format: double
+        totalOrderCostWithoutTax:
+          type: number
+          description: >-
+            Total order cost without tax applied in the local currency where the
+            reporting maintenance shop operates.
+          format: double
+        totalOrderCostWithTax:
+          type: number
+          description: >-
+            Total order cost including tax in the local currency where the
+            reporting maintenance shop operates.
+          format: double
+      additionalProperties: false
+    MaintenanceOrderHeader:
+      type: object
+      properties:
+        maintenanceOrderNumber:
+          type: integer
+          format: int64
+        equipmentNumber:
+          type: string
+          nullable: true
+        totalOrderCost:
+          type: number
+          format: double
+        maintenanceShopCode:
+          type: string
+          nullable: true
+        locationCode:
+          type: string
+          nullable: true
+        isoCurrencyCode:
+          type: string
+          nullable: true
+        exchangeRate:
+          type: number
+          description: >-
+            Exchange rate of the shop's currency to USD. Represents how much 1
+            unit of the shop's currency is worth in USD.
+          format: double
+        maintenanceRepairModeCode:
+          type: string
+          nullable: true
+        maintenanceOrderStatusCode:
+          $ref: >-
+            #/components/schemas/MaintenanceOrder/properties/maintenanceOrderStatusCode
+        maintenanceOrderStatusUpdatedTimestamp:
+          type: string
+          format: date-time
+        createUserID:
+          type: string
+          nullable: true
+        createTimestamp:
+          type: string
+          format: date-time
+        updateTimestamp:
+          type: string
+          format: date-time
+          nullable: true
+      additionalProperties: false
+      description: >-
+        The Maintenance Order is the instruction for a Maintenance shop or
+        Vessel team to do repairs or Maintenance on equipment in the fleet.
+    MaintenanceOrderUpdateRequest:
+      type: object
+      properties:
+        maintenanceShopCode:
+          type: string
+          description: Unique 3 character code used to identify a maintenance shop.
+          nullable: true
+        equipmentNumber:
+          type: string
+          description: >-
+            Unique identifier of the equipment e.g., ISO combined code for a
+            container. Currently, only container equipment numbers are
+            supported.
+          nullable: true
+        reeferContainerCondition:
+          type: string
+          description: "An upper snake case code provided by maintenance shop representing the condition of the reefer container.\r\nPossible values are 'BOX_OK' or 'MAC_OK' or 'NOT_PROVIDED'."
+          nullable: true
+        maintenanceOrderCause:
+          type: string
+          description: "An upper snake case code identifying what or who caused the need for maintenance or repair.\r\nPossible values are 'CONFIRMED_3RD_PARTY' or 'HANDLING_DAMAGE' or 'UNCONFIRMED_3RD_PARTY' or 'WEAR_AND_TEAR'"
+          nullable: true
+        damagedAt:
+          type: string
+          description: "Unique code which identifies the location of the facility or terminal where the equipment was damaged.\r\nRequired when the maintenance order cause is CONFIRMED_3RD_PARTY./>"
+          nullable: true
+        maintenanceRepairModeCode:
+          type: string
+          description: >-
+            2 character uppercase mode identifying the performed service of
+            maintenance/repair for the chosen equipment.
+          nullable: true
+        vendorsReference:
+          type: string
+          description: Reference number that identifies the vendor or maintenance shop.
+          nullable: true
+        attachedImages:
+          type: array
+          items:
+            $ref: >-
+              #/components/schemas/MaintenanceOrder/properties/attachedImages/items
+          description: "Collection of metadata details for images or other documents attached to the maintenance order,\r\nused as documentation of what needs to be repaired."
+          nullable: true
+        maintenanceOrderLines:
+          type: array
+          items:
+            $ref: >-
+              #/components/schemas/MaintenanceOrderCreateRequest/properties/maintenanceOrderLines/items
+          description: >-
+            Collection of maintenance work items or repairs performed on the
+            equipment.
+          nullable: true
+        maintenanceOrderRemarks:
+          type: array
+          items:
+            $ref: '#/components/schemas/MaintenanceOrderRemark'
+          description: >-
+            Collection of remarks attached to the maintenance order, provided by
+            either the maintenance shop or GSE personnel.
+          nullable: true
+        maintenanceOrderManHours:
+          type: array
+          items:
+            $ref: >-
+              #/components/schemas/MaintenanceOrder/properties/maintenanceOrderManHours/items
+          description: Collection of maintenance order man hours spent on repair.
+          nullable: true
+        maintenanceOrderNumber:
+          type: integer
+          description: >-
+            Globally unique maintenance order identifier starting with 5
+            followed by an incremental number.
+          format: int32
+      additionalProperties: false
+    MaintenanceOrderRemark:
+      type: object
+      properties:
+        maintenanceOrderRemarkText:
+          type: string
+          description: >-
+            Text field provided by the maintenance shop or GSC personnel used to
+            communicate important notices or specific details about the order or
+            equipment.
+          nullable: true
+        maintenanceOrderRemarkScope:
+          enum:
+            - 0
+            - 1
+          type: integer
+          format: int32
+      additionalProperties: false
+    MaintenanceOrderRemarkResponse:
+      type: object
+      properties:
+        maintenanceOrderRemarkText:
+          type: string
+          description: >-
+            Text field provided by the maintenance shop or GSC personnel used to
+            communicate important notices or specific details about the order or
+            equipment.
+          nullable: true
+        createTimestamp:
+          type: string
+          description: >-
+            The date and time (in ISO 8601 UTC format) of when the remark was
+            created.
+          format: date-time
+        createUserId:
+          type: string
+          description: The login name of the user who created the remark.
+          nullable: true
+      additionalProperties: false
+    MaintenanceOrderPartSerialNumberUpdateRequest:
+      type: object
+      properties:
+        maintenanceOrderPartSerialNumbers:
+          type: array
+          items:
+            type: object
+            properties:
+              maintenanceTypeCode:
+                type: string
+                description: >-
+                  4 character repair code identifying what kind of maintenance
+                  or repair is performed to repair what is reported as damage
+                  code.
+                nullable: true
+              maintenanceRepairLocationCode:
+                type: string
+                description: >-
+                  2 character code identifying the physical location of where
+                  the damage occurred on the equipment.
+                nullable: true
+              partNumber:
+                type: string
+                description: >-
+                  Unique maersk defined code identifying the part or piece of
+                  equipment required for the maintenance work.
+                nullable: true
+              newSerialNumbers:
+                type: array
+                items:
+                  type: string
+                description: >-
+                  This is the collection of serial numbers that replaces the
+                  current parts.
+                nullable: true
+            additionalProperties: false
+            description: >-
+              Represents serial number updates for a specific part in a
+              maintenance order.
+          description: >-
+            optional collection of serial number updates for each maintenance
+            order part.
+          nullable: true
+      additionalProperties: false
+      description: Request to update serial numbers for parts in a maintenance order.
+    MaintenanceOrderStatusHistory:
+      type: object
+      properties:
+        maintenanceOrderNumber:
+          type: integer
+          description: The unique identifier of the maintenance order.
+          format: int64
+        maintenanceOrderStatus:
+          type: object
+          properties:
+            timestamp:
+              type: string
+              description: Time of when the given status was applicable from.
+              format: date-time
+            maintenanceOrderStatusCode:
+              $ref: >-
+                #/components/schemas/MaintenanceOrder/properties/maintenanceOrderStatusCode
+            maintenanceOrderStatusText:
+              type: string
+              description: >-
+                Text representation of the
+                Aems.Domain.Models.Orders.MaintenanceOrderStatus.StatusCode of
+                the maintenance order.
+              nullable: true
+          additionalProperties: false
+          description: Class representing the status of a maintenance order.
+        maintenanceOrderStatusHistory:
+          type: array
+          items:
+            $ref: >-
+              #/components/schemas/MaintenanceOrderStatusHistory/properties/maintenanceOrderStatus
+          description: >-
+            Collection of historical of statuses of the maintenance order,
+            ordered by timestamp.
+          nullable: true
+      additionalProperties: false
+      description: Class representing the current and history statuses of a work order.
+  headers:
+    First-Page:
+      description: >
+        Page reference representing the first page of data in the data set. To
+        fetch the first page of data the ```page``` query request parameter
+        should be set to this value.
+      schema:
+        type: integer
+        minimum: 1
+        example: 1
+      required: false
+    Previous-Page:
+      description: >
+        Page reference representing the previous page of data. To fetch the
+        previous page of data the ```page``` query request parameter should be
+        set to this value.
+      schema:
+        type: integer
+        minimum: 1
+        example: 14
+      required: false
+    Current-Page:
+      description: Page reference representing the current page of data.
+      schema:
+        type: integer
+        minimum: 1
+        example: 15
+      required: true
+    Next-Page:
+      description: >
+        Page reference representing the next page of data if not all items have
+        been returned. To fetch the next page of data the ```page``` query
+        request parameter should be set to this value.
+      schema:
+        type: integer
+        minimum: 1
+        example: 16
+      required: false
+    Last-Page:
+      description: >
+        Page reference representing the last page of data in the data set. To
+        fetch the last page of data the ```page``` query request parameter
+        should be set to this value.
+      schema:
+        type: integer
+        minimum: 1
+        example: 25
+      required: false
+    Total-Item-Count:
+      description: >
+        Total number of items found in a search. As pagination gives last page
+        and limit per page only it is not possible to calculate exact total
+        items found which is why it is available as separate property.
+      schema:
+        type: integer
+        minimum: 0
+        example: 243
+      required: false
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      description: >
+        Specifies the number of data sets to be sent in the response.
+
+        This could be adjusted to appropriate values depending on the data set
+        size.
+      required: false
+      schema:
+        type: integer
+        minimum: 10
+        maximum: 100
+        default: 25
+    Page:
+      name: page
+      in: query
+      description: >
+        This is the number of the current page/next page/first page/previous
+        page/last page/any specific intermediate page that is requested by
+        consumer
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        example: 125
+    Sort:
+      name: sort
+      in: query
+      description: |
+        Consumer specified sort fields and order in the format:
+        ```
+        (Parameter1 Name)[:](asc|desc), (Parameter2 Name)[:](asc|desc)
+        ```
+      required: false
+      schema:
+        type: string
+        example: cityName:asc, countryName:desc
+  responses:
+    Unauthorized:
+      description: >-
+        <b>Unauthorized</b> <br/> The request has not been applied because it
+        lacks valid authentication credentials for the target resource.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/responses/Forbidden/content/application~1json/schema'
+          example:
+            httpMethod: POST
+            requestUri: /api/maintenance-orders
+            statusCode: 401
+            statusText: Unauthorized
+            errorMessage: Failed authenticating using the parsed bearer token.
+            correlationIdentifier: 0HN749U0FM5K7:00000002
+            status: null
+            errorTimestamp: '2024-10-04T08:36:40.023753+00:00'
+            detailedErrors: null
+    BadRequest:
+      description: "<b>Bad Request</b>\r\n\nValidation failed as the parsed data is not acceptable."
+      content:
+        application/json:
+          schema:
+            required:
+              - correlationIdentifier
+              - errorTimestamp
+              - httpMethod
+            type: object
+            properties:
+              httpMethod:
+                minLength: 1
+                type: string
+                description: The request method type e.g. GET, POST.
+              requestUri:
+                type: string
+                description: >-
+                  The request URI as it was sent by the consumer. May not always
+                  be available, depending on infrastructure.
+                nullable: true
+              errorMessage:
+                maxLength: 200
+                type: string
+                description: Other error information
+                nullable: true
+              correlationIdentifier:
+                minLength: 1
+                type: string
+                description: Correlation identifier, e.g. a UUID
+              status:
+                type: string
+                description: The textual representation of the response status.
+                nullable: true
+              errorTimestamp:
+                type: string
+                description: The date and time (in ISO 8601 UTC format) the error occurred.
+                format: date-time
+              detailedErrors:
+                type: array
+                items:
+                  $ref: >-
+                    #/components/responses/Forbidden/content/application~1json/schema/properties/detailedErrors/items
+                description: >-
+                  List of detailed errors, e.g. fields that could not pass
+                  validation
+                nullable: true
+              statusCode:
+                type: integer
+                format: int32
+                readOnly: true
+              statusText:
+                type: string
+                nullable: true
+                readOnly: true
+            additionalProperties: {}
+          example:
+            statusCode: 400
+            statusText: Bad Request
+            httpMethod: POST
+            requestUri: /api/maintenance-orders
+            errorMessage: One or more validation errors occurred.
+            correlationIdentifier: 0HN749EUK7OAF:00000004
+            status: null
+            errorTimestamp: '2024-10-04T08:08:41.094686+00:00'
+            detailedErrors:
+              - errorCode: null
+                field: MaintenanceShopCode
+                value: 1VDLS
+                message: >-
+                  'Maintenance Shop Code' must be 3 characters in length. You
+                  entered 5 characters.
+    UnprocessableContent:
+      description: >-
+        <b>Unprocessable Entity</b><br/>Validation failed due to one or more
+        business rules were violated.
+      content:
+        application/json:
+          schema:
+            required:
+              - correlationIdentifier
+              - errorTimestamp
+              - httpMethod
+            type: object
+            properties:
+              httpMethod:
+                minLength: 1
+                type: string
+                description: The request method type e.g. GET, POST.
+              requestUri:
+                type: string
+                description: >-
+                  The request URI as it was sent by the consumer. May not always
+                  be available, depending on infrastructure.
+                nullable: true
+              errorMessage:
+                maxLength: 200
+                type: string
+                description: Other error information
+                nullable: true
+              correlationIdentifier:
+                minLength: 1
+                type: string
+                description: Correlation identifier, e.g. a UUID
+              status:
+                type: string
+                description: The textual representation of the response status.
+                nullable: true
+              errorTimestamp:
+                type: string
+                description: The date and time (in ISO 8601 UTC format) the error occurred.
+                format: date-time
+              detailedErrors:
+                type: array
+                items:
+                  $ref: >-
+                    #/components/responses/Forbidden/content/application~1json/schema/properties/detailedErrors/items
+                description: >-
+                  List of detailed errors, e.g. fields that could not pass
+                  validation
+                nullable: true
+              statusCode:
+                type: integer
+                format: int32
+                readOnly: true
+              statusText:
+                type: string
+                nullable: true
+                readOnly: true
+            additionalProperties: {}
+          example:
+            statusCode: 422
+            statusText: Unprocessable Entity
+            httpMethod: POST
+            requestUri: null
+            errorMessage: One or more rule validation errors occurred.
+            correlationIdentifier: 0HN6S555O4MA8:00000002
+            status: null
+            errorTimestamp: '2024-09-24T08:02:15.0709897+00:00'
+            detailedErrors: null
+            violations:
+              - rulesetName: equipment_number_ruleset
+                rulesetProperties:
+                  - EquipmentNumber
+                code: '0002'
+                message: >-
+                  Work order with equipment number 'MCAU6024920' already exists
+                  in the system.
+                severity: 0
+              - rulesetName: maintenance_order_shop_ruleset
+                rulesetProperties:
+                  - MaintenanceShopCode
+                code: '0077'
+                message: Labour rate is not present for shop code '3FI'
+                severity: 0
+    Forbidden:
+      description: >-
+        <b>Forbidden</b> <br/> The server understood the request, but is
+        refusing to fulfill it.
+      content:
+        application/json:
+          schema:
+            required:
+              - correlationIdentifier
+              - errorTimestamp
+              - httpMethod
+              - statusCode
+              - statusText
+            type: object
+            properties:
+              httpMethod:
+                minLength: 1
+                type: string
+                description: The request method type e.g. GET, POST.
+              requestUri:
+                type: string
+                description: >-
+                  The request URI as it was sent by the consumer. May not always
+                  be available, depending on infrastructure.
+                nullable: true
+              statusCode:
+                type: integer
+                description: The HTTP status code e.g. 401
+                format: int32
+                readOnly: true
+              statusText:
+                minLength: 1
+                type: string
+                description: The HTTP status text
+                readOnly: true
+              errorMessage:
+                maxLength: 200
+                type: string
+                description: Other error information
+                nullable: true
+              correlationIdentifier:
+                minLength: 1
+                type: string
+                description: Correlation identifier, e.g. a UUID
+              status:
+                type: string
+                description: The textual representation of the response status.
+                nullable: true
+              errorTimestamp:
+                type: string
+                description: The date and time (in ISO 8601 UTC format) the error occurred.
+                format: date-time
+              detailedErrors:
+                type: array
+                items:
+                  required:
+                    - message
+                  type: object
+                  properties:
+                    errorCode:
+                      type: integer
+                      description: >-
+                        Standard error code, examples: 7003 – out or range
+                        value, 7004 - invalid type
+                      format: int32
+                      nullable: true
+                    field:
+                      type: string
+                      description: >-
+                        The field that caused the error, e.g. a failed
+                        validation.
+                      nullable: true
+                    value:
+                      type: string
+                      description: The value that of the field that caused the error.
+                      nullable: true
+                    message:
+                      minLength: 1
+                      type: string
+                      description: The reason and advice for why the error occured.
+                  additionalProperties: false
+                  description: Detailed error message of fields that caused errors to occur
+                description: >-
+                  List of detailed errors, e.g. fields that could not pass
+                  validation
+                nullable: true
+            additionalProperties: {}
+            description: >-
+              Default error model used to respond to requests that went in to
+              error. This error model is used for all HTTP code errors instead
+              of individually declaring HTTP responses for errors.
+          example:
+            httpMethod: POST
+            requestUri: /api/maintenance-orders
+            statusCode: 403
+            statusText: Forbidden
+            errorMessage: User 'osi022' does not have access to the shop 'XYZ'
+            correlationIdentifier: 0HN749INE7DQL:00000002
+            status: null
+            errorTimestamp: '2024-10-04T08:15:27.230916+00:00'
+            detailedErrors: null
+    InternalServerError:
+      description: <b>Internal Server Error</b> <br/> An unexpected error occurred.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/responses/Forbidden/content/application~1json/schema'
+          example:
+            httpMethod: POST
+            requestUri: /api/maintenance-orders
+            statusCode: 500
+            statusText: Internal Server Error
+            errorMessage: An unexpected error occurred.
+            correlationIdentifier: 0HN749EUK7OAF:00000004
+            status: Internal Server Error
+            errorTimestamp: '2024-10-04T08:08:41.094686+00:00'
+            detailedErrors: null
+    ServiceUnavailable:
+      description: >-
+        <b>Service Unavailable</b> <br/> The database server or external system
+        is currently unable to handle the request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/responses/Forbidden/content/application~1json/schema'
+          example:
+            httpMethod: GET
+            requestUri: /api/v1/equipment/MCAU6024920
+            statusCode: 503
+            statusText: Service Unavailable
+            errorMessage: One or more rule validation errors occurred.
+            correlationIdentifier: 0HN6S555O4MA8:00000002
+            status: AEMS API unavailable
+            errorTimestamp: '2024-09-24T08:02:15+00:00'
+            detailedErrors: null
+  securitySchemes:
+    ConsumerKey:
+      description: Consumer key used for authorisation to the API
+      type: apiKey
+      in: header
+      name: Consumer-Key
+    Bearer:
+      type: apiKey
+      description: |-
+        JWT Authorization header using the Bearer scheme. 
+                              Enter 'Bearer' [space] and then your token in the text input below.
+                              Example: 'Bearer 12345abcdef'
+      name: Authorization
+      in: header
+security:
+  - ConsumerKey: []
+  - Bearer: []

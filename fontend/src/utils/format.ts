@@ -25,6 +25,13 @@ export function formatNumber(value: number | null | undefined): string {
 /**
   Truncates string with ellipsis if exceeds length
  */
+/** Thời gian ISO (UTC) từ backend → giờ địa phương dd/mm/yyyy hh:mm:ss; rỗng → "—". */
+export function formatDateTime(value: string | null | undefined): string {
+  if (!value) return '—';
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? value : d.toLocaleString('vi-VN');
+}
+
 export function truncateText(text: string, maxLength: number): string {
   if (!text) return '';
   if (text.length <= maxLength) return text;

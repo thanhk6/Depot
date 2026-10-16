@@ -10,12 +10,29 @@ import {
   CustomerNotificationPreference
 } from '../models/notification.types';
 
-import { MOCK_ZALO_SETTINGS } from '../mock/notification.mock';
 import { notificationApi } from '../../../api';
 
 // Cấu hình Zalo OA vẫn giữ dạng demo/simulator theo quyết định của người dùng (chưa tích hợp Zalo OA
 // thật — xem docs/backend-progress/36-zalo-overview.md) — chỉ phần này còn dùng state cục bộ.
-let zaloSettingsState: ZaloSettingsConfig = { ...MOCK_ZALO_SETTINGS };
+// Hệ thống CHƯA tích hợp Zalo OA thật và chưa có bảng lưu cấu hình Zalo — trạng thái ban đầu là "chưa cấu hình".
+// Trước đây khởi tạo bằng cấu hình mẫu (OA ID/App ID bịa, isConnected = true) nên màn Zalo báo "đã kết nối".
+let zaloSettingsState: ZaloSettingsConfig = {
+  provider: 'ZALO_OFFICIAL_ACCOUNT',
+  environment: 'PRODUCTION',
+  oaId: '',
+  appId: '',
+  secretKey: '',
+  accessToken: '',
+  refreshToken: '',
+  tokenExpiresAt: '',
+  webhookUrl: '',
+  isConnected: false,
+  lastConnectedAt: '',
+  dailyQuota: 0,
+  usedQuotaToday: 0,
+  znsTemplatesCount: 0,
+  webhookEventsEnabled: false
+};
 
 const mapEmployeeDto = (e: any): NotificationEmployee => ({
   id: e.id,
@@ -330,10 +347,10 @@ export const notificationService = {
       const q = filters.search.toLowerCase();
       list = list.filter(
         (h) =>
-          h.recipientName.toLowerCase().includes(q) ||
-          h.recipientPhone.includes(q) ||
-          h.trackingCode.toLowerCase().includes(q) ||
-          h.title.toLowerCase().includes(q) ||
+          (h.recipientName || '').toLowerCase().includes(q) ||
+          (h.recipientPhone || '').includes(q) ||
+          (h.trackingCode || '').toLowerCase().includes(q) ||
+          (h.title || '').toLowerCase().includes(q) ||
           (h.entityReference && h.entityReference.toLowerCase().includes(q))
       );
     }
@@ -423,15 +440,15 @@ export const notificationService = {
     latencyMs: number;
     message: string;
   }> => {
-    await new Promise((res) => setTimeout(res, 400));
+    // Không giả lập kết nối thành công — chưa có tích hợp Zalo OA thật để kiểm tra.
     return {
-      success: true,
-      oaName: 'EMR DEPOT CONTAINER NOTIFICATION GATEWAY',
-      oaId: zaloSettingsState.oaId || '38192847192837192',
-      followersCount: 1485,
-      quotaRemaining: 4872,
-      latencyMs: 142,
-      message: 'Kết nối Zalo Official Account & ZNS Gateway thành công 100%! (Chế độ demo)'
+      success: false,
+      oaName: '',
+      oaId: zaloSettingsState.oaId,
+      followersCount: 0,
+      quotaRemaining: 0,
+      latencyMs: 0,
+      message: 'Hệ thống chưa tích hợp Zalo Official Account — không có kết nối thật để kiểm tra.'
     };
   }
 };

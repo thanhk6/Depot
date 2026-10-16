@@ -10,7 +10,6 @@ namespace Depot.Data.Entities.Depot
     public class SurveyCleaningItem : FullAuditedEntity<long>
     {
         public long SurveyId { get; set; }
-        public virtual Survey? Survey { get; set; }
 
         public string CleaningCode { get; set; } = string.Empty;
         public string CleaningName { get; set; } = string.Empty;

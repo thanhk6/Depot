@@ -19,16 +19,29 @@ Bãi" (`handleConfirmDrop`) mới thật sự ghi xuống DB.
 
 - `POST /api/DepotJobs/{id}/forklift-move` → `DepotJobsController.CompleteForkliftMove` →
   `CompleteForkliftMoveAsync`: validate toạ độ Block/Bay/Row/Tier > 0, cập nhật `BlockCode/Bay/Row/Tier`
-  và `Status = "IN_YARD"` trên `DepotJob`, đồng thời tạo/cập nhật `YardPosition` tương ứng
-  (`IsOccupied = true`, `OccupiedContainerNo`). `jobId` truyền vào đúng là `containerId` lấy từ
-  `ContainerRecord.id` (= `DepotJob.Id`, xem 02-container-list.md) — khớp kiểu Guid. ✅
+  trên `DepotJob`, đồng thời tạo/cập nhật `YardPosition` tương ứng (`IsOccupied = true`,
+  `OccupiedContainerNo`). `jobId` truyền vào đúng là `containerId` lấy từ `ContainerRecord.id`
+  (= `DepotJob.Id`, xem 02-container-list.md). ✅
 
-Không phát hiện lỗi tích hợp — endpoint hoạt động đúng như thiết kế, không cần sửa.
+## Cập nhật 2026-09-06: chạy thử thật phát hiện bug cross-module (cùng loại với màn 07-payment), đã sửa
 
-## Trạng thái: ✅ Xong
+`CompleteForkliftMoveAsync` trước đây còn ghi đè `job.Status = "IN_YARD"` **vô điều kiện** mỗi lần xe nâng
+dời container, bất kể job đang ở trạng thái nghiệp vụ nào. Xe nâng có thể đảo chuyển vị trí ở bất kỳ giai
+đoạn nào trong vòng đời — kể cả 1 container đã QC đạt (`READY_FOR_OUT`) bị dời chỗ trong lúc chờ xe tới
+lấy — ghi đè status như cũ sẽ xoá mất `READY_FOR_OUT`, khiến `GateOutAsync` (yêu cầu đúng
+`Status == "READY_FOR_OUT"`) từ chối vĩnh viễn, container kẹt mãi không Gate-Out được. Grep toàn backend
+xác nhận không nơi nào khác đọc `DepotJob.Status == "IN_YARD"` làm điều kiện thật (chỉ xuất hiện trong
+danh sách "allowed" của endpoint set-status thủ công) — đã xoá dòng ghi đè, vị trí vật lý vẫn cập nhật đủ
+qua `BlockCode/Bay/Row/Tier` + `YardPosition`.
 
-- [x] `POST /api/DepotJobs/{id}/forklift-move` — khớp, không cần sửa
-- [x] Không cần build lại (không đổi code)
+Verify thật: đưa 1 job về `READY_FOR_OUT` → gọi forklift-move dời vị trí → job vẫn `READY_FOR_OUT` (trước
+khi sửa sẽ thành `IN_YARD`) → gọi `POST .../gate-out` thành công (trước khi sửa sẽ luôn thất bại).
+`dotnet build` solution 0 lỗi.
+
+## Trạng thái: ✅ Xong (đã sửa bug 2026-09-06)
+
+- [x] `POST /api/DepotJobs/{id}/forklift-move` — đã sửa: bỏ `job.Status = "IN_YARD"` ghi đè sai
+- [x] `dotnet build` solution 0 lỗi, verify thật qua Postgres (forklift-move → gate-out liên tiếp)
 - [ ] Ghi chú: hàng đợi/nhận lệnh/lịch sử điều xe hiển thị trên UI là state cục bộ tính lại mỗi lần từ
       `containers`, không có bảng "ForkliftJob" riêng lưu lịch sử ai nhận lệnh lúc nào — nếu sau này cần
       lưu vết đầy đủ (ai claim, claim lúc nào, huỷ bao nhiêu lần...) sẽ là việc lớn tương tự màn 09,

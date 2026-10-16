@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ServiceOrder } from '../types';
 import { formatVND } from '../../../utils/format';
 import {
@@ -24,51 +24,45 @@ import {
   Layers,
   Send
 } from 'lucide-react';
+import { VietQrCode } from '../../../components/common/VietQrCode';
+import { buildTransferContent } from '../../../utils/vietqr';
 
 interface ServiceOrderDetailModalProps {
   order: ServiceOrder | null;
   isOpen: boolean;
   onClose: () => void;
-  onMarkPaid?: (orderId: string) => void;
-  onNavigateToPayment?: (containerId?: string) => void;
-  onCancelOrder?: (orderId: string) => Promise<void>;
+  /** Mở ra là in ngay chứng từ này (dùng cho "Lưu & In" ở form lập phiếu). */
+  autoPrint?: 'ORDER' | 'RECEIPT' | 'EEIR' | null;
+  onAutoPrinted?: () => void;
 }
 
 export const ServiceOrderDetailModal: React.FC<ServiceOrderDetailModalProps> = ({
   order,
   isOpen,
   onClose,
-  onMarkPaid,
-  onNavigateToPayment,
-  onCancelOrder
+  autoPrint,
+  onAutoPrinted
 }) => {
-  const [activeDocumentTab, setActiveDocumentTab] = useState<'RECEIPT' | 'EEIR' | 'ALL'>('RECEIPT');
-  const [isCancelling, setIsCancelling] = useState(false);
-  const [cancelError, setCancelError] = useState<string | null>(null);
+  // Màn này chỉ để XEM và IN chứng từ — thu tiền làm ở màn Thanh Toán, không huỷ / chuyển trang từ đây.
+  const [activeDocumentTab, setActiveDocumentTab] = useState<'ORDER' | 'RECEIPT' | 'EEIR' | 'ALL'>('ORDER');
+
+  useEffect(() => {
+    if (!isOpen || !order || !autoPrint) return;
+    setActiveDocumentTab(autoPrint);
+    const timer = setTimeout(() => {
+      window.print();
+      onAutoPrinted?.();
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [isOpen, order?.id, autoPrint]);
 
   if (!isOpen || !order) return null;
 
-  const handlePrint = (mode: 'RECEIPT' | 'EEIR' | 'ALL') => {
+  const handlePrint = (mode: 'ORDER' | 'RECEIPT' | 'EEIR' | 'ALL') => {
     setActiveDocumentTab(mode);
     setTimeout(() => {
       window.print();
     }, 150);
-  };
-
-  const canCancel = order.status !== 'PAID' && order.status !== 'CANCELLED';
-
-  const handleCancelOrder = async () => {
-    if (!onCancelOrder) return;
-    if (!window.confirm(`Huỷ phiếu dịch vụ ${order.orderNo}? Hành động này không thể hoàn tác.`)) return;
-    setCancelError(null);
-    setIsCancelling(true);
-    try {
-      await onCancelOrder(order.id);
-    } catch (error) {
-      setCancelError(error instanceof Error ? error.message : 'Không thể huỷ phiếu dịch vụ.');
-    } finally {
-      setIsCancelling(false);
-    }
   };
 
   const getConditionBadge = (condition?: 'AV' | 'CL' | 'DM') => {
@@ -125,7 +119,7 @@ export const ServiceOrderDetailModal: React.FC<ServiceOrderDetailModalProps> = (
                 </h2>
               </div>
               <p className="text-xs text-slate-500">
-                Phiếu Thu Dịch Vụ: <strong className="text-slate-700 font-mono">#{order.orderNo}</strong> &bull; Biên Bản e-EIR: <strong className="text-emerald-700 font-mono">#{eeirNumber}</strong>
+                Phiếu Dịch Vụ: <strong className="text-slate-700 font-mono">#{order.orderNo}</strong> &bull; Biên Bản e-EIR: <strong className="text-emerald-700 font-mono">#{eeirNumber}</strong>
               </p>
             </div>
           </div>
@@ -133,6 +127,18 @@ export const ServiceOrderDetailModal: React.FC<ServiceOrderDetailModalProps> = (
           {/* Document Switcher Tabs & Print Controls */}
           <div className="flex items-center gap-2">
             <div className="bg-white p-1 rounded-xl border border-slate-200 flex items-center gap-1">
+              <button
+                onClick={() => setActiveDocumentTab('ORDER')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                  activeDocumentTab === 'ORDER'
+                    ? 'bg-indigo-600 text-white shadow'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                <FileCheck className="w-3.5 h-3.5" />
+                <span>Phiếu Dịch Vụ</span>
+              </button>
+
               <button
                 onClick={() => setActiveDocumentTab('RECEIPT')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
@@ -142,7 +148,7 @@ export const ServiceOrderDetailModal: React.FC<ServiceOrderDetailModalProps> = (
                 }`}
               >
                 <Receipt className="w-3.5 h-3.5" />
-                <span>1. Phiếu Thu Tiền</span>
+                <span>Phiếu Thu Tiền</span>
               </button>
 
               <button
@@ -154,7 +160,7 @@ export const ServiceOrderDetailModal: React.FC<ServiceOrderDetailModalProps> = (
                 }`}
               >
                 <FileCheck className="w-3.5 h-3.5" />
-                <span>2. Biên Bản e-EIR</span>
+                <span>Biên Bản e-EIR</span>
               </button>
 
               <button
@@ -166,7 +172,7 @@ export const ServiceOrderDetailModal: React.FC<ServiceOrderDetailModalProps> = (
                 }`}
               >
                 <Layers className="w-3.5 h-3.5" />
-                <span>Xem Cả Hai</span>
+                <span>Phiếu Thu + e-EIR</span>
               </button>
             </div>
 
@@ -178,7 +184,7 @@ export const ServiceOrderDetailModal: React.FC<ServiceOrderDetailModalProps> = (
               >
                 <Printer className="w-4 h-4 text-cyan-700" />
                 <span className="hidden sm:inline">
-                  {activeDocumentTab === 'RECEIPT' ? 'In Phiếu Thu' : activeDocumentTab === 'EEIR' ? 'In e-EIR' : 'In Cả Hai'}
+                  {activeDocumentTab === 'ORDER' ? 'In Phiếu Dịch Vụ' : activeDocumentTab === 'RECEIPT' ? 'In Phiếu Thu' : activeDocumentTab === 'EEIR' ? 'In e-EIR' : 'In Phiếu Thu + e-EIR'}
                 </span>
               </button>
 
@@ -198,7 +204,7 @@ export const ServiceOrderDetailModal: React.FC<ServiceOrderDetailModalProps> = (
           {/* ========================================================= */}
           {/* DOCUMENT 1: PHIẾU THU TIỀN DỊCH VỤ (SERVICE PAYMENT RECEIPT) */}
           {/* ========================================================= */}
-          {(activeDocumentTab === 'RECEIPT' || activeDocumentTab === 'ALL') && (
+          {(activeDocumentTab === 'ORDER' || activeDocumentTab === 'RECEIPT' || activeDocumentTab === 'ALL') && (
             <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 space-y-6 print:border-none print:p-0 print:bg-white print:text-black">
               {/* Header Info & Company Brand */}
               <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col md:flex-row justify-between gap-4 print:bg-white print:border-b-2 print:border-black print:p-2">
@@ -208,19 +214,16 @@ export const ServiceOrderDetailModal: React.FC<ServiceOrderDetailModalProps> = (
                       STB DEPOT ERP
                     </span>
                     <span className="text-xs text-slate-500 print:text-gray-700 font-semibold">
-                      CÔNG TY CỔ PHẦN CẢNG & TIẾP VẬN CONTAINER STB
+                      SOLUTION DEPOT
                     </span>
                   </div>
                   <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-wide print:text-black">
-                    PHIẾU THU DỊCH VỤ CONTAINER GATE-IN
+                    {activeDocumentTab === 'ORDER' ? 'PHIẾU DỊCH VỤ CONTAINER GATE-IN' : 'PHIẾU THU DỊCH VỤ CONTAINER GATE-IN'}
                   </h3>
-                  <p className="text-xs text-slate-500 print:text-gray-600">
-                    Địa chỉ: Cụm Cảng & Bãi Depot Cát Lái - Phú Hữu, TP. Thủ Đức, TP. Hồ Chí Minh &bull; Hotline: 1900 8899
-                  </p>
                 </div>
 
                 <div className="text-left md:text-right space-y-1">
-                  <div className="text-xs text-slate-500 print:text-gray-600">Số Phiếu Thu:</div>
+                  <div className="text-xs text-slate-500 print:text-gray-600">{activeDocumentTab === 'ORDER' ? 'Số Phiếu Dịch Vụ:' : 'Số Phiếu Thu:'}</div>
                   <div className="text-base font-mono font-bold text-cyan-700 print:text-black">{order.orderNo}</div>
                   <div className="text-xs text-slate-500 print:text-gray-600 flex items-center md:justify-end gap-1">
                     <Calendar className="w-3.5 h-3.5" />
@@ -390,7 +393,7 @@ export const ServiceOrderDetailModal: React.FC<ServiceOrderDetailModalProps> = (
                       <div className="font-bold text-slate-700 print:text-black">THU NGÂN / NHÂN VIÊN KHAI THÁC</div>
                       <div className="text-[10px] text-slate-500 print:text-gray-600">(Ký và đóng dấu xác nhận)</div>
                       <div className="h-14 flex items-end justify-center font-serif italic text-cyan-700 print:text-black">
-                        {order.createdBy || 'Nguyễn Văn Thu Ngân'}
+                        {order.createdBy || '—'}
                       </div>
                     </div>
                   </div>
@@ -398,25 +401,8 @@ export const ServiceOrderDetailModal: React.FC<ServiceOrderDetailModalProps> = (
 
                 {/* Right Col: VietQR Box */}
                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col items-center justify-center text-center space-y-3 print:bg-white print:border print:border-gray-300">
-                  <div className="p-3 bg-white rounded-2xl border-2 border-purple-500/40 shadow-xl">
-                    <img
-                      src={order.qrImageUrl || `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=STB_DEPOT_PAYMENT_${order.orderNo}_${order.containerNo}_${order.grandTotal}`}
-                      alt={`VietQR ${order.orderNo}`}
-                      className="w-32 h-32 object-contain mx-auto"
-                    />
-                    <div className="text-[10px] font-bold font-mono text-slate-900 pt-1">
-                      VIETQR NAPAS 24/7
-                    </div>
-                  </div>
-                  <div className="space-y-1 text-xs">
-                    <div className="font-bold text-slate-900 print:text-black">Quét mã QR chuyển khoản</div>
-                    <div className="font-mono font-black text-emerald-700 text-sm print:text-black">{formatVND(order.grandTotal)}</div>
-                    <div className="text-[10px] text-slate-500 print:text-gray-600">
-                      NH: Vietcombank CN Tân Cảng<br />
-                      STK: 0071001234567<br />
-                      ND: <strong className="text-cyan-700 print:text-black font-mono">STB {order.orderNo}</strong>
-                    </div>
-                  </div>
+                  <VietQrCode compact amount={order.grandTotal} addInfo={buildTransferContent(order.customerName, order.containerNo)} />
+                  <div className="font-mono font-black text-emerald-700 text-sm print:text-black">{formatVND(order.grandTotal)}</div>
                 </div>
               </div>
             </div>
@@ -435,7 +421,7 @@ export const ServiceOrderDetailModal: React.FC<ServiceOrderDetailModalProps> = (
                       ELECTRONIC EIR
                     </span>
                     <span className="text-xs text-slate-500 print:text-gray-700 font-semibold">
-                      CÔNG TY CỔ PHẦN CẢNG & TIẾP VẬN CONTAINER STB
+                      SOLUTION DEPOT
                     </span>
                   </div>
                   <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-wide print:text-black">
@@ -509,7 +495,7 @@ export const ServiceOrderDetailModal: React.FC<ServiceOrderDetailModalProps> = (
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500 print:text-gray-600">SĐT Liên Lạc:</span>
-                      <span className="font-mono text-slate-700 print:text-black">{order.driverPhone || '0909.123.456'}</span>
+                      <span className="font-mono text-slate-700 print:text-black">{order.driverPhone || '—'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500 print:text-gray-600">Số Bằng Lái:</span>
@@ -535,7 +521,7 @@ export const ServiceOrderDetailModal: React.FC<ServiceOrderDetailModalProps> = (
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500 print:text-gray-600">Giám Định Viên:</span>
-                      <span className="font-semibold text-slate-700 print:text-black">{order.surveyRef?.surveyorName || order.surveyRef?.surveyor || 'Lê Hoàng Nam (IICL)'}</span>
+                      <span className="font-semibold text-slate-700 print:text-black">{order.surveyRef?.surveyorName || order.surveyRef?.surveyor || '—'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500 print:text-gray-600">Tiêu Chuẩn Giám Định:</span>
@@ -569,8 +555,7 @@ export const ServiceOrderDetailModal: React.FC<ServiceOrderDetailModalProps> = (
                   <div className="font-bold text-slate-700 print:text-black uppercase">ĐẠI DIỆN BÊN NHẬN (DEPOT SURVEYOR)</div>
                   <div className="text-[10px] text-slate-500 print:text-gray-600">Chứng nhận e-EIR số hóa an toàn SHA-256</div>
                   <div className="h-16 flex flex-col items-center justify-end font-serif italic text-cyan-700 print:text-black">
-                    <span className="text-[11px] text-cyan-700 font-mono">[Đã ký số Depot CA]</span>
-                    <span className="font-bold">{order.surveyRef?.surveyorName || order.surveyRef?.surveyor || order.createdBy || 'Lê Hoàng Nam (IICL)'}</span>
+                    <span className="font-bold">{order.surveyRef?.surveyorName || order.surveyRef?.surveyor || order.createdBy || '—'}</span>
                   </div>
                 </div>
               </div>
@@ -579,15 +564,7 @@ export const ServiceOrderDetailModal: React.FC<ServiceOrderDetailModalProps> = (
 
         </div>
 
-        {/* Cancel Error Banner */}
-        {cancelError && (
-          <div className="mx-6 mt-4 p-3 bg-rose-50 border border-rose-200 rounded-2xl flex items-center justify-between text-xs text-rose-700">
-            <span className="font-bold">{cancelError}</span>
-            <button onClick={() => setCancelError(null)} className="text-slate-500 hover:text-slate-900">✕</button>
-          </div>
-        )}
-
-        {/* Modal Bottom Actions */}
+        {/* Modal Bottom Actions — chỉ in chứng từ */}
         <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="text-xs text-slate-500 flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -595,31 +572,15 @@ export const ServiceOrderDetailModal: React.FC<ServiceOrderDetailModalProps> = (
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
-            {/* Cancel Order */}
-            {onCancelOrder && canCancel && (
-              <button
-                onClick={handleCancelOrder}
-                disabled={isCancelling}
-                className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-xl border border-rose-200 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <X className="w-3.5 h-3.5" />
-                <span>{isCancelling ? 'Đang huỷ...' : 'Huỷ Phiếu'}</span>
-              </button>
-            )}
-
-            {/* Quick Mark Paid (Cash) — thay thế cho việc phải điều hướng hẳn sang màn Thanh Toán */}
-            {onMarkPaid && order.paymentStatus !== 'PAID' && order.status !== 'CANCELLED' && (
-              <button
-                onClick={() => onMarkPaid(order.id)}
-                className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-xl border border-emerald-200 transition flex items-center gap-1.5 cursor-pointer"
-                title="Ghi nhận đã thu tiền mặt trực tiếp tại quầy, không cần chuyển sang màn Thanh Toán VietQR"
-              >
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Đánh Dấu Đã Thanh Toán</span>
-              </button>
-            )}
-
             {/* Direct Print Buttons */}
+            <button
+              onClick={() => handlePrint('ORDER')}
+              className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <FileCheck className="w-3.5 h-3.5 text-indigo-700" />
+              <span>In Phiếu Dịch Vụ</span>
+            </button>
+
             <button
               onClick={() => handlePrint('RECEIPT')}
               className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 transition flex items-center gap-1.5 cursor-pointer"
@@ -636,28 +597,6 @@ export const ServiceOrderDetailModal: React.FC<ServiceOrderDetailModalProps> = (
               <span>In e-EIR</span>
             </button>
 
-            {/* Transfer to Payment Module */}
-            {onNavigateToPayment && (
-              <button
-                onClick={() => {
-                  onClose();
-                  onNavigateToPayment(order.containerId || order.containerNo);
-                }}
-                className="px-5 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-purple-600/30 transition flex items-center gap-2 cursor-pointer"
-                title="Chuyển ngay sang màn hình thu ngân và mở danh sách cần thanh toán"
-              >
-                <QrCode className="w-4 h-4" />
-                <span>Chuyển Qua Mục Thanh Toán</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            )}
-
-            <button
-              onClick={onClose}
-              className="px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl border border-slate-200 transition cursor-pointer"
-            >
-              Đóng
-            </button>
           </div>
         </div>
       </div>

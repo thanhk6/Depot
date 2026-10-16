@@ -12,6 +12,8 @@ import {
   Receipt,
   FileCheck
 } from 'lucide-react';
+import { VietQrCode } from '../../../components/common/VietQrCode';
+import { buildTransferContent } from '../../../utils/vietqr';
 
 interface QuickQrModalProps {
   isOpen: boolean;
@@ -40,7 +42,6 @@ export const QuickQrModal: React.FC<QuickQrModalProps> = ({
 }) => {
   if (!isOpen) return null;
 
-  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=STB_DEPOT_NAPAS_${orderNo}_${containerNo}_${grandTotal}`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-fade-in">
@@ -87,16 +88,7 @@ export const QuickQrModal: React.FC<QuickQrModalProps> = ({
           </div>
 
           {/* QR Code Container */}
-          <div className="p-4 bg-white rounded-2xl border-4 border-purple-500/30 shadow-2xl inline-block mx-auto">
-            <img
-              src={qrImageUrl}
-              alt={`VietQR ${orderNo}`}
-              className="w-48 h-48 object-contain mx-auto"
-            />
-            <div className="text-[10px] font-black font-mono text-slate-900 pt-1 tracking-wider">
-              VIETQR NAPAS 24/7 &bull; AUTO
-            </div>
-          </div>
+          <VietQrCode amount={grandTotal} addInfo={buildTransferContent(customerName, containerNo)} />
 
           {/* Price & Transfer Note */}
           <div className="space-y-1">
@@ -106,13 +98,7 @@ export const QuickQrModal: React.FC<QuickQrModalProps> = ({
             </div>
             <div className="text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-0.5">
               <div>
-                Ngân hàng: <strong className="text-slate-900">Vietcombank - CN Tân Cảng</strong>
-              </div>
-              <div>
-                STK: <strong className="font-mono text-slate-900">0071001234567</strong> &bull; Tên: <strong className="text-slate-700">STB DEPOT LOGISTICS</strong>
-              </div>
-              <div>
-                Nội dung: <strong className="font-mono text-cyan-700 font-bold">STB {orderNo}</strong>
+                Phiếu: <strong className="font-mono text-cyan-700 font-bold">{orderNo}</strong>
               </div>
             </div>
           </div>

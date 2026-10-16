@@ -10,7 +10,6 @@ namespace Depot.Data.Entities.Depot
     public class SurveyPhotoItem : FullAuditedEntity<long>
     {
         public long SurveyId { get; set; }
-        public virtual Survey? Survey { get; set; }
 
         public string Url { get; set; } = string.Empty;
         /// <summary>OVERVIEW / DETAIL / DOOR_SEAL / INTERIOR_FLOOR / REEFER_PANEL / OTHER.</summary>

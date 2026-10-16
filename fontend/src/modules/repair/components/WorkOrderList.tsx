@@ -84,16 +84,16 @@ export const WorkOrderList: React.FC<WorkOrderListProps> = ({
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       {/* Top Banner Header */}
-      <div className="p-6 bg-slate-900 border border-slate-800 rounded-3xl flex items-center justify-between flex-wrap gap-4">
+      <div className="p-6 bg-white border border-slate-200 rounded-3xl flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-3.5 bg-rose-600/20 border border-rose-500/30 text-rose-400 rounded-2xl">
+          <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-600 rounded-2xl">
             <Wrench className="w-7 h-7" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-white tracking-wide">
+            <h2 className="text-xl font-bold text-slate-900 tracking-wide">
               8. SỬA CHỮA CONTAINER (REPAIR & WORK ORDER EXECUTION)
             </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-500 mt-0.5">
               Sau khi Estimate được Hãng tàu phê duyệt, xưởng cơ khí tiếp nhận Work Order, thi công từng hạng mục, chụp ảnh trước/sau và chuyển QC nghiệm thu.
             </p>
           </div>
@@ -102,9 +102,9 @@ export const WorkOrderList: React.FC<WorkOrderListProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={() => onNavigateTab('qc')}
-            className="px-4 py-2.5 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/40 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow"
+            className="px-4 py-2.5 bg-purple-50 hover:bg-purple-50 text-purple-700 border border-purple-200 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow"
           >
-            <ShieldCheck className="w-4 h-4 text-purple-400" />
+            <ShieldCheck className="w-4 h-4 text-purple-600" />
             <span>Chuyển Sang Bước 9 (Kỹ Thuật QC) &rarr;</span>
           </button>
         </div>
@@ -116,12 +116,12 @@ export const WorkOrderList: React.FC<WorkOrderListProps> = ({
           onClick={() => setActiveStatusTab('ALL')}
           className={`p-4 rounded-2xl border transition cursor-pointer ${
             activeStatusTab === 'ALL'
-              ? 'bg-blue-950/60 border-blue-500 shadow-md shadow-blue-950'
-              : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+              ? 'bg-blue-50 border-blue-500 shadow-md '
+              : 'bg-white border-slate-200 hover:border-slate-200'
           }`}
         >
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Tất Cả WO</span>
-          <div className="text-2xl font-black text-white font-mono mt-1">{totalCount}</div>
+          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Tất Cả WO</span>
+          <div className="text-2xl font-black text-slate-900 font-mono mt-1">{totalCount}</div>
           <span className="text-[10px] text-slate-500">Toàn bộ hồ sơ xưởng</span>
         </div>
 
@@ -129,12 +129,12 @@ export const WorkOrderList: React.FC<WorkOrderListProps> = ({
           onClick={() => setActiveStatusTab('WAITING')}
           className={`p-4 rounded-2xl border transition cursor-pointer ${
             activeStatusTab === 'WAITING'
-              ? 'bg-amber-950/60 border-amber-500 shadow-md shadow-amber-950'
-              : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+              ? 'bg-amber-50 border-amber-500 shadow-md '
+              : 'bg-white border-slate-200 hover:border-slate-200'
           }`}
         >
-          <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider block">Chờ Sửa (Waiting)</span>
-          <div className="text-2xl font-black text-amber-400 font-mono mt-1">{waitingCount}</div>
+          <span className="text-[11px] font-bold text-amber-600 uppercase tracking-wider block">Chờ Sửa (Waiting)</span>
+          <div className="text-2xl font-black text-amber-600 font-mono mt-1">{waitingCount}</div>
           <span className="text-[10px] text-slate-500">Đã duyệt &bull; Chờ phân công</span>
         </div>
 
@@ -142,12 +142,12 @@ export const WorkOrderList: React.FC<WorkOrderListProps> = ({
           onClick={() => setActiveStatusTab('IN_PROGRESS')}
           className={`p-4 rounded-2xl border transition cursor-pointer ${
             activeStatusTab === 'IN_PROGRESS'
-              ? 'bg-rose-950/60 border-rose-500 shadow-md shadow-rose-950'
-              : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+              ? 'bg-rose-50 border-rose-500 shadow-md '
+              : 'bg-white border-slate-200 hover:border-slate-200'
           }`}
         >
-          <span className="text-[11px] font-bold text-rose-400 uppercase tracking-wider block">Đang Sửa (In Progress)</span>
-          <div className="text-2xl font-black text-rose-400 font-mono mt-1">{inProgressCount}</div>
+          <span className="text-[11px] font-bold text-rose-600 uppercase tracking-wider block">Đang Sửa (In Progress)</span>
+          <div className="text-2xl font-black text-rose-600 font-mono mt-1">{inProgressCount}</div>
           <span className="text-[10px] text-slate-500">Thợ đang hàn/gọt sàn</span>
         </div>
 
@@ -155,12 +155,12 @@ export const WorkOrderList: React.FC<WorkOrderListProps> = ({
           onClick={() => setActiveStatusTab('QC_PENDING')}
           className={`p-4 rounded-2xl border transition cursor-pointer ${
             activeStatusTab === 'QC_PENDING'
-              ? 'bg-purple-950/60 border-purple-500 shadow-md shadow-purple-950'
-              : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+              ? 'bg-purple-50 border-purple-500 shadow-md '
+              : 'bg-white border-slate-200 hover:border-slate-200'
           }`}
         >
-          <span className="text-[11px] font-bold text-purple-400 uppercase tracking-wider block">Chờ QC (QC Pending)</span>
-          <div className="text-2xl font-black text-purple-400 font-mono mt-1">{qcPendingCount}</div>
+          <span className="text-[11px] font-bold text-purple-600 uppercase tracking-wider block">Chờ QC (QC Pending)</span>
+          <div className="text-2xl font-black text-purple-600 font-mono mt-1">{qcPendingCount}</div>
           <span className="text-[10px] text-slate-500">Đã xong &bull; Đầy đủ ảnh</span>
         </div>
 
@@ -168,24 +168,24 @@ export const WorkOrderList: React.FC<WorkOrderListProps> = ({
           onClick={() => setActiveStatusTab('QC_PASSED')}
           className={`p-4 rounded-2xl border transition cursor-pointer ${
             activeStatusTab === 'QC_PASSED'
-              ? 'bg-emerald-950/60 border-emerald-500 shadow-md shadow-emerald-950'
-              : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+              ? 'bg-emerald-50 border-emerald-500 shadow-md '
+              : 'bg-white border-slate-200 hover:border-slate-200'
           }`}
         >
-          <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider block">QC Đạt (Passed)</span>
-          <div className="text-2xl font-black text-emerald-400 font-mono mt-1">{qcPassedCount}</div>
+          <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider block">QC Đạt (Passed)</span>
+          <div className="text-2xl font-black text-emerald-600 font-mono mt-1">{qcPassedCount}</div>
           <span className="text-[10px] text-slate-500">Chuyển vỏ sạch AV</span>
         </div>
 
-        <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
-          <span className="text-[11px] font-bold text-rose-300 uppercase tracking-wider block">Khẩn Cấp (SLA)</span>
-          <div className="text-2xl font-black text-rose-400 font-mono mt-1">{urgentCount}</div>
+        <div className="p-4 bg-white border border-slate-200 rounded-2xl">
+          <span className="text-[11px] font-bold text-rose-700 uppercase tracking-wider block">Khẩn Cấp (SLA)</span>
+          <div className="text-2xl font-black text-rose-600 font-mono mt-1">{urgentCount}</div>
           <span className="text-[10px] text-slate-500">Cần xuất bãi trong 24h</span>
         </div>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="p-5 bg-slate-900 border border-slate-800 rounded-3xl space-y-4">
+      <div className="p-5 bg-white border border-slate-200 rounded-3xl space-y-4">
         {/* Status Filter Tabs (8.1) */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
           {[
@@ -202,8 +202,8 @@ export const WorkOrderList: React.FC<WorkOrderListProps> = ({
               onClick={() => setActiveStatusTab(tab.id)}
               className={`px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer shrink-0 ${
                 activeStatusTab === tab.id
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-950'
-                  : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+                  ? 'bg-blue-600 text-white shadow-md '
+                  : 'bg-slate-50 text-slate-500 hover:text-slate-700 border border-slate-200'
               }`}
             >
               {tab.label}
@@ -221,7 +221,7 @@ export const WorkOrderList: React.FC<WorkOrderListProps> = ({
               value={searchKeyword}
               onChange={(e) => setSearchKeyword(e.target.value)}
               placeholder="Tìm theo Container No, Work Order No, Báo Giá, Thợ thi công..."
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 text-white text-xs rounded-xl focus:outline-none focus:border-blue-500"
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 text-slate-900 text-xs rounded-xl focus:outline-none focus:border-blue-500"
             />
           </div>
 
@@ -230,7 +230,7 @@ export const WorkOrderList: React.FC<WorkOrderListProps> = ({
             <select
               value={selectedShippingLine}
               onChange={(e) => setSelectedShippingLine(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 text-white text-xs rounded-xl focus:outline-none"
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 text-slate-900 text-xs rounded-xl focus:outline-none"
             >
               <option value="ALL">Tất cả Hãng Tàu</option>
               {shippingLines.map((line) => (
@@ -246,7 +246,7 @@ export const WorkOrderList: React.FC<WorkOrderListProps> = ({
             <select
               value={selectedPriority}
               onChange={(e) => setSelectedPriority(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 text-white text-xs rounded-xl focus:outline-none"
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 text-slate-900 text-xs rounded-xl focus:outline-none"
             >
               <option value="ALL">Mọi Mức Ưu Tiên</option>
               <option value="URGENT">Khẩn cấp (Urgent)</option>
@@ -259,9 +259,9 @@ export const WorkOrderList: React.FC<WorkOrderListProps> = ({
       </div>
 
       {/* Work Orders Table */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
-        <div className="p-4 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between text-xs">
-          <span className="font-bold text-slate-300">
+      <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-xl">
+        <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs">
+          <span className="font-bold text-slate-700">
             DANH SÁCH LỆNH SỬA CHỮA (WORK ORDERS) ({filteredWorkOrders.length})
           </span>
           <span className="text-slate-500 font-mono text-[11px]">
@@ -272,7 +272,7 @@ export const WorkOrderList: React.FC<WorkOrderListProps> = ({
         {filteredWorkOrders.length === 0 ? (
           <div className="p-12 text-center space-y-3">
             <Wrench className="w-12 h-12 text-slate-600 mx-auto" />
-            <h4 className="text-sm font-bold text-slate-300">Không tìm thấy Work Order phù hợp</h4>
+            <h4 className="text-sm font-bold text-slate-700">Không tìm thấy Work Order phù hợp</h4>
             <p className="text-xs text-slate-500 max-w-sm mx-auto">
               Không có lệnh sửa chữa nào thỏa mãn điều kiện lọc. Vui lòng thay đổi trạng thái hoặc từ khóa tìm kiếm.
             </p>
@@ -281,7 +281,7 @@ export const WorkOrderList: React.FC<WorkOrderListProps> = ({
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-950/60 border-b border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   <th className="p-4">Work Order No</th>
                   <th className="p-4">Container & Loại Vỏ</th>
                   <th className="p-4">Báo Giá & Hãng Tàu</th>
@@ -292,7 +292,7 @@ export const WorkOrderList: React.FC<WorkOrderListProps> = ({
                   <th className="p-4 text-right">Thao Tác</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/80 text-xs">
+              <tbody className="divide-y divide-slate-200/80 text-xs">
                 {filteredWorkOrders.map((wo) => {
                   const total = wo.items.length;
                   const completed = wo.items.filter((i) => i.status === 'COMPLETED').length;
@@ -306,7 +306,7 @@ export const WorkOrderList: React.FC<WorkOrderListProps> = ({
                     >
                       {/* Work Order No */}
                       <td className="p-4">
-                        <div className="font-mono font-black text-amber-400 text-sm">
+                        <div className="font-mono font-black text-amber-600 text-sm">
                           {wo.workOrderNo}
                         </div>
                         <div className="text-[10px] text-slate-500 font-mono mt-0.5">
@@ -316,24 +316,24 @@ export const WorkOrderList: React.FC<WorkOrderListProps> = ({
 
                       {/* Container & Type */}
                       <td className="p-4">
-                        <div className="font-mono font-bold text-white text-sm">
+                        <div className="font-mono font-bold text-slate-900 text-sm">
                           {wo.containerNo}
                         </div>
-                        <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1.5 font-mono">
+                        <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5 font-mono">
                           <span>{wo.size} {wo.type}</span>
                           <span>&bull;</span>
-                          <span className="text-blue-400">Vị trí: {wo.yardLocation.block}-{wo.yardLocation.bay}</span>
+                          <span className="text-blue-600">Vị trí: {wo.yardLocation.block}-{wo.yardLocation.bay}</span>
                         </div>
                       </td>
 
                       {/* Estimate & Shipping Line */}
                       <td className="p-4">
                         <div className="flex items-center gap-1.5">
-                          <span className="px-2 py-0.5 bg-blue-950 border border-blue-800 text-blue-300 font-mono font-bold rounded text-[11px]">
+                          <span className="px-2 py-0.5 bg-blue-50 border border-blue-200 text-blue-700 font-mono font-bold rounded text-[11px]">
                             {wo.shippingLine}
                           </span>
                         </div>
-                        <div className="font-mono text-[11px] text-slate-400 mt-1">
+                        <div className="font-mono text-[11px] text-slate-500 mt-1">
                           {wo.estimateNo}
                         </div>
                       </td>
@@ -341,12 +341,12 @@ export const WorkOrderList: React.FC<WorkOrderListProps> = ({
                       {/* Items count & progress */}
                       <td className="p-4 min-w-[180px]">
                         <div className="flex items-center justify-between text-[11px] font-mono mb-1">
-                          <span className="text-slate-300 font-bold">{completed} / {total} Hạng mục</span>
-                          <span className={pct === 100 ? 'text-emerald-400 font-bold' : 'text-amber-400 font-bold'}>
+                          <span className="text-slate-700 font-bold">{completed} / {total} Hạng mục</span>
+                          <span className={pct === 100 ? 'text-emerald-600 font-bold' : 'text-amber-600 font-bold'}>
                             {pct}%
                           </span>
                         </div>
-                        <div className="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                        <div className="w-full h-1.5 bg-slate-50 rounded-full overflow-hidden border border-slate-200">
                           <div
                             className={`h-full transition-all duration-300 ${
                               pct === 100 ? 'bg-emerald-500' : 'bg-amber-500'
@@ -363,10 +363,10 @@ export const WorkOrderList: React.FC<WorkOrderListProps> = ({
                       <td className="p-4">
                         <span className={`px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold border ${
                           wo.priority === 'URGENT'
-                            ? 'bg-rose-950 text-rose-300 border-rose-800 animate-pulse'
+                            ? 'bg-rose-50 text-rose-700 border-rose-200 animate-pulse'
                             : wo.priority === 'HIGH'
-                            ? 'bg-amber-950 text-amber-300 border-amber-800'
-                            : 'bg-slate-800 text-slate-300 border-slate-700'
+                            ? 'bg-amber-50 text-amber-700 border-amber-200'
+                            : 'bg-slate-100 text-slate-700 border-slate-200'
                         }`}>
                           {wo.priority === 'URGENT' ? 'Khẩn Cấp' : wo.priority === 'HIGH' ? 'Ưu Tiên Cao' : 'Bình Thường'}
                         </span>
@@ -376,12 +376,12 @@ export const WorkOrderList: React.FC<WorkOrderListProps> = ({
                       <td className="p-4">
                         <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border inline-flex items-center gap-1.5 ${
                           wo.status === 'QC_PASSED'
-                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                             : wo.status === 'QC_PENDING'
-                            ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                            ? 'bg-purple-50 text-purple-700 border-purple-200'
                             : wo.status === 'IN_PROGRESS'
-                            ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                            : 'bg-slate-800 text-slate-300 border-slate-700'
+                            ? 'bg-amber-50 text-amber-700 border-amber-200'
+                            : 'bg-slate-100 text-slate-700 border-slate-200'
                         }`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${
                             wo.status === 'QC_PASSED'
@@ -405,7 +405,7 @@ export const WorkOrderList: React.FC<WorkOrderListProps> = ({
                       </td>
 
                       {/* Deadline SLA */}
-                      <td className="p-4 font-mono text-[11px] text-slate-300">
+                      <td className="p-4 font-mono text-[11px] text-slate-700">
                         {wo.deadline}
                       </td>
 
@@ -414,7 +414,7 @@ export const WorkOrderList: React.FC<WorkOrderListProps> = ({
                         <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={() => onSelectWorkOrder(wo)}
-                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-xs shadow-md shadow-blue-950 transition flex items-center gap-1 cursor-pointer shrink-0"
+                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-xs shadow-md  transition flex items-center gap-1 cursor-pointer shrink-0"
                           >
                             <Wrench className="w-3.5 h-3.5" />
                             <span>Chi Tiết Sửa Chữa</span>

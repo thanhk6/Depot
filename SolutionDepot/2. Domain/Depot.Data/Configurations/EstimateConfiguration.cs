@@ -12,6 +12,10 @@ namespace Depot.Data.Configurations
             builder.Property(x => x.DepotJobId).IsRequired();
             builder.HasIndex(x => x.JobNo).IsUnique();
             builder.HasIndex(x => x.DepotJobId).IsUnique();
+
+            // EstimateItem không còn navigation trỏ ngược về Estimate — khai báo tường minh thay cho
+            // convention discovery cũ (xem SurveyConfiguration.cs cho cùng pattern).
+            builder.HasMany<EstimateItem>().WithOne().HasForeignKey(x => x.EstimateId).OnDelete(DeleteBehavior.Cascade);
         }
     }
 }

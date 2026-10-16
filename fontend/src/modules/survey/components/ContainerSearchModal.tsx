@@ -4,11 +4,7 @@ import {
   Search,
   AlertTriangle,
   CheckCircle2,
-  Boxes,
   X,
-  PlusCircle,
-  Truck,
-  Ship,
   Sparkles
 } from 'lucide-react';
 
@@ -16,7 +12,7 @@ interface ContainerSearchModalProps {
   isOpen: boolean;
   onClose: () => void;
   existingSurveys: SurveyItemRecord[];
-  onStartSurvey: (containerNo: string, isPreSurvey: boolean, shippingLine: string, size: string) => void;
+  onOpenSurvey: (survey: SurveyItemRecord) => void;
   onOpenFullCreateModal?: (prefilledContainerNo?: string) => void;
 }
 
@@ -26,12 +22,10 @@ export const ContainerSearchModal: React.FC<ContainerSearchModalProps> = ({
   isOpen,
   onClose,
   existingSurveys,
-  onStartSurvey,
+  onOpenSurvey,
   onOpenFullCreateModal
 }) => {
   const [containerQuery, setContainerQuery] = useState('');
-  const [shippingLine, setShippingLine] = useState('MAERSK');
-  const [size, setSize] = useState('40HC');
   const [hasSearched, setHasSearched] = useState(false);
 
   if (!isOpen) return null;
@@ -59,7 +53,7 @@ export const ContainerSearchModal: React.FC<ContainerSearchModalProps> = ({
             <div>
               <h3 className="text-base font-bold text-slate-900">Tra Cứu Container &amp; Khởi Tạo Giám Định</h3>
               <p className="text-xs text-slate-500">
-                Hỗ trợ tìm kiếm container đã Gate-In hoặc tạo Pre-Survey cho vỏ chuẩn bị hạ bãi.
+                Tìm container đã Gate-In để mở phiếu, hoặc tiếp nhận cổng + giám định container mới.
               </p>
             </div>
           </div>
@@ -126,7 +120,7 @@ export const ContainerSearchModal: React.FC<ContainerSearchModalProps> = ({
 
                 <button
                   onClick={() => {
-                    onStartSurvey(matched.containerNo, false, matched.shippingLine, matched.size);
+                    onOpenSurvey(matched);
                     onClose();
                   }}
                   className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg transition flex items-center justify-center gap-1.5 cursor-pointer"
@@ -149,71 +143,23 @@ export const ContainerSearchModal: React.FC<ContainerSearchModalProps> = ({
                       </span>
                     </div>
                     <p className="text-[11px] text-slate-600 mt-1">
-                      Hệ thống cho phép thực hiện <strong>Pre-Survey (Giám định trước)</strong> khi xe cont đang xếp hàng ngoài cổng hoặc kiểm tra trước khi cấp số EIR.
+                      Phiếu giám định chỉ lưu được khi container đã có hồ sơ Gate-In. Dùng form chi tiết để tiếp nhận cổng
+                      và lập phiếu giám định cùng lúc.
                     </p>
                   </div>
                 </div>
 
-                {/* Pre-survey quick setup */}
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                      Hãng Tàu (Shipping Line)*
-                    </label>
-                    <select
-                      value={shippingLine}
-                      onChange={(e) => setShippingLine(e.target.value)}
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none"
-                    >
-                      <option value="MAERSK">MAERSK Line</option>
-                      <option value="MSC">MSC Shipping</option>
-                      <option value="ONE">ONE Network Express</option>
-                      <option value="CMA-CGM">CMA CGM</option>
-                      <option value="COSCO">COSCO Shipping</option>
-                      <option value="EVERGREEN">EVERGREEN Line</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                      Kích Cỡ (Size / Type)*
-                    </label>
-                    <select
-                      value={size}
-                      onChange={(e) => setSize(e.target.value)}
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none"
-                    >
-                      <option value="20DC">20DC - 20' Dry Container</option>
-                      <option value="40DC">40DC - 40' Dry Container</option>
-                      <option value="40HC">40HC - 40' High Cube Dry</option>
-                      <option value="40HR">40HR - 40' Reefer High Cube</option>
-                      <option value="45HC">45HC - 45' High Cube</option>
-                    </select>
-                  </div>
-                </div>
-
                 <div className="space-y-2">
-                  <button
-                    onClick={() => {
-                      onStartSurvey(cleanQuery, true, shippingLine, size);
-                      onClose();
-                    }}
-                    className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow-lg transition flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <PlusCircle className="w-4 h-4" />
-                    <span>Tạo Nhanh Phiếu Pre-Survey ({cleanQuery})</span>
-                  </button>
-
                   {onOpenFullCreateModal && (
                     <button
                       onClick={() => {
                         onClose();
                         onOpenFullCreateModal(cleanQuery);
                       }}
-                      className="w-full py-2 bg-white hover:bg-amber-50 text-amber-700 font-semibold text-xs rounded-xl border border-amber-300 transition flex items-center justify-center gap-1.5 cursor-pointer"
+                      className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow-lg transition flex items-center justify-center gap-1.5 cursor-pointer"
                     >
-                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                      <span>Nhập Đầy Đủ Thông Số &amp; Tổn Thất (Form Chi Tiết)</span>
+                      <Sparkles className="w-4 h-4" />
+                      <span>Tiếp Nhận Cổng &amp; Lập Phiếu Giám Định ({cleanQuery})</span>
                     </button>
                   )}
                 </div>

@@ -123,41 +123,39 @@ export const NotificationHeader: React.FC<NotificationHeaderProps> = ({
   ];
 
   return (
-    <div className="bg-white border-b border-slate-200 -mt-3 -mx-3 sm:-mt-4 sm:-mx-4 md:-mt-6 md:-mx-6 mb-6 px-4 sm:px-6 pt-5 pb-0 shadow-sm">
+    // Đồng bộ đúng chuẩn "Dashboard ERP Tổng Quan" (dashboard/pages/DashboardPage.tsx) theo yêu cầu
+    // người dùng 2026-09-06 — xem docs/frontend-theme-unification.md. Banner nền gradient sáng
+    // (blue-50→white→indigo-50), KHÔNG còn hộp icon gradient tối, dải tab chuyển sang nền sáng. Tiện thể
+    // sửa luôn 1 lỗi tương phản có sẵn ("CONNECTED" dùng text-emerald-400 khó đọc trên nền sáng) vì đang
+    // viết lại y hệt trang gốc này — trước đây các màn KHÁC chỉ nhân bản đúng y hệt kể cả lỗi này, nhưng
+    // giờ đang sửa lại chính trang tham chiếu nên không có lý do giữ lỗi.
+    <div className="p-6 bg-gradient-to-r from-blue-50 via-white to-indigo-50 border border-blue-200 rounded-3xl shadow-sm relative overflow-hidden space-y-4">
       {/* Title & Live Status Area */}
-      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 pb-4 border-b border-slate-200">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-600 via-sky-600 to-indigo-600 p-0.5 flex items-center justify-center shadow-lg shadow-blue-500/20">
-            <div className="w-full h-full bg-white rounded-[14px] flex items-center justify-center">
-              <Radio className="w-6 h-6 text-sky-400" />
-            </div>
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="space-y-2 relative z-10">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-700 rounded-full border border-blue-200 text-xs font-bold font-mono">
+            <Radio className="w-3.5 h-3.5" />
+            <span>OFFICIAL ACCOUNT &amp; ZNS</span>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                THÔNG BÁO & ZALO GATEWAY
-              </h1>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-sky-50 text-sky-700 border border-sky-200">
-                Official Account & ZNS
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Hệ thống gửi tin nhắn tự động & đồng bộ theo thời gian thực vòng đời Container Depot
-            </p>
-          </div>
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+            Thông Báo &amp; Zalo Gateway
+          </h2>
+          <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
+            Hệ thống gửi tin nhắn tự động &amp; đồng bộ theo thời gian thực vòng đời Container Depot.
+          </p>
         </div>
 
         {/* Action & Zalo Connection Badge */}
-        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-between lg:justify-end">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50 animate-pulse" />
+        <div className="flex flex-wrap items-center gap-3 relative z-10">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-white border border-slate-200 text-xs text-slate-700 shadow-sm">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50 animate-pulse" />
             <span className="font-semibold text-slate-700">Zalo OA:</span>
-            <span className="font-mono text-emerald-400 font-bold">CONNECTED (Quota 5,000/ngày)</span>
+            <span className="font-mono text-emerald-700 font-bold">CONNECTED (Quota 5,000/ngày)</span>
           </div>
 
           <button
             onClick={() => onSelectTab('send')}
-            className="px-4 py-2 bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-500 hover:to-sky-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-600/30 transition flex items-center gap-2 cursor-pointer active:scale-95"
+            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-2xl shadow-sm transition flex items-center gap-2 cursor-pointer active:scale-95"
           >
             <Send className="w-4 h-4" />
             <span>+ Gửi Thông Báo Mới</span>
@@ -165,22 +163,22 @@ export const NotificationHeader: React.FC<NotificationHeaderProps> = ({
         </div>
       </div>
 
-      {/* Navigation Sub-Tabs Bar */}
-      <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-2 mt-1">
+      {/* Navigation Sub-Tabs Bar (nền sáng) */}
+      <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none relative z-10">
         {tabs.map((tab) => {
           const isActive = currentTab === tab.id;
           return (
             <button
               key={tab.id}
               onClick={() => onSelectTab(tab.id)}
-              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-t-xl text-xs font-bold transition whitespace-nowrap cursor-pointer border-b-2 ${
+              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
                 isActive
                   ? tab.isZaloHighlight
-                    ? 'bg-blue-950/60 text-sky-300 border-sky-400 shadow-sm'
-                    : 'bg-slate-800/80 text-white border-blue-500 shadow-sm'
+                    ? 'bg-sky-600 text-white shadow-sm'
+                    : 'bg-blue-600 text-white shadow-sm'
                   : tab.isZaloHighlight
-                  ? 'text-sky-400/80 hover:text-sky-300 hover:bg-slate-800/40 border-transparent'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border-transparent'
+                  ? 'text-sky-700 bg-white/60 hover:text-sky-800 hover:bg-white border border-transparent hover:border-sky-200'
+                  : 'text-slate-600 bg-white/60 hover:text-slate-900 hover:bg-white border border-transparent hover:border-slate-200'
               }`}
             >
               {tab.icon}
@@ -188,11 +186,11 @@ export const NotificationHeader: React.FC<NotificationHeaderProps> = ({
               {tab.badge !== undefined && (
                 <span
                   className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold ${
-                    tab.isZaloHighlight
-                      ? 'bg-blue-600 text-white'
-                      : isActive
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-800 text-slate-300 border border-slate-700'
+                    isActive
+                      ? 'bg-white/20 text-white'
+                      : tab.isZaloHighlight
+                      ? 'bg-sky-100 text-sky-700 border border-sky-200'
+                      : 'bg-slate-100 text-slate-600 border border-slate-200'
                   }`}
                 >
                   {tab.badge}

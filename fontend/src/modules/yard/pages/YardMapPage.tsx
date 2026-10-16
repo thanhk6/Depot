@@ -11,7 +11,7 @@ import {
   YardFilterState,
   YardMoveHistory
 } from '../types/yardTypes';
-import { yardApi, initialBlocks, initialZones, initialForklifts, initialContainers } from '../services/yardApi';
+import { yardApi } from '../services/yardApi';
 import { YardKPIHeader } from '../components/YardKPIHeader';
 import { YardToolbar } from '../components/YardToolbar';
 import { YardFilter } from '../components/YardFilter';
@@ -35,6 +35,7 @@ import {
   AlertTriangle,
   Info
 } from 'lucide-react';
+import { useDepot } from '../../../context/DepotContext';
 
 interface YardMapPageProps {
   containers?: ContainerRecord[];
@@ -45,11 +46,14 @@ export const YardMapPage: React.FC<YardMapPageProps> = ({
   containers: initialAppContainers,
   onSelectContainer: onNavigateToContainerDetail
 }) => {
+  // Người thao tác = tài khoản đang đăng nhập thật (thay cho tên người mẫu viết cứng trước đây).
+  const { loggedInUserProfile } = useDepot();
+  const currentUserName = loggedInUserProfile?.fullName || loggedInUserProfile?.username || '';
   // State from API
-  const [zones, setZones] = useState<YardZone[]>(initialZones);
-  const [blocks, setBlocks] = useState<YardBlock[]>(initialBlocks);
-  const [containers, setContainers] = useState<YardContainer[]>(initialContainers);
-  const [forklifts, setForklifts] = useState<Forklift[]>(initialForklifts);
+  const [zones, setZones] = useState<YardZone[]>([]);
+  const [blocks, setBlocks] = useState<YardBlock[]>([]);
+  const [containers, setContainers] = useState<YardContainer[]>([]);
+  const [forklifts, setForklifts] = useState<Forklift[]>([]);
   const [dispatches, setDispatches] = useState<ForkliftDispatch[]>([]);
   const [gateLanes, setGateLanes] = useState<YardGateLane[]>([]);
   const [statistics, setStatistics] = useState<YardStatistics>({
@@ -269,7 +273,7 @@ export const YardMapPage: React.FC<YardMapPageProps> = ({
   }) => {
     const res = await yardApi.moveContainer({
       ...payload,
-      operatorName: 'Nguyễn Văn Hùng (Điều Độ Bãi)'
+      operatorName: currentUserName
     });
 
     if (res.success) {
@@ -326,37 +330,37 @@ export const YardMapPage: React.FC<YardMapPageProps> = ({
         <div
           className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-2xl shadow-2xl border flex items-center gap-2.5 text-xs font-semibold animate-bounce ${
             toastMessage.type === 'success'
-              ? 'bg-emerald-950/95 border-emerald-500 text-emerald-200'
+              ? 'bg-emerald-50 border-emerald-500 text-emerald-200'
               : toastMessage.type === 'error'
-              ? 'bg-rose-950/95 border-rose-500 text-rose-200'
-              : 'bg-slate-900/95 border-slate-700 text-slate-200'
+              ? 'bg-rose-50 border-rose-500 text-rose-200'
+              : 'bg-white border-slate-200 text-slate-700'
           }`}
         >
           {toastMessage.type === 'success' ? (
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
           ) : (
-            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
           )}
           <span>{toastMessage.text}</span>
         </div>
       )}
 
       {/* Main Header */}
-      <div className="p-6 bg-slate-900 border border-slate-800 rounded-3xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
+      <div className="p-6 bg-white border border-slate-200 rounded-3xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
         <div className="flex items-center gap-3.5">
-          <div className="p-3 bg-teal-500/10 border border-teal-500/30 text-teal-400 rounded-2xl">
+          <div className="p-3 bg-teal-50 border border-teal-200 text-teal-600 rounded-2xl">
             <Grid3X3 className="w-7 h-7" />
           </div>
           <div>
             <div className="flex items-center gap-2.5">
-              <h2 className="text-xl font-black tracking-tight text-white">
+              <h2 className="text-xl font-black tracking-tight text-slate-900">
                 SƠ ĐỒ BÃI CONTAINER 2D (YARD MAP 2D)
               </h2>
-              <span className="px-2.5 py-0.5 bg-teal-500/10 border border-teal-500/30 text-teal-300 font-mono text-[10px] font-bold rounded-full">
+              <span className="px-2.5 py-0.5 bg-teal-50 border border-teal-200 text-teal-700 font-mono text-[10px] font-bold rounded-full">
                 Interactive Konva Engine
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-500 mt-0.5">
               Bản đồ mặt bằng bãi Top-View vận hành trực quan: Block • Bay • Row • Tier • Gate • Sửa chữa • Vệ sinh • Xe nâng
             </p>
           </div>
@@ -367,9 +371,9 @@ export const YardMapPage: React.FC<YardMapPageProps> = ({
           <button
             onClick={loadYardData}
             disabled={isLoading}
-            className="px-3.5 py-2 bg-slate-950 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-800 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-sm"
+            className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-200 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-sm"
           >
-            <RefreshCw className={`w-3.5 h-3.5 text-teal-400 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 text-teal-600 ${isLoading ? 'animate-spin' : ''}`} />
             <span>LÀM MỚI BÃI</span>
           </button>
         </div>

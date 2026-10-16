@@ -90,20 +90,20 @@ export const NotificationHistory: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header Banner */}
-      <div className="p-5 rounded-3xl bg-[#0b132b] border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
+      <div className="p-5 rounded-3xl bg-[#0b132b] border border-slate-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
         <div>
-          <h2 className="text-lg font-black text-white flex items-center gap-2">
-            <History className="w-5 h-5 text-blue-400" />
+          <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+            <History className="w-5 h-5 text-blue-600" />
             <span>LỊCH SỬ GỬI THÔNG BÁO (AUDIT LOGS)</span>
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 mt-0.5">
             Toàn bộ nhật ký các thông báo Zalo OA, ZNS, In-App và SMS gửi từ hệ thống EMR
           </p>
         </div>
 
         <button
           onClick={handleExportCSV}
-          className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs flex items-center gap-2 transition cursor-pointer"
+          className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 font-bold text-xs flex items-center gap-2 transition cursor-pointer"
         >
           <Download className="w-3.5 h-3.5" />
           <span>Xuất Báo Cáo CSV</span>
@@ -111,7 +111,7 @@ export const NotificationHistory: React.FC = () => {
       </div>
 
       {/* Comprehensive Filter Toolbar */}
-      <div className="p-4 rounded-2xl bg-[#0b132b] border border-slate-800 grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+      <div className="p-4 rounded-2xl bg-[#0b132b] border border-slate-200 grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
         {/* Search */}
         <div className="relative sm:col-span-4">
           <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
@@ -120,7 +120,7 @@ export const NotificationHistory: React.FC = () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Tìm mã tracking, người nhận, sđt, cont..."
-            className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700/80 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+            className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200/80 rounded-xl text-xs text-slate-900 placeholder-slate-500 focus:outline-none focus:border-blue-500"
           />
         </div>
 
@@ -129,7 +129,7 @@ export const NotificationHistory: React.FC = () => {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-full px-3 py-2 bg-slate-900 border border-slate-700/80 rounded-xl text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer"
+            className="w-full px-3 py-2 bg-white border border-slate-200/80 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-blue-500 cursor-pointer"
           >
             <option value="ALL">Tất cả trạng thái</option>
             <option value="SENT">🟢 SENT (Thành công)</option>
@@ -143,7 +143,7 @@ export const NotificationHistory: React.FC = () => {
           <select
             value={channelFilter}
             onChange={(e) => setChannelFilter(e.target.value)}
-            className="w-full px-3 py-2 bg-slate-900 border border-slate-700/80 rounded-xl text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer"
+            className="w-full px-3 py-2 bg-white border border-slate-200/80 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-blue-500 cursor-pointer"
           >
             <option value="ALL">Tất cả kênh</option>
             <option value="ZALO_OA">Zalo OA</option>
@@ -158,7 +158,7 @@ export const NotificationHistory: React.FC = () => {
           <select
             value={recipientFilter}
             onChange={(e) => setRecipientFilter(e.target.value)}
-            className="w-full px-3 py-2 bg-slate-900 border border-slate-700/80 rounded-xl text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer"
+            className="w-full px-3 py-2 bg-white border border-slate-200/80 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-blue-500 cursor-pointer"
           >
             <option value="ALL">Tất cả đối tượng</option>
             <option value="CUSTOMER">Khách Hàng</option>
@@ -171,7 +171,7 @@ export const NotificationHistory: React.FC = () => {
           <select
             value={eventTypeFilter}
             onChange={(e) => setEventTypeFilter(e.target.value)}
-            className="w-full px-3 py-2 bg-slate-900 border border-slate-700/80 rounded-xl text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer"
+            className="w-full px-3 py-2 bg-white border border-slate-200/80 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-blue-500 cursor-pointer"
           >
             <option value="ALL">Tất cả nghiệp vụ</option>
             <option value="GATE_IN_COMPLETED">Gate-In</option>
@@ -186,17 +186,17 @@ export const NotificationHistory: React.FC = () => {
       </div>
 
       {/* Main DataGrid Table */}
-      <div className="bg-[#0b132b] border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4">
-        <div className="flex items-center justify-between pb-2 border-b border-slate-800 text-xs text-slate-400">
+      <div className="bg-[#0b132b] border border-slate-200 rounded-3xl p-5 shadow-xl space-y-4">
+        <div className="flex items-center justify-between pb-2 border-b border-slate-200 text-xs text-slate-500">
           <span>
-            Tìm thấy <strong className="text-sky-400 font-mono">{historyItems.length}</strong> kết quả
+            Tìm thấy <strong className="text-sky-600 font-mono">{historyItems.length}</strong> kết quả
           </span>
           <span>Trang {currentPage} / {totalPages}</span>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-300">
-            <thead className="bg-slate-900/90 text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-800">
+          <table className="w-full text-left text-xs text-slate-700">
+            <thead className="bg-white text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-200">
               <tr>
                 <th className="py-3 px-3">Thời Gian Gửi</th>
                 <th className="py-3 px-3">Mã Thông Báo</th>
@@ -208,25 +208,25 @@ export const NotificationHistory: React.FC = () => {
                 <th className="py-3 px-3 text-right">Thao Tác</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-slate-200/60">
               {paginatedItems.map((item) => (
                 <tr
                   key={item.id}
                   onClick={() => handleOpenDetail(item)}
-                  className="hover:bg-slate-800/50 transition cursor-pointer"
+                  className="hover:bg-slate-100 transition cursor-pointer"
                 >
-                  <td className="py-3 px-3 font-mono text-[11px] text-slate-400 whitespace-nowrap">
+                  <td className="py-3 px-3 font-mono text-[11px] text-slate-500 whitespace-nowrap">
                     {item.createdAt}
                   </td>
-                  <td className="py-3 px-3 font-mono font-bold text-sky-400 whitespace-nowrap">
+                  <td className="py-3 px-3 font-mono font-bold text-sky-600 whitespace-nowrap">
                     {item.trackingCode}
                   </td>
                   <td className="py-3 px-3 whitespace-nowrap">
-                    <div className="font-bold text-white">{item.recipientName}</div>
-                    <div className="text-[10px] text-slate-400 font-mono">{item.recipientPhone}</div>
+                    <div className="font-bold text-slate-900">{item.recipientName}</div>
+                    <div className="text-[10px] text-slate-500 font-mono">{item.recipientPhone}</div>
                   </td>
                   <td className="py-3 px-3 whitespace-nowrap">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
                       {item.recipientType === 'EMPLOYEE' ? 'Nhân Viên' : 'Khách Hàng'}
                     </span>
                   </td>
@@ -234,7 +234,7 @@ export const NotificationHistory: React.FC = () => {
                     <ChannelBadge channel={item.channel} />
                   </td>
                   <td className="py-3 px-3">
-                    <div className="font-bold text-slate-200 truncate max-w-[240px]">
+                    <div className="font-bold text-slate-700 truncate max-w-[240px]">
                       {item.title}
                     </div>
                     <p className="text-[10px] text-slate-500 truncate max-w-[240px]">
@@ -248,7 +248,7 @@ export const NotificationHistory: React.FC = () => {
                     <div className="flex items-center justify-end gap-1.5">
                       <button
                         onClick={() => handleOpenDetail(item)}
-                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
+                        className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 transition cursor-pointer"
                         title="Xem chi tiết"
                       >
                         <Eye className="w-3.5 h-3.5" />
@@ -257,7 +257,7 @@ export const NotificationHistory: React.FC = () => {
                       {item.status === 'FAILED' && (
                         <button
                           onClick={() => handleResend(item.id)}
-                          className="p-1.5 rounded-lg bg-rose-900/60 hover:bg-rose-800 text-rose-300 hover:text-white transition cursor-pointer"
+                          className="p-1.5 rounded-lg bg-rose-100 hover:bg-rose-800 text-rose-700 hover:text-slate-900 transition cursor-pointer"
                           title="Gửi lại ngay"
                         >
                           <RotateCcw className="w-3.5 h-3.5" />
@@ -272,11 +272,11 @@ export const NotificationHistory: React.FC = () => {
         </div>
 
         {/* Pagination Bar */}
-        <div className="flex items-center justify-between pt-3 border-t border-slate-800 text-xs">
+        <div className="flex items-center justify-between pt-3 border-t border-slate-200 text-xs">
           <button
             disabled={currentPage === 1}
             onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            className="px-3 py-1.5 rounded-xl bg-slate-800 disabled:opacity-40 text-slate-300 font-bold transition cursor-pointer"
+            className="px-3 py-1.5 rounded-xl bg-slate-100 disabled:opacity-40 text-slate-700 font-bold transition cursor-pointer"
           >
             Trang trước
           </button>
@@ -289,7 +289,7 @@ export const NotificationHistory: React.FC = () => {
                 className={`w-7 h-7 rounded-lg text-xs font-bold transition cursor-pointer ${
                   currentPage === num
                     ? 'bg-blue-600 text-white shadow'
-                    : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
+                    : 'bg-white text-slate-500 hover:bg-slate-100'
                 }`}
               >
                 {num}
@@ -300,7 +300,7 @@ export const NotificationHistory: React.FC = () => {
           <button
             disabled={currentPage === totalPages}
             onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            className="px-3 py-1.5 rounded-xl bg-slate-800 disabled:opacity-40 text-slate-300 font-bold transition cursor-pointer"
+            className="px-3 py-1.5 rounded-xl bg-slate-100 disabled:opacity-40 text-slate-700 font-bold transition cursor-pointer"
           >
             Trang kế
           </button>

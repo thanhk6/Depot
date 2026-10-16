@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../app/providers/AuthProvider';
 import { masterDataApi } from '../../api';
+import { useDepot } from '../../context/DepotContext';
+import { canAccessMenu } from '../../constants/menuPermissions';
 import {
   LayoutDashboard,
   LogIn,
@@ -38,7 +40,9 @@ import {
   Activity,
   Clock,
   Ship,
-  FileText
+  FileText,
+  BookOpen,
+  Coins
 } from 'lucide-react';
 
 export interface MenuItem {
@@ -71,6 +75,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const isDrawerOpen = isMobileOpen !== undefined ? isMobileOpen : isOpen;
   const { currentRole } = useAuth();
+  const { loggedInUserProfile } = useDepot();
+  const allowedTabs = loggedInUserProfile?.allowedTabs;
 
   // Số lượng hiển thị trên badge của từng mục trong nhóm "DANH MỤC MASTER DATA" (DM Phòng Ban, Biểu Phí
   // Vệ Sinh, DM Loại Container...) trước đây là chuỗi hardcode cứng ("12 Khối", "10 Loại", "14 Loại"...)
@@ -190,15 +196,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ]
     },
     {
-      // Theo yêu cầu người dùng 2026-08-25: "BÁO GIÁ & SỬA CHỮA" đứng ngay sau "KHAI THÁC & GATE-IN" —
-      // đổi chỗ 2 nhóm này (chỉ đổi thứ tự hiển thị, không đổi id/nội dung từng mục).
-      title: 'BÁO GIÁ & SỬA CHỮA',
+      // 2026-10-08: tách "BÁO GIÁ" thành nhóm riêng (nghiệp vụ báo giá + danh mục riêng theo Maersk AEMS),
+      // "SỬA CHỮA" giữ lệnh sửa chữa + QC. Cả 2 nhóm vẫn đứng ngay sau "KHAI THÁC & GATE-IN".
+      title: 'BÁO GIÁ',
       items: [
         {
           id: 'estimate',
           label: 'Lập Báo Giá Estimate',
           icon: <Calculator className="w-4 h-4 text-orange-400" />,
-          badge: 'IICL-5'
+          badge: 'AEMS'
         },
         {
           id: 'approval',
@@ -206,6 +212,43 @@ export const Sidebar: React.FC<SidebarProps> = ({
           icon: <ShieldCheck className="w-4 h-4 text-pink-400" />,
           badge: 'MNR'
         },
+        {
+          id: 'shipping_api',
+          label: 'Truyền API Hãng Tàu',
+          icon: <Radio className="w-4 h-4 text-sky-400" />,
+          badge: 'REST API',
+          badgeColor: 'bg-sky-950 text-sky-300 border-sky-800'
+        },
+        {
+          id: 'est_damage_codes',
+          label: 'DM Mã Hư Hỏng (Damage)',
+          icon: <Tag className="w-4 h-4 text-rose-300" />
+        },
+        {
+          id: 'est_repair_codes',
+          label: 'DM Mã Sửa Chữa (Repair)',
+          icon: <Hammer className="w-4 h-4 text-amber-300" />
+        },
+        {
+          id: 'est_repair_locations',
+          label: 'DM Vị Trí Sửa Chữa (Rep. Loc)',
+          icon: <MapPin className="w-4 h-4 text-teal-300" />
+        },
+        {
+          id: 'est_labor_rates',
+          label: 'DM Đơn Giá Giờ Công',
+          icon: <Coins className="w-4 h-4 text-yellow-300" />
+        },
+        {
+          id: 'est_misc_codes',
+          label: 'DM TPI · Cause · Mode · Shop',
+          icon: <BookOpen className="w-4 h-4 text-indigo-300" />
+        }
+      ]
+    },
+    {
+      title: 'SỬA CHỮA',
+      items: [
         {
           id: 'repair',
           label: 'Lệnh Sửa Chữa (WO)',
@@ -217,13 +260,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           label: '9. QC Nghiệm Thu (AV Grade)',
           icon: <CheckCircle2 className="w-4 h-4 text-emerald-400" />,
           badge: 'AV'
-        },
-        {
-          id: 'shipping_api',
-          label: '10. Truyền API Hãng Tàu',
-          icon: <Radio className="w-4 h-4 text-sky-400" />,
-          badge: 'REST API',
-          badgeColor: 'bg-sky-950 text-sky-300 border-sky-800'
         }
       ]
     },
@@ -532,6 +568,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   ];
 
+  // Chỉ hiện mục menu vai trò được phép (ma trận RolePermissions ở backend) và bỏ nhóm không còn mục nào.
+  const visibleMenuGroups = menuGroups
+    .map((group) => ({ ...group, items: group.items.filter((item) => canAccessMenu(allowedTabs, item.id)) }))
+    .filter((group) => group.items.length > 0);
+  const canOpenSystem = canAccessMenu(allowedTabs, 'system');
+
   const renderSidebarContent = (isMobile = false) => (
     <div className="flex flex-col h-full overflow-hidden bg-[#0B2A43]">
       {/* Brand Header */}
@@ -565,23 +607,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Role Selector Box */}
       <div
         onClick={() => {
+          if (!canOpenSystem) return;
           onSelectTab('system');
           if (isMobile && onCloseMobile) onCloseMobile();
         }}
-        className="px-4 py-2.5 bg-black/20 hover:bg-black/30 border-b border-[#1E3A5F] flex items-center justify-between gap-2 shrink-0 cursor-pointer transition"
-        title="Bấm để mở cấu hình Phân Quyền & Người Dùng"
+        className={`px-4 py-2.5 bg-black/20 hover:bg-black/30 border-b border-[#1E3A5F] flex items-center justify-between gap-2 shrink-0 transition ${canOpenSystem ? 'cursor-pointer' : 'cursor-default'}`}
+        title={canOpenSystem ? 'Bấm để mở cấu hình Phân Quyền & Người Dùng' : undefined}
       >
         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
           VAI TRÒ:
         </span>
-        <div className="px-2.5 py-1 rounded-lg bg-[#1677FF] text-white font-bold text-xs shadow-sm truncate max-w-[140px]">
+        <div className="px-2.5 py-1 rounded-lg bg-[#1677FF] text-white font-bold text-xs shadow-sm text-right leading-snug">
           {currentRole.name}
         </div>
       </div>
 
       {/* Navigation Menu */}
       <div className="p-3 space-y-4 overflow-y-auto flex-1 scrollbar-thin">
-        {menuGroups.map((group, idx) => (
+        {visibleMenuGroups.map((group, idx) => (
           <div key={idx} className="space-y-1">
             <div className="px-3 text-[10px] font-extrabold text-slate-400 tracking-wider uppercase">
               {group.title}
@@ -606,7 +649,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <span className={`shrink-0 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-white'}`}>
                         {item.icon}
                       </span>
-                      <span className="truncate">{item.label}</span>
+                      <span className="text-left leading-snug">{item.label}</span>
                     </div>
                     {item.badge && (
                       <span
@@ -640,7 +683,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex w-64 bg-[#0B2A43] border-r border-[#1E3A5F] text-white flex-col justify-between h-screen shrink-0 sticky top-0 z-40 select-none shadow-sm">
+      <aside className="hidden lg:flex w-72 bg-[#0B2A43] border-r border-[#1E3A5F] text-white flex-col justify-between h-screen shrink-0 sticky top-0 z-40 select-none shadow-sm">
         {renderSidebarContent(false)}
       </aside>
 

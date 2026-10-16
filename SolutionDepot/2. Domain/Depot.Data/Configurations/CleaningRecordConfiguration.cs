@@ -9,6 +9,8 @@ namespace Depot.Data.Configurations
     {
         public void Configure(EntityTypeBuilder<CleaningRecord> builder)
         {
+            // Lệnh vệ sinh đã xoá mềm (vd lệnh thừa đã đóng) không hiện ở bất kỳ màn / truy vấn nào.
+            builder.HasQueryFilter(x => !x.IsDeleted);
             builder.Property(x => x.Code).IsRequired().HasMaxLength(40);
             builder.HasIndex(x => x.Code).IsUnique();
             builder.Property(x => x.JobNo).HasMaxLength(30);

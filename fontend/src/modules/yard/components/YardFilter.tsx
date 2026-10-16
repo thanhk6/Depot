@@ -42,11 +42,11 @@ export const YardFilter: React.FC<YardFilterProps> = ({
     filters.status !== 'ALL';
 
   return (
-    <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl shadow-lg space-y-3">
+    <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-lg space-y-3">
       <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3">
         {/* Search Container Box */}
         <div className="relative flex-1 min-w-[260px]">
-          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
             <Search className="w-4 h-4" />
           </div>
           <input
@@ -55,12 +55,12 @@ export const YardFilter: React.FC<YardFilterProps> = ({
             onChange={(e) => handleChange('searchQuery', e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Tìm theo Số Container (MSKU...), Vị Trí (A-05-03), Hãng Tàu..."
-            className="w-full pl-10 pr-10 py-2 bg-slate-950 border border-slate-700/80 rounded-xl text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition"
+            className="w-full pl-10 pr-10 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-mono text-slate-900 placeholder-slate-500 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition"
           />
           {filters.searchQuery && (
             <button
               onClick={() => handleChange('searchQuery', '')}
-              className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-white cursor-pointer"
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-slate-900 cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -73,7 +73,7 @@ export const YardFilter: React.FC<YardFilterProps> = ({
           <select
             value={filters.shippingLine}
             onChange={(e) => handleChange('shippingLine', e.target.value)}
-            className="px-2.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-teal-500 cursor-pointer truncate"
+            className="px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:border-teal-500 cursor-pointer truncate"
           >
             <option value="ALL">Tất cả Hãng Tàu</option>
             {(shippingLines || []).map((line) => (
@@ -87,7 +87,7 @@ export const YardFilter: React.FC<YardFilterProps> = ({
           <select
             value={filters.block}
             onChange={(e) => handleChange('block', e.target.value)}
-            className="px-2.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-teal-500 cursor-pointer"
+            className="px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:border-teal-500 cursor-pointer"
           >
             <option value="ALL">Tất cả Block</option>
             {(blocks || []).map((b) => (
@@ -101,7 +101,7 @@ export const YardFilter: React.FC<YardFilterProps> = ({
           <select
             value={filters.zone}
             onChange={(e) => handleChange('zone', e.target.value)}
-            className="px-2.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-teal-500 cursor-pointer"
+            className="px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:border-teal-500 cursor-pointer"
           >
             <option value="ALL">Tất cả Khu Vực</option>
             <option value="STORAGE">Lưu Bãi (Storage)</option>
@@ -117,7 +117,7 @@ export const YardFilter: React.FC<YardFilterProps> = ({
           <select
             value={filters.status}
             onChange={(e) => handleChange('status', e.target.value)}
-            className="px-2.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-teal-500 cursor-pointer font-medium"
+            className="px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:border-teal-500 cursor-pointer font-medium"
           >
             <option value="ALL">Tất cả Trạng Thái</option>
             <option value="AVAILABLE">AVAILABLE (Sẵn sàng)</option>
@@ -133,7 +133,7 @@ export const YardFilter: React.FC<YardFilterProps> = ({
           <select
             value={filters.size}
             onChange={(e) => handleChange('size', e.target.value)}
-            className="px-2.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-teal-500 cursor-pointer"
+            className="px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:border-teal-500 cursor-pointer"
           >
             <option value="ALL">Tất cả Size</option>
             <option value="20">20 Feet (20GP)</option>
@@ -145,7 +145,7 @@ export const YardFilter: React.FC<YardFilterProps> = ({
           <select
             value={filters.type}
             onChange={(e) => handleChange('type', e.target.value)}
-            className="px-2.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-teal-500 cursor-pointer"
+            className="px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:border-teal-500 cursor-pointer"
           >
             <option value="ALL">Tất cả Loại Cont</option>
             <option value="DRY">Khô Tiêu Chuẩn (DRY)</option>
@@ -169,7 +169,7 @@ export const YardFilter: React.FC<YardFilterProps> = ({
             <button
               onClick={onResetFilters}
               title="Đặt lại toàn bộ bộ lọc"
-              className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-semibold border border-slate-700 transition cursor-pointer shrink-0"
+              className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-xl text-xs font-semibold border border-slate-200 transition cursor-pointer shrink-0"
             >
               <RotateCcw className="w-4 h-4" />
             </button>

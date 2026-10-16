@@ -12,8 +12,8 @@ namespace Depot.Data.Configurations
             builder.Property(x => x.ShippingLineId).IsRequired();
             builder.HasIndex(x => x.ContainerNo).IsUnique();
             builder.HasIndex(x => x.ShippingLineId);
-            builder.HasOne(x => x.ShippingLine)
-                .WithMany(x => x.Containers)
+            builder.HasOne<ShippingLine>()
+                .WithMany()
                 .HasForeignKey(x => x.ShippingLineId)
                 .OnDelete(DeleteBehavior.Restrict);
         }

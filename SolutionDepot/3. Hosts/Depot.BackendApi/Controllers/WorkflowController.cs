@@ -45,26 +45,37 @@ namespace Depot.BackendApi.Controllers
         [HttpGet("summary")]
         public async Task<IActionResult> GetSummary()
         {
-            var jobs = await _jobService.GetAllJobsAsync();
-            var summary = new WorkflowSummaryDto
+            try
             {
-                TotalJobs = jobs.Count,
-                GateInCount = jobs.Count(j => j.Status == "GATE_IN"),
-                SurveyingCount = jobs.Count(j => j.Status == "SURVEYING"),
-                EstimatingCount = jobs.Count(j => j.Status == "ESTIMATING"),
-                AwaitingApprovalCount = jobs.Count(j => j.Status == "WAITING_APPROVAL" || j.Status == "PENDING_APPROVAL"),
-                RepairingCount = jobs.Count(j => j.Status == "REPAIRING"),
-                QcCount = jobs.Count(j => j.Status == "WAITING_QC" || j.Status == "QC"),
-                ReadyForOutCount = jobs.Count(j => j.Status == "READY_FOR_OUT" || j.Status == "READY_FOR_USE"),
-                GateOutCount = jobs.Count(j => j.Status == "GATE_OUT")
-            };
+                var jobs = await _jobService.GetAllJobsAsync();
+                var summary = new WorkflowSummaryDto
+                {
+                    TotalJobs = jobs.Count,
+                    // "GATE_IN" không phải trạng thái thật (CreateGateInJobAsync khởi tạo thẳng
+                    // "SURVEYING", không có bước nghỉ riêng ở GATE_IN) — đếm luôn = 0, đã ghi nhận trong
+                    // báo cáo QA, cố ý CHƯA đổi ý nghĩa KPI này ở đây (cần quyết định rõ ý nghĩa KPI trước,
+                    // ngoài phạm vi lần sửa try/catch này).
+                    GateInCount = jobs.Count(j => j.Status == "GATE_IN"),
+                    SurveyingCount = jobs.Count(j => j.Status == "SURVEYING"),
+                    EstimatingCount = jobs.Count(j => j.Status == "ESTIMATING"),
+                    AwaitingApprovalCount = jobs.Count(j => j.Status == "WAITING_APPROVAL" || j.Status == "PENDING_APPROVAL"),
+                    RepairingCount = jobs.Count(j => j.Status == "REPAIRING"),
+                    QcCount = jobs.Count(j => j.Status == "WAITING_QC" || j.Status == "QC"),
+                    ReadyForOutCount = jobs.Count(j => j.Status == "READY_FOR_OUT" || j.Status == "READY_FOR_USE"),
+                    GateOutCount = jobs.Count(j => j.Status == "GATE_OUT")
+                };
 
-            return Ok(new ResponseSingleContentModel<WorkflowSummaryDto>
+                return Ok(new ResponseSingleContentModel<WorkflowSummaryDto>
+                {
+                    StatusCode = 200,
+                    Message = "Lấy tổng quan workflow thành công",
+                    Data = summary
+                });
+            }
+            catch (Exception ex)
             {
-                StatusCode = 200,
-                Message = "Lấy tổng quan workflow thành công",
-                Data = summary
-            });
+                return StatusCode(500, new ResponseSingleContentModel<string> { StatusCode = 500, Message = "Lỗi khi lấy tổng quan workflow", Data = ex.Message });
+            }
         }
     }
 }

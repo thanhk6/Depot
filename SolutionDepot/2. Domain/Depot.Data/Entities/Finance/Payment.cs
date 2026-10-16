@@ -1,6 +1,5 @@
 using System;
 using Depot.Data.Entities.Base;
-using Depot.Data.Entities.Depot;
 
 namespace Depot.Data.Entities.Finance
 {
@@ -11,8 +10,6 @@ namespace Depot.Data.Entities.Finance
     {
         /// <summary>Khóa ngoại trỏ về DepotJob.</summary>
         public long DepotJobId { get; set; }
-        /// <summary>Thực thể DepotJob gốc.</summary>
-        public virtual DepotJob? DepotJob { get; set; }
 
         /// <summary>Số hóa đơn thanh toán.</summary>
         public string InvoiceNo { get; set; } = string.Empty;
@@ -30,5 +27,8 @@ namespace Depot.Data.Entities.Finance
         public string? PaymentMethod { get; set; }
         /// <summary>Nhân viên thu ngân hoặc người ghi nhận thanh toán.</summary>
         public string? CashierName { get; set; }
+        /// <summary>Mã giao dịch ngân hàng/cổng thanh toán (vd VietQR TransactionRef) — dùng để chống xử lý
+        /// trùng khi webhook bị gọi lặp lại (ngân hàng retry). Null với thanh toán ghi tay tại quầy.</summary>
+        public string? TransactionRef { get; set; }
     }
 }

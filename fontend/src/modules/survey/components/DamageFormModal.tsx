@@ -2,13 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { DamageRecord, DamageLocationMasterItem, DamageCodeMasterItem, RepairCodeMasterItem } from '../types';
 import {
   Wrench,
-  AlertTriangle,
   Camera,
   X,
-  CheckCircle2,
-  Maximize2,
-  FileCode,
-  DollarSign
+  CheckCircle2
 } from 'lucide-react';
 
 interface DamageFormModalProps {
@@ -98,7 +94,7 @@ export const DamageFormModal: React.FC<DamageFormModalProps> = ({
       lengthMm: Number(lengthMm) || 0,
       widthMm: Number(widthMm) || 0,
       quantity: Number(quantity) || 1,
-      photoUrl: photoUrl || 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=600&auto=format&fit=crop&q=60',
+      photoUrl: photoUrl || '',
       createdBy: initialData?.createdBy || currentUser,
       createdAt: initialData?.createdAt || now
     };
@@ -289,17 +285,9 @@ export const DamageFormModal: React.FC<DamageFormModalProps> = ({
                 type="text"
                 value={photoUrl}
                 onChange={(e) => setPhotoUrl(e.target.value)}
-                placeholder="https://... hoặc chụp ảnh nhanh"
+                placeholder="Đường dẫn ảnh hư hỏng (https://...)"
                 className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-mono text-[11px] focus:outline-none"
               />
-              <button
-                type="button"
-                onClick={() => setPhotoUrl('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=600&auto=format&fit=crop&q=60')}
-                className="px-3 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 rounded-xl font-bold transition flex items-center gap-1 cursor-pointer"
-              >
-                <Camera className="w-3.5 h-3.5" />
-                <span>Chụp</span>
-              </button>
             </div>
           </div>
 

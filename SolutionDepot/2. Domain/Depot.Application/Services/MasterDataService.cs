@@ -26,6 +26,7 @@ namespace Depot.Application.Services
         {
             if (string.IsNullOrWhiteSpace(model.Code) || string.IsNullOrWhiteSpace(model.Name))
                 throw new ArgumentException("Mã và tên hãng tàu là bắt buộc.");
+            ValidateEmail(model.ContactEmail, "Email liên hệ hãng tàu");
             var code = model.Code.Trim().ToUpperInvariant();
             if (await _db.ShippingLines.AnyAsync(x => x.Code == code))
                 throw new InvalidOperationException("Mã hãng tàu đã tồn tại.");
@@ -48,6 +49,7 @@ namespace Depot.Application.Services
             var entity = await _db.ShippingLines.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
             if (entity == null) return null;
             if (string.IsNullOrWhiteSpace(model.Name)) throw new ArgumentException("Tên hãng tàu là bắt buộc.");
+            ValidateEmail(model.ContactEmail, "Email liên hệ hãng tàu");
             entity.Name = model.Name.Trim();
             entity.ContactEmail = model.ContactEmail;
             entity.Phone = model.Phone;
@@ -74,10 +76,26 @@ namespace Depot.Application.Services
 
         public async Task<Material> AddMaterialAsync(MaterialViewModel model)
         {
-            var entity = new Material { Code = model.Code };
+            var code = model.Code.Trim();
+            ValidateStockLevels(model);
+            // Trước đây thêm thẳng không kiểm tra trùng: 2 vật tư cùng mã làm tồn kho tách 2 dòng, giao dịch
+            // nhập/xuất chỉ rơi vào 1 dòng (BUG-007). Unique index UX_Materials_Code_Active là chốt chặn cuối.
+            var codeUpper = code.ToUpper();
+            if (await _db.Materials.AnyAsync(x => !x.IsDeleted && x.Code.ToUpper() == codeUpper))
+                throw new ArgumentException($"Mã vật tư '{code}' đã tồn tại.");
+
+            var entity = new Material { Code = code };
             ApplyMaterialFields(entity, model);
             _db.Materials.Add(entity);
-            await _db.SaveChangesAsync();
+            try
+            {
+                await _db.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("UX_Materials_Code_Active") == true)
+            {
+                _db.Entry(entity).State = EntityState.Detached;
+                throw new ArgumentException($"Mã vật tư '{code}' đã tồn tại.");
+            }
             return entity;
         }
 
@@ -85,9 +103,22 @@ namespace Depot.Application.Services
         {
             var entity = await _db.Materials.FirstOrDefaultAsync(x => x.Id == id);
             if (entity == null) return null;
+            ValidateStockLevels(model);
             ApplyMaterialFields(entity, model);
             await _db.SaveChangesAsync();
             return entity;
+        }
+
+        // BUG-026: tồn tối thiểu > tối đa làm cảnh báo đặt hàng lại không bao giờ đúng. MaximumStock = 0 nghĩa là
+        // không đặt mức tối đa nên bỏ qua so sánh đó.
+        private static void ValidateStockLevels(MaterialViewModel model)
+        {
+            if (model.MinimumStock < 0 || model.MaximumStock < 0 || model.ReorderLevel < 0)
+                throw new ArgumentException("Tồn tối thiểu, tồn tối đa và mức đặt hàng lại không được âm.");
+            if (model.MaximumStock > 0 && model.MinimumStock > model.MaximumStock)
+                throw new ArgumentException($"Tồn tối thiểu ({model.MinimumStock}) không được lớn hơn tồn tối đa ({model.MaximumStock}).");
+            if (model.MaximumStock > 0 && model.ReorderLevel > model.MaximumStock)
+                throw new ArgumentException($"Mức đặt hàng lại ({model.ReorderLevel}) không được lớn hơn tồn tối đa ({model.MaximumStock}).");
         }
 
         private static void ApplyMaterialFields(Material entity, MaterialViewModel model)
@@ -110,10 +141,14 @@ namespace Depot.Application.Services
             entity.IsActive = model.IsActive;
         }
 
-        public async Task<List<MasterCatalogItem>> GetCatalogAsync(string catalogType)
+        // `IsActive=false` nghĩa là "Tạm ngưng" (vẫn phải hiện ở màn quản trị Master Data để bật lại),
+        // còn "Xóa" là `IsDeleted=true` — trước đây cả 2 cùng ghi IsActive=false và API chỉ trả dòng
+        // active, nên bấm "Tạm ngưng" 1 dòng thì F5 xong dòng đó biến mất khỏi màn quản trị luôn.
+        // Mặc định (không truyền includeInactive) vẫn chỉ trả dòng đang áp dụng cho các màn nghiệp vụ.
+        public async Task<List<MasterCatalogItem>> GetCatalogAsync(string catalogType, bool includeInactive = false)
         {
             return await _db.MasterCatalogItems
-                .Where(x => x.CatalogType == catalogType && x.IsActive)
+                .Where(x => x.CatalogType == catalogType && !x.IsDeleted && (includeInactive || x.IsActive))
                 .OrderBy(x => x.SortOrder).ThenBy(x => x.Code)
                 .ToListAsync();
         }
@@ -122,11 +157,27 @@ namespace Depot.Application.Services
         {
             if (string.IsNullOrWhiteSpace(request.CatalogType) || string.IsNullOrWhiteSpace(request.Code) || string.IsNullOrWhiteSpace(request.Name))
                 throw new ArgumentException("CatalogType, Code và Name là bắt buộc.");
-            var exists = await _db.MasterCatalogItems.AnyAsync(x => x.CatalogType == request.CatalogType && x.Code == request.Code);
-            if (exists) throw new InvalidOperationException("Mã catalog đã tồn tại trong loại danh mục này.");
+            var catalogType = request.CatalogType.Trim().ToUpperInvariant();
+            var code = request.Code.Trim().ToUpperInvariant();
+            // So sánh trùng phải dùng đúng giá trị đã chuẩn hoá (Trim+Upper) — trước đây so trực tiếp
+            // request.Code thô nên Code khác hoa/thường hoặc dư khoảng trắng lọt qua bước tiền-kiểm này,
+            // rơi xuống bắt lỗi bằng unique index DB (trả message Postgres thô, không thân thiện).
+            var existing = await _db.MasterCatalogItems.FirstOrDefaultAsync(x => x.CatalogType == catalogType && x.Code == code);
+            if (existing != null && !existing.IsDeleted) throw new InvalidOperationException("Mã catalog đã tồn tại trong loại danh mục này.");
+            if (existing != null)
+            {
+                // Mã từng bị xóa mềm vẫn chiếm unique index (CatalogType, Code) — tạo lại cùng mã thì hồi
+                // sinh đúng dòng cũ với dữ liệu mới thay vì báo "đã tồn tại" mà người dùng không nhìn thấy.
+                existing.IsDeleted = false; existing.DeletedAt = null; existing.DeletedBy = null;
+                existing.Name = request.Name.Trim(); existing.NameVi = request.NameVi?.Trim(); existing.Description = request.Description?.Trim();
+                existing.JsonData = string.IsNullOrWhiteSpace(request.JsonData) ? "{}" : request.JsonData;
+                existing.IsActive = request.IsActive; existing.SortOrder = request.SortOrder;
+                await _db.SaveChangesAsync();
+                return existing;
+            }
             var item = new MasterCatalogItem
             {
-                CatalogType = request.CatalogType.Trim().ToUpperInvariant(), Code = request.Code.Trim().ToUpperInvariant(),
+                CatalogType = catalogType, Code = code,
                 Name = request.Name.Trim(), NameVi = request.NameVi?.Trim(), Description = request.Description?.Trim(),
                 JsonData = string.IsNullOrWhiteSpace(request.JsonData) ? "{}" : request.JsonData, IsActive = request.IsActive, SortOrder = request.SortOrder
             };
@@ -139,7 +190,21 @@ namespace Depot.Application.Services
         {
             var item = await _db.MasterCatalogItems.FirstOrDefaultAsync(x => x.Id == id);
             if (item == null) return null;
-            item.Code = request.Code.Trim().ToUpperInvariant(); item.Name = request.Name.Trim(); item.NameVi = request.NameVi?.Trim();
+            var code = request.Code.Trim().ToUpperInvariant();
+            // Kiểm tra trùng Code TRƯỚC khi gán — trước đây gán thẳng rồi để unique index DB bắt lỗi,
+            // nhưng controller không try/catch nên exception bay thẳng ra ngoài thành lỗi 500 thô thay vì
+            // 400 theo đúng envelope {statusCode,message,data} của app.
+            var duplicate = await _db.MasterCatalogItems.FirstOrDefaultAsync(x => x.Id != id && x.CatalogType == item.CatalogType && x.Code == code);
+            if (duplicate != null && !duplicate.IsDeleted) throw new InvalidOperationException("Mã catalog đã tồn tại trong loại danh mục này.");
+            // Đổi sang mã của 1 dòng đã xóa mềm: giải phóng mã cũ đó (unique index không phân biệt IsDeleted).
+            // Lưu riêng trước để Postgres không vướng unique index khi 2 dòng cùng được UPDATE trong 1 lượt.
+            if (duplicate != null)
+            {
+                var releasedCode = $"#DEL{duplicate.Id}:{duplicate.Code}";
+                duplicate.Code = releasedCode.Length <= 50 ? releasedCode : releasedCode[..50];
+                await _db.SaveChangesAsync();
+            }
+            item.Code = code; item.Name = request.Name.Trim(); item.NameVi = request.NameVi?.Trim();
             item.Description = request.Description?.Trim(); item.JsonData = string.IsNullOrWhiteSpace(request.JsonData) ? "{}" : request.JsonData;
             item.IsActive = request.IsActive; item.SortOrder = request.SortOrder;
             await _db.SaveChangesAsync();
@@ -148,17 +213,21 @@ namespace Depot.Application.Services
 
         public async Task<bool> DeactivateCatalogItemAsync(long id)
         {
-            var item = await _db.MasterCatalogItems.FirstOrDefaultAsync(x => x.Id == id);
+            var item = await _db.MasterCatalogItems.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
             if (item == null) return false;
-            item.IsActive = false;
+            // Xóa = xóa mềm (IsDeleted), KHÔNG dùng IsActive — IsActive=false là trạng thái "Tạm ngưng".
+            item.IsDeleted = true; item.DeletedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();
             return true;
         }
 
-        public async Task<List<ServiceTariff>> GetServiceTariffsAsync()
+        // Giống GetCatalogAsync: IsActive=false = "Tạm ngưng" (màn quản trị vẫn phải thấy để bật lại),
+        // "Xóa" = IsDeleted. Trước đây cả 2 cùng IsActive=false + API chỉ trả dòng active → chọn "Tạm Ngưng"
+        // trong form rồi F5 là hạng mục biến mất. Mặc định vẫn chỉ trả dòng đang áp dụng (Calculator, Operation).
+        public async Task<List<ServiceTariff>> GetServiceTariffsAsync(bool includeInactive = false)
         {
             return await _db.ServiceTariffs
-                .Where(x => x.IsActive)
+                .Where(x => !x.IsDeleted && (includeInactive || x.IsActive))
                 .OrderBy(x => x.SortOrder).ThenBy(x => x.Code)
                 .ToListAsync();
         }
@@ -167,9 +236,18 @@ namespace Depot.Application.Services
         {
             if (string.IsNullOrWhiteSpace(request.Code) || string.IsNullOrWhiteSpace(request.NameVi))
                 throw new ArgumentException("Mã biểu cước và tên dịch vụ là bắt buộc.");
+            ValidateServiceTariff(request);
             var code = request.Code.Trim().ToUpperInvariant();
-            var exists = await _db.ServiceTariffs.AnyAsync(x => x.Code == code);
-            if (exists) throw new InvalidOperationException("Mã biểu cước nâng hạ đã tồn tại.");
+            var existing = await _db.ServiceTariffs.FirstOrDefaultAsync(x => x.Code == code);
+            if (existing != null && !existing.IsDeleted) throw new InvalidOperationException("Mã biểu cước nâng hạ đã tồn tại.");
+            if (existing != null)
+            {
+                // Mã đã xóa mềm vẫn chiếm unique index Code — tạo lại cùng mã thì hồi sinh đúng dòng cũ.
+                existing.IsDeleted = false; existing.DeletedAt = null; existing.DeletedBy = null;
+                ApplyServiceTariffRequest(existing, request, code);
+                await _db.SaveChangesAsync();
+                return existing;
+            }
             var item = new ServiceTariff
             {
                 Code = code, ServiceCategory = request.ServiceCategory, NameVi = request.NameVi.Trim(), NameEn = request.NameEn?.Trim(),
@@ -187,21 +265,70 @@ namespace Depot.Application.Services
         {
             var item = await _db.ServiceTariffs.FirstOrDefaultAsync(x => x.Id == id);
             if (item == null) return null;
-            item.Code = request.Code.Trim().ToUpperInvariant(); item.ServiceCategory = request.ServiceCategory;
+            if (string.IsNullOrWhiteSpace(request.Code) || string.IsNullOrWhiteSpace(request.NameVi))
+                throw new ArgumentException("Mã biểu cước và tên dịch vụ là bắt buộc.");
+            ValidateServiceTariff(request);
+            var code = request.Code.Trim().ToUpperInvariant();
+            var duplicate = await _db.ServiceTariffs.FirstOrDefaultAsync(x => x.Id != id && x.Code == code);
+            if (duplicate != null && !duplicate.IsDeleted) throw new InvalidOperationException("Mã biểu cước nâng hạ đã tồn tại.");
+            if (duplicate != null)
+            {
+                // Đổi sang mã của 1 dòng đã xóa mềm: giải phóng mã đó trước (lưu riêng để tránh vướng unique index).
+                var releasedCode = $"#DEL{duplicate.Id}:{duplicate.Code}";
+                duplicate.Code = releasedCode.Length <= 40 ? releasedCode : releasedCode[..40];
+                await _db.SaveChangesAsync();
+            }
+            ApplyServiceTariffRequest(item, request, code);
+            await _db.SaveChangesAsync();
+            return item;
+        }
+
+        // BUG-017: trước đây nhận đơn giá âm và VAT ngoài 0–100%, làm Máy tính cước / phiếu dịch vụ ra tiền âm.
+        private static void ValidateServiceTariff(ServiceTariffRequest r)
+        {
+            if (new[] { r.Price20GP, r.Price40HC, r.Price45HC, r.Price20RF, r.Price40RH, r.PriceSpecial }.Any(p => p < 0))
+                throw new ArgumentException("Đơn giá cước không được âm.");
+            if (r.VatPercent < 0 || r.VatPercent > 100)
+                throw new ArgumentException("VAT phải trong khoảng 0–100%.");
+        }
+
+        // BUG-018: bậc lũy tiến sai (đến ngày < từ ngày, chồng lấn, không có bậc) làm tính tiền lưu bãi sai.
+        // ToDay = null là bậc "trở đi" không giới hạn, chỉ được là bậc cuối.
+        private static void ValidateStorageTariff(StorageTariffRuleRequest r)
+        {
+            if (r.DefaultFreeDays < 0) throw new ArgumentException("Số ngày miễn phí không được âm.");
+            if (r.VatPercent < 0 || r.VatPercent > 100) throw new ArgumentException("VAT phải trong khoảng 0–100%.");
+            if (r.Tiers.Count == 0) throw new ArgumentException("Quy tắc lưu bãi phải có ít nhất 1 bậc giá.");
+            var tiers = r.Tiers.OrderBy(t => t.FromDay).ToList();
+            for (var i = 0; i < tiers.Count; i++)
+            {
+                var t = tiers[i];
+                var name = string.IsNullOrWhiteSpace(t.TierName) ? $"Bậc {i + 1}" : t.TierName;
+                if (t.FromDay < 0) throw new ArgumentException($"{name}: từ ngày không được âm.");
+                if (t.ToDay.HasValue && t.ToDay < t.FromDay) throw new ArgumentException($"{name}: đến ngày ({t.ToDay}) nhỏ hơn từ ngày ({t.FromDay}).");
+                if (!t.ToDay.HasValue && i < tiers.Count - 1) throw new ArgumentException($"{name}: bậc không giới hạn đến ngày phải là bậc cuối cùng.");
+                if (i > 0 && t.FromDay <= tiers[i - 1].ToDay) throw new ArgumentException($"{name} (từ ngày {t.FromDay}) chồng lấn bậc trước (đến ngày {tiers[i - 1].ToDay}).");
+                if (new[] { t.Price20Dry, t.Price40Dry, t.Price45Dry, t.Price20Reefer, t.Price40Reefer, t.PriceSpecial }.Any(p => p < 0))
+                    throw new ArgumentException($"{name}: đơn giá không được âm.");
+            }
+        }
+
+        private static void ApplyServiceTariffRequest(ServiceTariff item, ServiceTariffRequest request, string code)
+        {
+            item.Code = code; item.ServiceCategory = request.ServiceCategory;
             item.NameVi = request.NameVi.Trim(); item.NameEn = request.NameEn?.Trim(); item.Unit = request.Unit;
             item.Price20GP = request.Price20GP; item.Price40HC = request.Price40HC; item.Price45HC = request.Price45HC;
             item.Price20RF = request.Price20RF; item.Price40RH = request.Price40RH; item.PriceSpecial = request.PriceSpecial;
             item.VatPercent = request.VatPercent; item.Currency = request.Currency; item.ApplicableShift = request.ApplicableShift;
             item.Description = request.Description?.Trim(); item.IsActive = request.IsActive; item.SortOrder = request.SortOrder;
-            await _db.SaveChangesAsync();
-            return item;
         }
 
         public async Task<bool> DeactivateServiceTariffAsync(long id)
         {
-            var item = await _db.ServiceTariffs.FirstOrDefaultAsync(x => x.Id == id);
+            var item = await _db.ServiceTariffs.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
             if (item == null) return false;
-            item.IsActive = false;
+            // Xóa = xóa mềm (IsDeleted); IsActive=false là "Tạm ngưng", do form tự đặt.
+            item.IsDeleted = true; item.DeletedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();
             return true;
         }
@@ -227,6 +354,7 @@ namespace Depot.Application.Services
         {
             if (string.IsNullOrWhiteSpace(request.Code) || string.IsNullOrWhiteSpace(request.ShippingLineName))
                 throw new ArgumentException("Mã quy tắc và tên hãng tàu/nhóm áp dụng là bắt buộc.");
+            ValidateStorageTariff(request);
             var code = request.Code.Trim().ToUpperInvariant();
             var exists = await _db.StorageTariffRules.AnyAsync(x => x.Code == code);
             if (exists) throw new InvalidOperationException("Mã quy tắc lưu bãi đã tồn tại.");
@@ -250,7 +378,21 @@ namespace Depot.Application.Services
             // trong tracker) — cùng lý do đã áp dụng cho DamageItem ở SubmitSurveyAsync.
             var item = await _db.StorageTariffRules.FirstOrDefaultAsync(x => x.Id == id);
             if (item == null) return null;
-            item.Code = request.Code.Trim().ToUpperInvariant(); item.ShippingLineCode = request.ShippingLineCode;
+            if (string.IsNullOrWhiteSpace(request.Code) || string.IsNullOrWhiteSpace(request.ShippingLineName))
+                throw new ArgumentException("Mã quy tắc và tên hãng tàu/nhóm áp dụng là bắt buộc.");
+            ValidateStorageTariff(request);
+            var code = request.Code.Trim().ToUpperInvariant();
+            var duplicate = await _db.StorageTariffRules.AnyAsync(x => x.Id != id && x.Code == code);
+            if (duplicate) throw new InvalidOperationException("Mã quy tắc lưu bãi đã tồn tại.");
+
+            // ExecuteDeleteAsync chạy thẳng xuống DB ngay lập tức, KHÔNG tự gộp chung transaction với
+            // SaveChangesAsync phía sau — nếu SaveChangesAsync sau đó lỗi (vd trùng Code lọt qua do race
+            // condition), tier cũ đã bị xoá thật nhưng tier mới chưa kịp ghi, mất trắng dữ liệu lũy tiến.
+            // Bọc tường minh 1 transaction để đảm bảo atomic, giống nguyên tắc đã dùng ở
+            // DepotJobService.SubmitSurveyAsync.
+            await using var tx = await _db.Database.BeginTransactionAsync();
+
+            item.Code = code; item.ShippingLineCode = request.ShippingLineCode;
             item.ShippingLineName = request.ShippingLineName.Trim(); item.ContainerTypeCategory = request.ContainerTypeCategory;
             item.DefaultFreeDays = request.DefaultFreeDays; item.CalculationUnit = request.CalculationUnit;
             item.VatPercent = request.VatPercent; item.Notes = request.Notes?.Trim();
@@ -265,6 +407,7 @@ namespace Depot.Application.Services
             }
 
             await _db.SaveChangesAsync();
+            await tx.CommitAsync();
             return item;
         }
 
@@ -277,6 +420,30 @@ namespace Depot.Application.Services
             return true;
         }
 
+        // BUG-024: email trước đây không kiểm tra định dạng (lưu được "abc"), làm hỏng gửi thông báo/hoá đơn.
+        private static void ValidateEmail(string? email, string label)
+        {
+            if (string.IsNullOrWhiteSpace(email)) return;
+            if (!System.Net.Mail.MailAddress.TryCreate(email.Trim(), out var parsed) || parsed.Address != email.Trim() || !parsed.Host.Contains('.'))
+                throw new ArgumentException($"{label} '{email}' không đúng định dạng.");
+        }
+
+        private static void ValidateCustomerFields(CustomerCompanyRequest request)
+        {
+            if (request.CreditLimit < 0) throw new ArgumentException("Hạn mức công nợ không được âm.");
+            if (request.PaymentTermDays < 0) throw new ArgumentException("Số ngày thanh toán không được âm.");
+            ValidateEmail(request.Email, "Email khách hàng");
+            ValidateEmail(request.ContactEmail, "Email người liên hệ");
+        }
+
+        // BUG-020: trước đây tạo được tài xế/xe/tài khoản/booking gắn vào mã khách hàng không tồn tại.
+        private async Task EnsureCustomerExistsAsync(string customerCode)
+        {
+            var code = customerCode.Trim().ToUpperInvariant();
+            if (!await _db.CustomerCompanies.AnyAsync(x => x.Code == code && x.Status != "DELETED"))
+                throw new ArgumentException($"Khách hàng '{customerCode.Trim()}' không tồn tại hoặc đã bị khoá.");
+        }
+
         public async Task<List<CustomerCompany>> GetCustomersAsync()
         {
             return await _db.CustomerCompanies.Where(x => x.Status != "DELETED").OrderBy(x => x.Code).ToListAsync();
@@ -285,6 +452,7 @@ namespace Depot.Application.Services
         public async Task<CustomerCompany> CreateCustomerAsync(CustomerCompanyRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.Code) || string.IsNullOrWhiteSpace(request.Name)) throw new ArgumentException("Mã và tên khách hàng là bắt buộc.");
+            ValidateCustomerFields(request);
             if (await _db.CustomerCompanies.AnyAsync(x => x.Code == request.Code)) throw new InvalidOperationException("Mã khách hàng đã tồn tại.");
             var customer = new CustomerCompany
             {
@@ -303,6 +471,8 @@ namespace Depot.Application.Services
         {
             var customer = await _db.CustomerCompanies.FirstOrDefaultAsync(x => x.Id == id);
             if (customer == null) return null;
+            if (string.IsNullOrWhiteSpace(request.Name)) throw new ArgumentException("Tên khách hàng là bắt buộc.");
+            ValidateCustomerFields(request);
             customer.Name = request.Name.Trim(); customer.ShortName = request.ShortName; customer.TaxCode = request.TaxCode;
             customer.Phone = request.Phone; customer.Email = request.Email; customer.Address = request.Address;
             customer.ContactPerson = request.ContactPerson; customer.ContactPhone = request.ContactPhone; customer.ContactEmail = request.ContactEmail;
@@ -329,6 +499,8 @@ namespace Depot.Application.Services
         public async Task<CustomerDriver> CreateDriverAsync(CustomerDriverRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.CustomerCode) || string.IsNullOrWhiteSpace(request.DriverCode) || string.IsNullOrWhiteSpace(request.FullName)) throw new ArgumentException("CustomerCode, DriverCode và FullName là bắt buộc.");
+            await EnsureCustomerExistsAsync(request.CustomerCode);
+            ValidateEmail(request.Email, "Email tài xế");
             if (await _db.CustomerDrivers.AnyAsync(x => x.CustomerCode == request.CustomerCode && x.DriverCode == request.DriverCode)) throw new InvalidOperationException("Mã tài xế đã tồn tại.");
             var driver = new CustomerDriver { CustomerCode = request.CustomerCode.Trim().ToUpperInvariant(), DriverCode = request.DriverCode.Trim().ToUpperInvariant(), FullName = request.FullName.Trim(), Phone = request.Phone, Email = request.Email, CitizenId = request.CitizenId, LicenseNumber = request.LicenseNumber, LicenseGrade = request.LicenseGrade, LicenseExpiryDate = request.LicenseExpiryDate, Address = request.Address, Status = request.Status };
             _db.CustomerDrivers.Add(driver); await _db.SaveChangesAsync(); return driver;
@@ -337,6 +509,7 @@ namespace Depot.Application.Services
         public async Task<CustomerDriver?> UpdateDriverAsync(long id, CustomerDriverRequest request)
         {
             var driver = await _db.CustomerDrivers.FirstOrDefaultAsync(x => x.Id == id); if (driver == null) return null;
+            ValidateEmail(request.Email, "Email tài xế");
             driver.FullName = request.FullName.Trim(); driver.Phone = request.Phone; driver.Email = request.Email; driver.CitizenId = request.CitizenId; driver.LicenseNumber = request.LicenseNumber; driver.LicenseGrade = request.LicenseGrade; driver.LicenseExpiryDate = request.LicenseExpiryDate; driver.Address = request.Address; driver.Status = request.Status;
             await _db.SaveChangesAsync(); return driver;
         }
@@ -355,6 +528,8 @@ namespace Depot.Application.Services
         public async Task<CustomerVehicle> CreateVehicleAsync(CustomerVehicleRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.CustomerCode) || string.IsNullOrWhiteSpace(request.PlateNumber)) throw new ArgumentException("CustomerCode và biển số là bắt buộc.");
+            await EnsureCustomerExistsAsync(request.CustomerCode);
+            if (request.PayloadTon < 0) throw new ArgumentException("Tải trọng phương tiện không được âm.");
             if (await _db.CustomerVehicles.AnyAsync(x => x.CustomerCode == request.CustomerCode && x.PlateNumber == request.PlateNumber)) throw new InvalidOperationException("Phương tiện đã tồn tại.");
             var vehicle = new CustomerVehicle { CustomerCode = request.CustomerCode.Trim().ToUpperInvariant(), PlateNumber = request.PlateNumber.Trim().ToUpperInvariant(), VehicleType = request.VehicleType, Brand = request.Brand, PayloadTon = request.PayloadTon, OwnerName = request.OwnerName, DefaultDriverCode = request.DefaultDriverCode, InspectionExpiry = request.InspectionExpiry, Status = request.Status };
             _db.CustomerVehicles.Add(vehicle); await _db.SaveChangesAsync(); return vehicle;
@@ -363,6 +538,7 @@ namespace Depot.Application.Services
         public async Task<CustomerVehicle?> UpdateVehicleAsync(long id, CustomerVehicleRequest request)
         {
             var vehicle = await _db.CustomerVehicles.FirstOrDefaultAsync(x => x.Id == id); if (vehicle == null) return null;
+            if (request.PayloadTon < 0) throw new ArgumentException("Tải trọng phương tiện không được âm.");
             vehicle.VehicleType = request.VehicleType; vehicle.Brand = request.Brand; vehicle.PayloadTon = request.PayloadTon; vehicle.OwnerName = request.OwnerName; vehicle.DefaultDriverCode = request.DefaultDriverCode; vehicle.InspectionExpiry = request.InspectionExpiry; vehicle.Status = request.Status;
             await _db.SaveChangesAsync(); return vehicle;
         }
@@ -381,6 +557,8 @@ namespace Depot.Application.Services
         public async Task<CustomerPortalUser> CreatePortalUserAsync(CustomerPortalUserRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.CustomerCode) || string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.FullName)) throw new ArgumentException("CustomerCode, Username và FullName là bắt buộc.");
+            await EnsureCustomerExistsAsync(request.CustomerCode);
+            ValidateEmail(request.Email, "Email tài khoản");
             if (await _db.CustomerPortalUsers.AnyAsync(x => x.CustomerCode == request.CustomerCode && x.Username == request.Username)) throw new InvalidOperationException("Username đã tồn tại.");
             var user = new CustomerPortalUser { CustomerCode = request.CustomerCode.Trim().ToUpperInvariant(), Username = request.Username.Trim().ToLowerInvariant(), FullName = request.FullName.Trim(), Email = request.Email, Phone = request.Phone, Role = request.Role, AccountType = request.AccountType, Status = request.Status };
             _db.CustomerPortalUsers.Add(user); await _db.SaveChangesAsync(); return user;
@@ -389,6 +567,7 @@ namespace Depot.Application.Services
         public async Task<CustomerPortalUser?> UpdatePortalUserAsync(long id, CustomerPortalUserRequest request)
         {
             var user = await _db.CustomerPortalUsers.FirstOrDefaultAsync(x => x.Id == id); if (user == null) return null;
+            ValidateEmail(request.Email, "Email tài khoản");
             user.FullName = request.FullName.Trim(); user.Email = request.Email; user.Phone = request.Phone; user.Role = request.Role; user.AccountType = request.AccountType; user.Status = request.Status;
             await _db.SaveChangesAsync(); return user;
         }
@@ -409,6 +588,7 @@ namespace Depot.Application.Services
             if (string.IsNullOrWhiteSpace(request.BookingNo) || string.IsNullOrWhiteSpace(request.CustomerCode)) throw new ArgumentException("BookingNo và CustomerCode là bắt buộc.");
             if (request.ContainerCount < 0 || request.UsedCount < 0 || request.UsedCount > request.ContainerCount) throw new ArgumentException("Số lượng container booking không hợp lệ.");
             if (await _db.CustomerBookings.AnyAsync(x => x.BookingNo == request.BookingNo)) throw new InvalidOperationException("BookingNo đã tồn tại.");
+            await EnsureCustomerExistsAsync(request.CustomerCode);
             var shippingLineCode = request.ShippingLineCode.Trim().ToUpperInvariant();
             var shippingLine = await _db.ShippingLines.FirstOrDefaultAsync(x => x.Code == shippingLineCode && !x.IsDeleted);
             if (shippingLine == null) throw new ArgumentException($"Mã hãng tàu {shippingLineCode} không tồn tại trong danh mục ShippingLine.Code.");

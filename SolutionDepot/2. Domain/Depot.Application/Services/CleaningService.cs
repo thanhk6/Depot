@@ -1,5 +1,6 @@
 using Depot.Data.EF;
 using Depot.Data.Entities.Cleaning;
+using Depot.Data.Entities.Depot;
 using Depot.ViewModels;
 using Microsoft.EntityFrameworkCore;
 
@@ -30,6 +31,7 @@ public sealed class CleaningService : ICleaningService
         return await query.OrderByDescending(x => x.CreatedAt).ToListAsync();
     }
 
+
     public Task<CleaningRecord?> GetByIdAsync(long id) => Query().FirstOrDefaultAsync(x => x.Id == id);
 
     private async Task<CleaningRecord> GetTrackedOrThrowAsync(long recordId)
@@ -49,6 +51,23 @@ public sealed class CleaningService : ICleaningService
             .AnyAsync(x => x.ContainerNo == containerNoNormalized && x.Status != "HANDOVER_TO_OPERATION");
         if (hasActiveRecord)
             throw new ArgumentException($"Container {containerNoNormalized} đã có lệnh vệ sinh đang hoạt động, không thể tạo trùng.");
+
+        // Trước đây JobNo (nếu có gửi lên) không được kiểm tra tồn tại — JobNo sai chính tả hoặc trỏ tới
+        // job đã xoá vẫn tạo được CleaningRecord bình thường, và lỗi chỉ lộ ra âm thầm ở bước bàn giao
+        // sau này (HandoverAsync không tìm thấy job tương ứng nên bỏ qua, DepotJob.Status không bao giờ
+        // chuyển sang READY_FOR_OUT, Gate-Out bị kẹt không rõ nguyên nhân). Chặn ngay từ lúc tạo.
+        if (!string.IsNullOrWhiteSpace(request.JobNo))
+        {
+            var jobExists = await db.DepotJobs.AnyAsync(j => j.JobNo == request.JobNo && !j.IsDeleted);
+            if (!jobExists)
+                throw new ArgumentException($"JobNo '{request.JobNo}' không tồn tại trong hệ thống.");
+        }
+
+        // BUG-021: trước đây tạo được lệnh vệ sinh cho số container không có trong bãi (không có hồ sơ nào).
+        if (!await db.DepotJobs.AnyAsync(j => j.ContainerNo == containerNoNormalized && j.Status != "GATE_OUT"))
+            throw new ArgumentException($"Container {containerNoNormalized} không có hồ sơ nào đang trong bãi.");
+        if (request.Items.Any(i => i.UnitPrice < 0 || i.EstimatedDurationMin < 0))
+            throw new ArgumentException("Đơn giá và thời gian dự kiến của hạng mục vệ sinh không được âm.");
 
         var now = DateTime.UtcNow;
         var code = "CL-" + now.ToString("yyyyMMddHHmmss") + "-" + Random.Shared.Next(100, 999);
@@ -83,15 +102,39 @@ public sealed class CleaningService : ICleaningService
             CleaningStaff = request.CleaningStaff,
             TargetQualityGrade = request.TargetQualityGrade,
             CleaningNotes = request.Notes,
-            BeforeCleaningPhotoUrl = "https://images.unsplash.com/photo-1541888946425-d0fbb186a5b3?auto=format&fit=crop&w=800&q=80",
+            // Không gán ảnh mẫu (trước đây là 1 ảnh Unsplash cố định) — chỉ lưu ảnh thật khi có.
+            BeforeCleaningPhotoUrl = null,
             BeforePhotoTimestamp = now,
             TotalCostVnd = items.Sum(x => x.TotalPrice),
             Items = items
         };
 
         db.CleaningRecords.Add(record);
+        await AddJobAuditAsync(record.JobNo, containerNoNormalized, "CLEANING_RECEIVED", request.CleaningStaff ?? "Tổ Vệ Sinh",
+            $"Tiếp nhận vệ sinh {code}: {items.Count} hạng mục, dự kiến {record.TotalCostVnd:N0} đ.");
         await db.SaveChangesAsync();
         return record;
+    }
+
+    /// <summary>Ghi nhật ký vào vòng đời container (JobAuditLog) — tìm hồ sơ theo JobNo, không có thì theo số
+    /// container đang trong bãi. Trước đây bước vệ sinh không ghi gì nên timeline container thiếu hẳn công đoạn này.</summary>
+    private async Task AddJobAuditAsync(string? jobNo, string containerNo, string action, string user, string details)
+    {
+        var job = !string.IsNullOrWhiteSpace(jobNo)
+            ? await db.DepotJobs.FirstOrDefaultAsync(j => j.JobNo == jobNo)
+            : await db.DepotJobs.Where(j => j.ContainerNo == containerNo && j.Status != "GATE_OUT")
+                .OrderByDescending(j => j.Id).FirstOrDefaultAsync();
+        if (job is null) return;
+        db.AuditLogs.Add(new JobAuditLog
+        {
+            DepotJobId = job.Id,
+            JobNo = job.JobNo,
+            Action = action,
+            // Người thao tác thật = tài khoản đăng nhập (AuditActorInterceptor gán khi lưu); đây chỉ là dự phòng.
+            User = string.IsNullOrWhiteSpace(user) ? "Tổ Vệ Sinh" : user,
+            Timestamp = DateTime.UtcNow,
+            Details = details
+        });
     }
 
     public async Task<CleaningRecord> ToggleItemAsync(long recordId, long itemId, ToggleCleaningItemRequest request)
@@ -107,6 +150,9 @@ public sealed class CleaningService : ICleaningService
         if (record.Status is "PENDING_CLEANING" or "IN_CLEANING")
             record.Status = record.Items.Any(x => x.IsCompleted) ? "IN_CLEANING" : "PENDING_CLEANING";
 
+        // Ghi lại từng lần đánh dấu tiến độ (người thao tác = tài khoản đăng nhập, gán khi lưu).
+        await AddJobAuditAsync(record.JobNo, record.ContainerNo, request.IsCompleted ? "CLEANING_ITEM_DONE" : "CLEANING_ITEM_UNDONE", request.PerformedBy ?? "",
+            $"{(request.IsCompleted ? "Xong" : "Bỏ đánh dấu")} hạng mục '{item.CleaningName}' ({record.Items.Count(x => x.IsCompleted)}/{record.Items.Count}) — lệnh {record.Code}.");
         await db.SaveChangesAsync();
         return record;
     }
@@ -127,6 +173,8 @@ public sealed class CleaningService : ICleaningService
         if (record.Status is "PENDING_CLEANING" or "IN_CLEANING")
             record.Status = !allDone ? "IN_CLEANING" : "PENDING_CLEANING";
 
+        await AddJobAuditAsync(record.JobNo, record.ContainerNo, !allDone ? "CLEANING_ALL_DONE" : "CLEANING_ALL_UNDONE", request.PerformedBy ?? "",
+            $"{(!allDone ? "Đánh dấu xong tất cả" : "Bỏ đánh dấu tất cả")} {record.Items.Count} hạng mục — lệnh {record.Code}.");
         await db.SaveChangesAsync();
         return record;
     }
@@ -148,6 +196,19 @@ public sealed class CleaningService : ICleaningService
             record.AfterPhotoTimestamp = DateTime.UtcNow;
         }
 
+        // Ghi lại thông số thi công đã cập nhật.
+        var changes = new List<string>();
+        if (request.CleaningStaff is not null) changes.Add($"nhân viên {request.CleaningStaff}");
+        if (request.WaterPressureBar is not null) changes.Add($"áp lực {request.WaterPressureBar} bar");
+        if (request.ChemicalUsed is not null) changes.Add($"hoá chất {request.ChemicalUsed}");
+        if (request.ChemicalVolumeLiters is not null) changes.Add($"{request.ChemicalVolumeLiters} lít");
+        if (request.TemperatureCelsius is not null) changes.Add($"nhiệt độ {request.TemperatureCelsius}°C");
+        if (request.TargetQualityGrade is not null) changes.Add($"hạng mục tiêu {request.TargetQualityGrade}");
+        if (request.CleaningNotes is not null) changes.Add("ghi chú");
+        if (request.AfterCleaningPhotoUrl is not null) changes.Add("ảnh sau vệ sinh");
+        if (changes.Count > 0)
+            await AddJobAuditAsync(record.JobNo, record.ContainerNo, "CLEANING_EXECUTION_UPDATED", request.CleaningStaff ?? "",
+                $"Cập nhật thi công vệ sinh {record.Code}: {string.Join(", ", changes)}.");
         await db.SaveChangesAsync();
         return record;
     }
@@ -158,6 +219,12 @@ public sealed class CleaningService : ICleaningService
             throw new ArgumentException("HandoverActor là bắt buộc.");
 
         var record = await GetTrackedOrThrowAsync(recordId);
+
+        // Trước đây không chặn gọi Handover lần 2 — vì mọi Item đã IsCompleted=true từ lần đầu,
+        // pendingCount luôn = 0 nên lần gọi sau vẫn "chạy thành công", ghi đè HandoverToOperationDate/
+        // HandoverActor, làm sai lệch lịch sử bàn giao (tưởng có 2 lần bàn giao thật).
+        if (record.Status == "HANDOVER_TO_OPERATION")
+            throw new ArgumentException("Lệnh vệ sinh này đã được bàn giao trước đó, không thể bàn giao lại.");
 
         // Trước đây bàn giao TỰ ĐỘNG đánh dấu hoàn thành mọi hạng mục còn dang dở (`item.IsCompleted = true`
         // vô điều kiện, bất kể trạng thái thật) — nghĩa là KTV bấm "Hoàn Tất Vệ Sinh & Chuyển Qua Khai Thác"
@@ -192,9 +259,16 @@ public sealed class CleaningService : ICleaningService
             var job = await db.DepotJobs.FirstOrDefaultAsync(j => j.JobNo == record.JobNo);
             if (job is not null && job.Status == "CLEANING")
             {
-                job.Status = "READY_FOR_OUT";
+                // Container giám định có hư hỏng → chờ báo giá sửa chữa (sau khi Khai thác lập phiếu + thu tiền);
+                // không hư hỏng → sẵn sàng xuất.
+                var hasDamages = await db.Surveys
+                    .Where(s => s.DepotJobId == job.Id)
+                    .AnyAsync(s => db.Set<DamageItem>().Any(d => d.SurveyId == s.Id));
+                job.Status = hasDamages ? "ESTIMATING" : "READY_FOR_OUT";
             }
         }
+        await AddJobAuditAsync(record.JobNo, record.ContainerNo, "CLEANING_HANDOVER", request.HandoverActor,
+            $"Hoàn tất vệ sinh {record.Code} ({record.Items.Count} hạng mục, {record.TotalCostVnd:N0} đ) — bàn giao Khai thác lập phiếu dịch vụ.");
 
         await db.SaveChangesAsync();
         return record;

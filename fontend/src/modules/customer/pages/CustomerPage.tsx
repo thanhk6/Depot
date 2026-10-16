@@ -38,6 +38,7 @@ import {
   UserCheck,
   Key
 } from 'lucide-react';
+import { fetchContainerTypes } from '../../masterdata/utils/containerTypeCatalog';
 
 export const CustomerPage: React.FC = () => {
   // Navigation mode: 'LIST' (shows only customer directory) or 'DETAIL' (shows clicked customer's account & workspace)
@@ -180,12 +181,20 @@ export const CustomerPage: React.FC = () => {
 
   const handleCreateGateIn = async (newGateIn: GateInRegistration) => {
     try {
+      // Trọng lượng vỏ lấy theo loại container trong DM Loại Container (DB) — trước đây gửi cố định 3800/28680 kg.
+      const typeCode = (newGateIn.isoCode || newGateIn.size || '').toUpperCase();
+      const containerType = (await fetchContainerTypes()).find(
+        (t) => t.typeCode.toUpperCase() === typeCode || t.isoCode.toUpperCase() === typeCode
+      );
+      if (!containerType || !containerType.tareWeightKg || !containerType.maxPayloadKg) {
+        throw new Error(`Loại container "${typeCode}" chưa khai báo Tare / Max payload trong DM Loại Container.`);
+      }
       const response: any = await containerApi.createGateIn({
         containerNo: newGateIn.containerNo,
-        isoSize: newGateIn.isoCode || newGateIn.size,
+        isoSize: containerType.typeCode,
         shippingLine: newGateIn.shippingLine,
-        tareWeightKg: 3800,
-        maxPayloadKg: 28680,
+        tareWeightKg: containerType.tareWeightKg,
+        maxPayloadKg: containerType.maxPayloadKg,
         truckPlate: newGateIn.vehiclePlate,
         driverName: newGateIn.driverName,
         driverPhone: newGateIn.driverPhone,
@@ -234,13 +243,13 @@ export const CustomerPage: React.FC = () => {
   const getCategoryLabel = (cat?: string) => {
     switch (cat) {
       case 'DOANH_NGHIEP':
-        return { text: 'Doanh Nghiệp / Tập Đoàn', color: 'text-blue-400 bg-blue-500/10 border-blue-500/30' };
+        return { text: 'Doanh Nghiệp / Tập Đoàn', color: 'text-blue-600 bg-blue-50 border-blue-200' };
       case 'CONG_TY':
-        return { text: 'Công Ty Vận Tải / FWD', color: 'text-purple-400 bg-purple-500/10 border-purple-500/30' };
+        return { text: 'Công Ty Vận Tải / FWD', color: 'text-purple-600 bg-purple-50 border-purple-200' };
       case 'KHACH_LE':
-        return { text: 'Khách Lẻ / Chủ Xe Cá Nhân', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' };
+        return { text: 'Khách Lẻ / Chủ Xe Cá Nhân', color: 'text-emerald-600 bg-emerald-50 border-emerald-200' };
       default:
-        return { text: 'Doanh Nghiệp Vận Tải', color: 'text-blue-400 bg-blue-500/10 border-blue-500/30' };
+        return { text: 'Doanh Nghiệp Vận Tải', color: 'text-blue-600 bg-blue-50 border-blue-200' };
     }
   };
 
@@ -263,7 +272,7 @@ export const CustomerPage: React.FC = () => {
   }
 
   if (!currentCustomer) {
-    return <div className="p-6 text-sm text-slate-400">Chưa có dữ liệu khách hàng từ backend.</div>;
+    return <div className="p-6 text-sm text-slate-500">Chưa có dữ liệu khách hàng từ backend.</div>;
   }
 
   const catMeta = getCategoryLabel(currentCustomer.category);
@@ -275,23 +284,23 @@ export const CustomerPage: React.FC = () => {
       <div className="flex items-center justify-between gap-3">
         <button
           onClick={() => setPageView('LIST')}
-          className="flex items-center gap-2 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl border border-slate-800 text-xs font-bold transition shadow-sm cursor-pointer"
+          className="flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-900 rounded-xl border border-slate-200 text-xs font-bold transition shadow-sm cursor-pointer"
         >
-          <ArrowLeft className="w-4 h-4 text-blue-400" />
+          <ArrowLeft className="w-4 h-4 text-blue-600" />
           <span>Danh Sách Khách Hàng</span>
         </button>
 
-        <div className="text-xs text-slate-400 font-mono hidden sm:block">
-          Quản Lý Khách Hàng / <strong className="text-white">{currentCustomer.code}</strong> - {currentCustomer.name}
+        <div className="text-xs text-slate-500 font-mono hidden sm:block">
+          Quản Lý Khách Hàng / <strong className="text-slate-900">{currentCustomer.code}</strong> - {currentCustomer.name}
         </div>
       </div>
 
       {/* Top Banner: Customer Identity & Switcher */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-2xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+      <div className="bg-white border border-slate-200 rounded-3xl p-4 sm:p-5 shadow-2xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
         {/* Left: Customer selector */}
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 p-0.5 flex items-center justify-center shadow-lg shadow-blue-500/20 shrink-0">
-            <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center text-blue-400">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 p-0.5 flex items-center justify-center shadow-lg  shrink-0">
+            <div className="w-full h-full bg-slate-50 rounded-[14px] flex items-center justify-center text-blue-600">
               <Building2 className="w-6 h-6" />
             </div>
           </div>
@@ -300,10 +309,10 @@ export const CustomerPage: React.FC = () => {
               <span className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-bold border ${catMeta.color}`}>
                 {catMeta.text}
               </span>
-              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">
                 {currentCustomer.status === 'ACTIVE' ? 'Đang hoạt động' : 'Tạm khóa'}
               </span>
-              <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30">
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-50 text-amber-700 border border-amber-200">
                 Admin: @{currentCustomer.adminUsername || 'admin'}
               </span>
             </div>
@@ -314,13 +323,13 @@ export const CustomerPage: React.FC = () => {
                 className="appearance-none pr-8 pl-0 py-0 bg-transparent text-base sm:text-lg font-black text-white focus:outline-none cursor-pointer border-none"
               >
                 {customers.map((c) => (
-                  <option key={c.id} value={c.id} className="bg-slate-900 text-white text-sm">
+                  <option key={c.id} value={c.id} className="bg-white text-slate-900 text-sm">
                     {c.name} ({c.code}) - [{c.category === 'DOANH_NGHIEP' ? 'Doanh nghiệp' : c.category === 'CONG_TY' ? 'Công ty' : 'Khách lẻ'}]
                   </option>
                 ))}
               </select>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5 font-mono">
+            <p className="text-xs text-slate-500 mt-0.5 font-mono">
               {currentCustomer.category === 'KHACH_LE' ? 'CCCD' : 'MST'}: {currentCustomer.taxCode} • SĐT: {currentCustomer.phone} • Email: {currentCustomer.email}
             </p>
           </div>
@@ -328,13 +337,13 @@ export const CustomerPage: React.FC = () => {
 
         {/* Right: Role Preview Switcher */}
         <div className="flex flex-wrap items-center gap-2.5 self-stretch sm:self-auto justify-end">
-          <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl p-1 text-xs">
+          <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl p-1 text-xs">
             <button
               onClick={() => setCurrentRole('CUSTOMER_ADMIN')}
               className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${
                 currentRole === 'CUSTOMER_ADMIN'
                   ? 'bg-blue-600 text-white shadow'
-                  : 'text-slate-400 hover:text-white'
+                  : 'text-slate-500 hover:text-slate-900'
               }`}
             >
               Admin KH
@@ -344,7 +353,7 @@ export const CustomerPage: React.FC = () => {
               className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${
                 currentRole === 'DISPATCHER'
                   ? 'bg-blue-600 text-white shadow'
-                  : 'text-slate-400 hover:text-white'
+                  : 'text-slate-500 hover:text-slate-900'
               }`}
             >
               Điều Độ
@@ -354,7 +363,7 @@ export const CustomerPage: React.FC = () => {
               className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${
                 currentRole === 'DRIVER'
                   ? 'bg-blue-600 text-white shadow'
-                  : 'text-slate-400 hover:text-white'
+                  : 'text-slate-500 hover:text-slate-900'
               }`}
             >
               Tài Xế
@@ -364,13 +373,13 @@ export const CustomerPage: React.FC = () => {
       </div>
 
       {/* Tabs Navigation */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin border-b border-slate-800/80">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin border-b border-slate-200/80">
         <button
           onClick={() => setActiveDetailTab('profile')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
             activeDetailTab === 'profile'
-              ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-              : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              ? 'bg-blue-600 text-white shadow-lg '
+              : 'text-slate-500 hover:text-slate-900 hover:bg-white'
           }`}
         >
           <Key className="w-4 h-4" />
@@ -381,13 +390,13 @@ export const CustomerPage: React.FC = () => {
           onClick={() => setActiveDetailTab('accounts')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
             activeDetailTab === 'accounts'
-              ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-              : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              ? 'bg-blue-600 text-white shadow-lg '
+              : 'text-slate-500 hover:text-slate-900 hover:bg-white'
           }`}
         >
           <Users className="w-4 h-4" />
           <span>Tài Khoản &amp; Phân Quyền</span>
-          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-500/20 text-emerald-300 font-mono">
+          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-50 text-emerald-700 font-mono">
             {users.filter((u) => u.customerId === currentCustomerId).length}
           </span>
         </button>
@@ -396,13 +405,13 @@ export const CustomerPage: React.FC = () => {
           onClick={() => setActiveDetailTab('gate_in_online')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
             activeDetailTab === 'gate_in_online'
-              ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-              : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              ? 'bg-blue-600 text-white shadow-lg '
+              : 'text-slate-500 hover:text-slate-900 hover:bg-white'
           }`}
         >
           <Truck className="w-4 h-4" />
           <span>Đăng Ký Gate-In Online</span>
-          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-cyan-500/20 text-cyan-300 font-mono">
+          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-cyan-50 text-cyan-700 font-mono">
             {gateIns.filter((g) => g.customerId === currentCustomerId).length}
           </span>
         </button>
@@ -411,13 +420,13 @@ export const CustomerPage: React.FC = () => {
           onClick={() => setActiveDetailTab('bookings')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
             activeDetailTab === 'bookings'
-              ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-              : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              ? 'bg-blue-600 text-white shadow-lg '
+              : 'text-slate-500 hover:text-slate-900 hover:bg-white'
           }`}
         >
           <FileText className="w-4 h-4" />
           <span>Lệnh / Booking</span>
-          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-purple-500/20 text-purple-300 font-mono">
+          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-purple-50 text-purple-700 font-mono">
             {bookings.filter((b) => b.customerId === currentCustomerId).length}
           </span>
         </button>
@@ -426,13 +435,13 @@ export const CustomerPage: React.FC = () => {
           onClick={() => setActiveDetailTab('containers')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
             activeDetailTab === 'containers'
-              ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-              : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              ? 'bg-blue-600 text-white shadow-lg '
+              : 'text-slate-500 hover:text-slate-900 hover:bg-white'
           }`}
         >
           <Box className="w-4 h-4" />
           <span>Container Tại Bãi</span>
-          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-500/20 text-indigo-300 font-mono">
+          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-50 text-indigo-700 font-mono">
             {containers.filter((c) => c.customerId === currentCustomerId).length}
           </span>
         </button>
@@ -441,13 +450,13 @@ export const CustomerPage: React.FC = () => {
           onClick={() => setActiveDetailTab('drivers')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
             activeDetailTab === 'drivers'
-              ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-              : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              ? 'bg-blue-600 text-white shadow-lg '
+              : 'text-slate-500 hover:text-slate-900 hover:bg-white'
           }`}
         >
           <UserCheck className="w-4 h-4" />
           <span>Đội Ngũ Tài Xế</span>
-          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-500/20 text-emerald-300 font-mono">
+          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-50 text-emerald-700 font-mono">
             {drivers.filter((d) => d.customerId === currentCustomerId).length}
           </span>
         </button>
@@ -456,13 +465,13 @@ export const CustomerPage: React.FC = () => {
           onClick={() => setActiveDetailTab('vehicles')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
             activeDetailTab === 'vehicles'
-              ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-              : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              ? 'bg-blue-600 text-white shadow-lg '
+              : 'text-slate-500 hover:text-slate-900 hover:bg-white'
           }`}
         >
           <Car className="w-4 h-4" />
           <span>Phương Tiện / Đầu Kéo</span>
-          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500/20 text-amber-300 font-mono">
+          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-50 text-amber-700 font-mono">
             {vehicles.filter((v) => v.customerId === currentCustomerId).length}
           </span>
         </button>
@@ -471,8 +480,8 @@ export const CustomerPage: React.FC = () => {
           onClick={() => setActiveDetailTab('dashboard')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
             activeDetailTab === 'dashboard'
-              ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-              : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              ? 'bg-blue-600 text-white shadow-lg '
+              : 'text-slate-500 hover:text-slate-900 hover:bg-white'
           }`}
         >
           <LayoutDashboard className="w-4 h-4" />
@@ -570,14 +579,14 @@ export const CustomerPage: React.FC = () => {
 
       {/* Gate-In Online Wizard Modal */}
       {isWizardOpen && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl relative">
+        <div className="fixed inset-0 bg-slate-50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl relative">
             <button
               onClick={() => {
                 setIsWizardOpen(false);
                 setPrefilledBooking(null);
               }}
-              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-lg transition cursor-pointer"
+              className="absolute top-4 right-4 p-2 text-slate-500 hover:text-slate-900 rounded-lg transition cursor-pointer"
             >
               ✕
             </button>

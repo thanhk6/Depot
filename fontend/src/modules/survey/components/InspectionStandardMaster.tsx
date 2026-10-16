@@ -8,8 +8,6 @@ import {
   Trash2,
   CheckCircle2,
   XCircle,
-  FileCheck,
-  Layers,
   AlertTriangle
 } from 'lucide-react';
 

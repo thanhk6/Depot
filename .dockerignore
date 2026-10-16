@@ -10,3 +10,4 @@ fontend/
 *.md
 .git/
 .gitignore
+**/storage-files/

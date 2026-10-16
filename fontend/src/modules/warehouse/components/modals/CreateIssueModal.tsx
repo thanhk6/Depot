@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Material, StockBalance, WorkOrderMaterial } from '../../types';
 import { X, ArrowUpFromLine, Plus, Trash2, AlertTriangle, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { formatVND } from '../../../../utils/format';
+import { containerApi } from '../../../../api';
 
 interface CreateIssueModalProps {
   isOpen: boolean;
@@ -18,7 +19,7 @@ interface CreateIssueModalProps {
     recipientName: string,
     note: string,
     items: { materialId: number; quantity: number; note?: string }[]
-  ) => { success: boolean; error?: string };
+  ) => Promise<{ success: boolean; error?: string }>;
 }
 
 interface IssueItemRow {
@@ -35,19 +36,24 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
   workOrderMaterials = [],
   onConfirmIssue
 }) => {
-  // Preset list of Work Orders
-  const availableWorkOrders = [
-    { woNo: 'WO-20260816-00001', contNo: 'MSKU1234567', shippingLine: 'MAERSK LINE', defaultTech: 'Nguyễn Văn Hùng (Thợ gò hàn EMR)' },
-    { woNo: 'WO-20260816-00002', contNo: 'MSKU7654321', shippingLine: 'MAERSK LINE', defaultTech: 'Lê Văn Tuấn (Thợ sửa cửa EMR)' },
-    { woNo: 'WO-20260816-00003', contNo: 'MSKU8888999', shippingLine: 'MAERSK LINE', defaultTech: 'Vũ Đình Hải (Thợ sàn gỗ EMR)' },
-    { woNo: 'WO-20260816-00004', contNo: 'MAEU4419208', shippingLine: 'MAERSK LINE', defaultTech: 'Nguyễn Văn Hùng (Thợ gò hàn EMR)' },
-    { woNo: 'WO-20260817-00005', contNo: 'MSKU9920112', shippingLine: 'MAERSK LINE', defaultTech: 'Trần Văn Sơn (Thợ sơn EMR)' },
-    { woNo: 'WO-20260817-00006', contNo: 'MAEU1109482', shippingLine: 'MAERSK LINE', defaultTech: 'Lê Văn Tuấn (Thợ sửa cửa EMR)' }
-  ];
+  // Lệnh sửa chữa = các hồ sơ container thật đang sửa chữa / chờ QC (trước đây là 6 lệnh + tên thợ mẫu).
+  // Số tham chiếu dùng JobNo thật của hồ sơ; thợ mặc định = kỹ thuật viên của RepairOrder nếu có.
+  const [availableWorkOrders, setAvailableWorkOrders] = useState<Array<{ woNo: string; contNo: string; shippingLine: string; defaultTech: string }>>([]);
+  useEffect(() => {
+    if (!isOpen) return;
+    containerApi.getAll()
+      .then((response: any) => {
+        const jobs: any[] = Array.isArray(response?.data) ? response.data : [];
+        setAvailableWorkOrders(jobs
+          .filter((j) => ['REPAIRING', 'QC_PENDING'].includes(String(j.status || '').toUpperCase()))
+          .map((j) => ({ woNo: j.jobNo, contNo: j.containerNo, shippingLine: j.shippingLineCode || '', defaultTech: j.repairOrder?.technicianName || '' })));
+      })
+      .catch(() => setAvailableWorkOrders([]));
+  }, [isOpen]);
 
-  const [selectedWO, setSelectedWO] = useState<string>(availableWorkOrders[0].woNo);
-  const [recipientName, setRecipientName] = useState<string>(availableWorkOrders[0].defaultTech);
-  const [note, setNote] = useState<string>('Xuất vật tư thi công sửa chữa container theo lệnh Work Order');
+  const [selectedWO, setSelectedWO] = useState<string>('');
+  const [recipientName, setRecipientName] = useState<string>('');
+  const [note, setNote] = useState<string>('');
   const [items, setItems] = useState<IssueItemRow[]>([
     {
       materialId: materials[0]?.id || 1,
@@ -56,13 +62,14 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
     }
   ]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const matched = availableWorkOrders.find((w) => w.woNo === selectedWO);
     if (matched) {
       setRecipientName(matched.defaultTech);
     }
-  }, [selectedWO]);
+  }, [selectedWO, availableWorkOrders]);
 
   useEffect(() => {
     setErrorMessage(null);
@@ -70,7 +77,7 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
 
   if (!isOpen) return null;
 
-  const currentWO = availableWorkOrders.find((w) => w.woNo === selectedWO) || availableWorkOrders[0];
+  const currentWO = availableWorkOrders.find((w) => w.woNo === selectedWO);
 
   const handleAddItem = () => {
     const defaultMat = materials[0];
@@ -128,9 +135,9 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
     return sum + Number(item.quantity || 0) * (b?.averageCost || 0);
   }, 0);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (items.length === 0) return;
+    if (items.length === 0 || isSubmitting) return;
 
     if (hasAnyShortage) {
       const firstShortage = rowValidations.find((v) => !v.isSufficient);
@@ -140,7 +147,16 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
       return;
     }
 
-    const result = onConfirmIssue(
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    // Chờ kết quả THẬT từ backend trước khi đóng modal — trước đây `onConfirmIssue` trả về thành công
+    // ngay lập tức (fire-and-forget), modal luôn đóng dù backend từ chối, khiến tồn kho hiển thị sai
+    // lệch với thực tế cho tới khi F5.
+    if (!currentWO) {
+      setErrorMessage('Chọn lệnh sửa chữa (container đang sửa chữa) trước khi xuất vật tư.'); setIsSubmitting(false);
+      return;
+    }
+    const result = await onConfirmIssue(
       `WO-${currentWO.woNo.slice(-6)}`,
       currentWO.woNo,
       `CONT-${currentWO.contNo}`,
@@ -150,6 +166,7 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
       note,
       items.map((i) => ({ ...i, quantity: Number(i.quantity) }))
     );
+    setIsSubmitting(false);
 
     if (!result.success) {
       setErrorMessage(result.error || 'Xuất kho thất bại do lỗi dữ liệu tồn kho.');
@@ -160,30 +177,30 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="bg-slate-900 border border-slate-700 w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 my-8">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950/60">
+      <div className="bg-white border border-slate-200 w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 my-8">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl">
+            <div className="p-2 bg-amber-50 border border-amber-200 text-amber-600 rounded-xl">
               <ArrowUpFromLine className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-white">Lập Phiếu Xuất Kho Vật Tư Sửa Chữa (PXK)</h2>
-              <p className="text-xs text-slate-400">
-                Xuất từ: <span className="text-amber-400 font-semibold">KHO VẬT TƯ SỬA CHỮA EMR</span> • Kiểm tra tồn khả dụng tự động
+              <h2 className="text-base font-bold text-slate-900">Lập Phiếu Xuất Kho Vật Tư Sửa Chữa (PXK)</h2>
+              <p className="text-xs text-slate-500">
+                Xuất từ: <span className="text-amber-600 font-semibold">KHO VẬT TƯ SỬA CHỮA EMR</span> • Kiểm tra tồn khả dụng tự động
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
+            className="p-1.5 text-slate-500 hover:text-slate-900 rounded-lg hover:bg-slate-100 transition"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {errorMessage && (
-          <div className="mx-6 mt-4 p-3 bg-rose-950/80 border border-rose-600/80 rounded-xl text-rose-200 text-xs flex items-start gap-2.5">
-            <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+          <div className="mx-6 mt-4 p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-200 text-xs flex items-start gap-2.5">
+            <ShieldAlert className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
             <div className="whitespace-pre-line font-medium leading-relaxed">{errorMessage}</div>
           </div>
         )}
@@ -191,14 +208,15 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
         <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-slate-300 font-medium mb-1">
-                Lệnh Sửa Chữa & Container <span className="text-rose-400">*</span>
+              <label className="block text-slate-700 font-medium mb-1">
+                Lệnh Sửa Chữa & Container <span className="text-rose-600">*</span>
               </label>
               <select
                 value={selectedWO}
                 onChange={(e) => setSelectedWO(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono font-semibold focus:border-amber-500 focus:outline-none"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 font-mono font-semibold focus:border-amber-500 focus:outline-none"
               >
+                <option value="">{availableWorkOrders.length === 0 ? '— Không có container nào đang sửa chữa —' : '— Chọn lệnh sửa chữa —'}</option>
                 {availableWorkOrders.map((wo) => (
                   <option key={wo.woNo} value={wo.woNo}>
                     {wo.woNo} • {wo.contNo} ({wo.shippingLine})
@@ -207,52 +225,52 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
               </select>
             </div>
             <div>
-              <label className="block text-slate-300 font-medium mb-1">
-                Thợ / Nhân Viên Nhận Vật Tư <span className="text-rose-400">*</span>
+              <label className="block text-slate-700 font-medium mb-1">
+                Thợ / Nhân Viên Nhận Vật Tư <span className="text-rose-600">*</span>
               </label>
               <input
                 type="text"
                 required
                 value={recipientName}
                 onChange={(e) => setRecipientName(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:border-amber-500 focus:outline-none"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-slate-300 font-medium mb-1">Ghi Chú Thi Công</label>
+            <label className="block text-slate-700 font-medium mb-1">Ghi Chú Thi Công</label>
             <input
               type="text"
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="VD: Xuất vật tư cho thợ gò hàn thay ván sàn và nắn vách..."
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:border-amber-500 focus:outline-none"
             />
           </div>
 
           {/* Items Table */}
           <div className="space-y-2 pt-2">
             <div className="flex items-center justify-between">
-              <h3 className="font-bold text-white text-xs uppercase tracking-wider flex items-center gap-2">
+              <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-2">
                 <span>Danh Sách Vật Tư Xuất</span>
-                <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full text-[10px]">
+                <span className="px-2 py-0.5 bg-amber-50 text-amber-600 rounded-full text-[10px]">
                   {items.length} dòng
                 </span>
               </h3>
               <button
                 type="button"
                 onClick={handleAddItem}
-                className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-lg flex items-center gap-1.5 font-medium transition"
+                className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-amber-600 rounded-lg flex items-center gap-1.5 font-medium transition"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Thêm vật tư</span>
               </button>
             </div>
 
-            <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-950">
+            <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-900 text-slate-400 font-semibold border-b border-slate-800">
+                <thead className="bg-white text-slate-500 font-semibold border-b border-slate-200">
                   <tr>
                     <th className="px-3 py-2">Vật Tư</th>
                     <th className="px-3 py-2 w-28 text-center">Tồn Khả Dụng</th>
@@ -262,7 +280,7 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
                     <th className="px-2 py-2 w-10 text-center"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60">
+                <tbody className="divide-y divide-slate-200/60">
                   {items.map((row, idx) => {
                     const val = rowValidations[idx];
                     const balance = val?.balance;
@@ -271,13 +289,13 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
                     return (
                       <tr
                         key={idx}
-                        className={`transition ${!val.isSufficient ? 'bg-rose-950/30' : 'hover:bg-slate-900/40'}`}
+                        className={`transition ${!val.isSufficient ? 'bg-rose-50' : 'hover:bg-white'}`}
                       >
                         <td className="px-3 py-2">
                           <select
                             value={row.materialId}
                             onChange={(e) => handleItemChange(idx, 'materialId', Number(e.target.value))}
-                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-white focus:border-amber-500 focus:outline-none"
+                            className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-slate-900 focus:border-amber-500 focus:outline-none"
                           >
                             {materials.map((m) => (
                               <option key={m.id} value={m.id}>
@@ -291,18 +309,18 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
                             <span
                               className={`font-bold ${
                                 val.effectiveAvailable === 0
-                                  ? 'text-rose-400'
+                                  ? 'text-rose-600'
                                   : val.effectiveAvailable <= (balance?.reorderLevel || 10)
-                                  ? 'text-amber-400'
-                                  : 'text-emerald-400'
+                                  ? 'text-amber-600'
+                                  : 'text-emerald-600'
                               }`}
                             >
                               {val.effectiveAvailable}
                             </span>
-                            <span className="text-slate-400 text-[10px] ml-1">{balance?.unit}</span>
+                            <span className="text-slate-500 text-[10px] ml-1">{balance?.unit}</span>
                           </div>
                           {val.reservedForThisWO > 0 && (
-                            <span className="text-[10px] text-sky-400 block font-medium">
+                            <span className="text-[10px] text-sky-600 block font-medium">
                               (Đã giữ: {val.reservedForThisWO})
                             </span>
                           )}
@@ -313,22 +331,22 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
                             min="1"
                             value={row.quantity}
                             onChange={(e) => handleItemChange(idx, 'quantity', Number(e.target.value))}
-                            className={`w-full bg-slate-900 border rounded-lg px-2 py-1.5 text-center font-mono font-bold ${
+                            className={`w-full bg-white border rounded-lg px-2 py-1.5 text-center font-mono font-bold ${
                               !val.isSufficient
-                                ? 'border-rose-500 text-rose-300 bg-rose-950/50'
-                                : 'border-slate-700 text-white'
+                                ? 'border-rose-500 text-rose-700 bg-rose-50'
+                                : 'border-slate-200 text-slate-900'
                             }`}
                           />
                           {!val.isSufficient && (
-                            <p className="text-[10px] text-rose-400 font-bold mt-0.5">
+                            <p className="text-[10px] text-rose-600 font-bold mt-0.5">
                               Thiếu {val.shortage} {balance?.unit}
                             </p>
                           )}
                         </td>
-                        <td className="px-3 py-2 text-right font-mono text-slate-300">
+                        <td className="px-3 py-2 text-right font-mono text-slate-700">
                           {formatVND(balance?.averageCost || 0)}
                         </td>
-                        <td className="px-3 py-2 text-right font-mono font-bold text-amber-300">
+                        <td className="px-3 py-2 text-right font-mono font-bold text-amber-700">
                           {formatVND(rowCost)}
                         </td>
                         <td className="px-2 py-2 text-center">
@@ -336,7 +354,7 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
                             type="button"
                             disabled={items.length <= 1}
                             onClick={() => handleRemoveItem(idx)}
-                            className="p-1 text-slate-500 hover:text-rose-400 disabled:opacity-30 transition"
+                            className="p-1 text-slate-500 hover:text-rose-600 disabled:opacity-30 transition"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -350,41 +368,41 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
           </div>
 
           {/* Validation Notice */}
-          <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
+          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between text-xs">
             <div className="flex items-center gap-2">
               {hasAnyShortage ? (
-                <div className="flex items-center gap-1.5 text-rose-400 font-bold">
+                <div className="flex items-center gap-1.5 text-rose-600 font-bold">
                   <AlertTriangle className="w-4 h-4" />
                   <span>Cảnh báo: Có vật tư không đủ tồn khả dụng! Vui lòng điều chỉnh số lượng.</span>
                 </div>
               ) : (
-                <div className="flex items-center gap-1.5 text-emerald-400 font-medium">
+                <div className="flex items-center gap-1.5 text-emerald-600 font-medium">
                   <CheckCircle2 className="w-4 h-4" />
                   <span>Tồn khả dụng đáp ứng 100% số lượng yêu cầu xuất.</span>
                 </div>
               )}
             </div>
             <div className="text-right">
-              <span className="text-slate-400 mr-2">Tổng chi phí vật tư:</span>
-              <span className="text-sm font-bold text-amber-400 font-mono">{formatVND(estimatedCost)}</span>
+              <span className="text-slate-500 mr-2">Tổng chi phí vật tư:</span>
+              <span className="text-sm font-bold text-amber-600 font-mono">{formatVND(estimatedCost)}</span>
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition"
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition"
             >
               Hủy bỏ
             </button>
             <button
               type="submit"
-              disabled={hasAnyShortage}
-              className="px-5 py-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-amber-500/20 transition"
+              disabled={hasAnyShortage || isSubmitting}
+              className="px-5 py-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 font-bold rounded-xl flex items-center gap-2 shadow-lg  transition"
             >
               <ArrowUpFromLine className="w-4 h-4" />
-              <span>Xác Nhận Xuất Kho (Deduct Stock)</span>
+              <span>{isSubmitting ? 'ĐANG GHI SQL SERVER...' : 'Xác Nhận Xuất Kho (Deduct Stock)'}</span>
             </button>
           </div>
         </form>

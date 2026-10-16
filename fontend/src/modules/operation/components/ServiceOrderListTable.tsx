@@ -16,14 +16,11 @@ import { QuickQrModal } from './QuickQrModal';
 interface ServiceOrderListTableProps {
   orders: ServiceOrder[];
   onViewDetail: (order: ServiceOrder) => void;
-  onMarkPaid?: (orderId: string) => void;
-  onNavigateToPayment: (containerId?: string) => void;
 }
 
 export const ServiceOrderListTable: React.FC<ServiceOrderListTableProps> = ({
   orders,
-  onViewDetail,
-  onNavigateToPayment
+  onViewDetail
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [lineFilter, setLineFilter] = useState<string>('ALL');
@@ -32,7 +29,7 @@ export const ServiceOrderListTable: React.FC<ServiceOrderListTableProps> = ({
   // Quick QR popup state for Operation
   const [qrModalOrder, setQrModalOrder] = useState<ServiceOrder | null>(null);
 
-  const shippingLines = Array.from(new Set(orders.map((o) => o.shippingLine)));
+  const shippingLines = Array.from(new Set(orders.map((o) => o.shippingLine).filter(Boolean)));
 
   const filteredOrders = orders.filter((order) => {
     const matchSearch =

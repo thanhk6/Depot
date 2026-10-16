@@ -18,14 +18,12 @@ import {
   DamageItem,
   ContainerSize
 } from '../types/depot';
-import {
-  SHIPPING_LINES,
-  MASTER_DAMAGE_CODES,
-  MASTER_COMPONENTS,
-  STANDARD_DEPOT_TARIFF,
-  FORKLIFT_UNITS
-} from '../data/depotMasterData';
+// Kiểu dữ liệu danh mục trong context — trước đây mượn `typeof` từ data/depotMasterData.ts (mảng dữ liệu mẫu gõ
+// cứng, đã xoá). Dữ liệu thật nạp từ backend.
+type DamageCodeOption = { code: string; nameVi: string; defaultRepair: string; defaultRepairVi: string; unitPriceLabor: number; unitPriceMaterial: number };
+type ForkliftUnit = { id: string; name: string; driver: string; status: string };
 import { USER_ACCOUNT_PROFILES, UserAccountProfile } from '../data/roleMenuConfig';
+import { authFetch } from '../api/authFetch';
 
 export interface ToastNotification {
   id: string;
@@ -37,10 +35,10 @@ export interface ToastNotification {
 interface DepotContextType {
   jobs: DepotJob[];
   shippingLines: string[];
-  damageCodes: typeof MASTER_DAMAGE_CODES;
+  damageCodes: DamageCodeOption[];
   masterComponents: string[];
   tariffs: DepotServiceItem[];
-  forklifts: typeof FORKLIFT_UNITS;
+  forklifts: ForkliftUnit[];
   activeRole: RoleType;
   setActiveRole: (role: RoleType) => void;
   userProfiles: UserAccountProfile[];
@@ -168,10 +166,10 @@ export const DepotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Master Data state loaded dynamically from Backend API
   // Empty until SQL Server master-data APIs return records. No frontend seed fallback.
   const [shippingLines, setShippingLines] = useState<string[]>([]);
-  const [damageCodes, setDamageCodes] = useState<typeof MASTER_DAMAGE_CODES>([]);
+  const [damageCodes, setDamageCodes] = useState<DamageCodeOption[]>([]);
   const [masterComponents, setMasterComponents] = useState<string[]>([]);
   const [tariffs, setTariffs] = useState<DepotServiceItem[]>([]);
-  const [forklifts, setForklifts] = useState<typeof FORKLIFT_UNITS>([]);
+  const [forklifts, setForklifts] = useState<ForkliftUnit[]>([]);
 
   // Hồ sơ tài khoản thật đang đăng nhập — đọc từ localStorage trước để refresh trang không mất, và để
   // `activeRole` khởi tạo đúng vai trò của người đã đăng nhập thay vì luôn reset về DEPOT_MANAGER.
@@ -275,7 +273,7 @@ export const DepotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   useEffect(() => {
     // Fetch initial jobs directly and exclusively from Backend SQL API
-    fetch('/api/jobs')
+    authFetch('/api/jobs')
       .then((res) => res.json())
       .then((data) => {
         if (isApiSuccess(data) && Array.isArray(data.data)) {
@@ -289,8 +287,8 @@ export const DepotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // These two master tables are persisted in SQL Server. Other UI catalogs
     // remain local until their dedicated backend tables are introduced.
     Promise.all([
-      fetch('/api/MasterData/shipping-lines').then((res) => res.json()),
-      fetch('/api/MasterData/materials').then((res) => res.json())
+      authFetch('/api/MasterData/shipping-lines').then((res) => res.json()),
+      authFetch('/api/MasterData/materials').then((res) => res.json())
     ])
       .then(([shippingLineResponse, materialResponse]) => {
         if (isApiSuccess(shippingLineResponse) && Array.isArray(shippingLineResponse.data)) {
@@ -357,7 +355,7 @@ export const DepotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     // Sync with backend API
-    fetch('/api/jobs/gate-in', {
+    authFetch('/api/jobs/gate-in', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -451,7 +449,7 @@ export const DepotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             jobId: job.id,
             containerNo: job.containerNo,
             forkliftId: 'FL-01',
-            driverName: forkliftDriver || 'Nguyễn Văn Nâng (FL-01)',
+            driverName: forkliftDriver || '',
             fromLocation: { ...job.currentLocation },
             toLocation: { ...targetLocation },
             requestedBy: updatedSurvey.surveyorName,
@@ -521,7 +519,7 @@ export const DepotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           method: 'VIETQR',
           status: 'PENDING',
           amount: totalAmount,
-          qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=DEPOT_${job.id}`
+          qrCodeUrl: ''
         };
 
         return {
@@ -761,13 +759,11 @@ export const DepotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           ...job.repairOrder,
           status: 'COMPLETED',
           completedDate: new Date().toISOString().replace('T', ' ').substring(0, 16),
-          postRepairPhotos: postPhotos.length > 0 ? postPhotos : [
-            'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=600&q=80'
-          ]
+          postRepairPhotos: postPhotos
         };
 
         const initialQC: QCInspection = {
-          inspectorName: 'Nguyễn Văn Hải (QC Inspector)',
+          inspectorName: '',
           result: 'PENDING',
           checklist: [
             { item: 'Kiểm tra độ kín nước/ánh sáng (Light-tightness)', passed: true },
@@ -809,7 +805,7 @@ export const DepotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (job.id !== jobId) return job;
 
         const qc: QCInspection = {
-          inspectorName: 'Nguyễn Văn Hải (QC Inspector)',
+          inspectorName: '',
           inspectionDate: new Date().toISOString().replace('T', ' ').substring(0, 16),
           result,
           checklist,
@@ -852,7 +848,7 @@ export const DepotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       prev.map((job) => {
         if (job.id !== jobId) return job;
 
-        const forklift = FORKLIFT_UNITS.find((f) => f.id === forkliftId) || FORKLIFT_UNITS[0];
+        const forklift = forklifts.find((f) => f.id === forkliftId);
 
         const moveOrder: ForkliftMoveOrder = {
           id: `MOV-${Date.now().toString().slice(-6)}`,
@@ -861,7 +857,7 @@ export const DepotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           fromLocation: { ...job.currentLocation },
           toLocation,
           forkliftId,
-          driverName: forklift.driver,
+          driverName: forklift?.driver || '',
           requestedBy: 'Điều hành bãi Depot',
           requestedAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
           status: 'PENDING',
@@ -949,7 +945,7 @@ export const DepotProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Action 14: Reset data by re-fetching from Backend SQL API
   const resetToDefaultData = () => {
     localStorage.removeItem(LOCAL_STORAGE_KEY);
-    fetch('/api/jobs')
+    authFetch('/api/jobs')
       .then((res) => res.json())
       .then((data) => {
         if (isApiSuccess(data) && Array.isArray(data.data)) {

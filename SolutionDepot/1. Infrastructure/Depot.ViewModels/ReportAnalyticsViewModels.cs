@@ -65,6 +65,15 @@ namespace Depot.ViewModels
         public double OccupancyPercent { get; set; }
     }
 
+    public class AgingTierDto
+    {
+        public string Label { get; set; } = string.Empty;
+        public int FromDay { get; set; }
+        public int? ToDay { get; set; }
+        public int Count { get; set; }
+        public double Percent { get; set; }
+    }
+
     public class GradeDistributionDto
     {
         public string Grade { get; set; } = string.Empty;
@@ -120,5 +129,9 @@ namespace Depot.ViewModels
         public decimal EmrRepairRevenueVnd { get; set; }
         public List<BlockCapacityDto> BlockCapacity { get; set; } = new();
         public List<GradeDistributionDto> GradeDistribution { get; set; } = new();
+        /// <summary>Phân tầng tuổi lưu bãi của MỌI container đang trong bãi (không giới hạn như DetailedLogs).</summary>
+        public List<AgingTierDto> AgingTiers { get; set; } = new();
+        /// <summary>Số ngày lưu bãi trung bình của container đang trong bãi; null khi bãi trống.</summary>
+        public double? AvgDwellDaysInYard { get; set; }
     }
 }

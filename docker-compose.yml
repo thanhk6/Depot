@@ -1,5 +1,8 @@
 # Dựng toàn bộ hệ thống SolutionDepot: PostgreSQL + Backend .NET 8 + Frontend React.
-# Chạy: docker compose up --build -d
+# Chạy: docker compose pull && docker compose up -d
+# (Image backend/frontend kéo từ Docker Hub: thanhnguyenit89/depot-backend, thanhnguyenit89/depot-cms.
+#  Muốn build lại từ source: docker build -f Dockerfile.backend -t thanhnguyenit89/depot-backend . và
+#  docker build -t thanhnguyenit89/depot-cms ./fontend)
 # Truy cập: Frontend http://localhost:3000  |  Backend Swagger http://localhost:50210/swagger
 
 services:
@@ -24,9 +27,7 @@ services:
       retries: 10
 
   backend:
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
+    image: thanhnguyenit89/depot-backend:latest
     container_name: solutiondepot-backend
     restart: unless-stopped
     environment:
@@ -35,6 +36,10 @@ services:
       # chuẩn của ASP.NET Core (dấu "__" thay cho dấu ":") — trỏ tới service "postgres" trong mạng
       # nội bộ docker-compose thay vì "localhost" như khi chạy dev trên máy thật.
       ConnectionStrings__PostgreSqlConnection: "Host=postgres;Port=5432;Database=SolutionDepotDb;Username=postgres;Password=12345678;"
+      # Bắt buộc ở Production: đặt trong file .env cạnh compose (xem .env.example), ví dụ
+      #   JWT_KEY=$(openssl rand -hex 32)   SEED_DEFAULT_PASSWORD=<mật khẩu ban đầu>
+      Jwt__Key: ${JWT_KEY:?JWT_KEY is required}
+      Seed__DefaultPassword: ${SEED_DEFAULT_PASSWORD:?SEED_DEFAULT_PASSWORD is required}
     depends_on:
       postgres:
         condition: service_healthy
@@ -42,9 +47,7 @@ services:
       - "50210:8080"
 
   frontend:
-    build:
-      context: ./fontend
-      dockerfile: Dockerfile
+    image: thanhnguyenit89/depot-cms:latest
     container_name: solutiondepot-frontend
     restart: unless-stopped
     environment:

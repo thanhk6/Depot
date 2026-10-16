@@ -25,48 +25,40 @@ export const WarehouseHeader: React.FC<WarehouseHeaderProps> = ({
     { id: 'catalog', label: '5. Danh Mục Vật Tư', icon: <BookOpen className="w-4 h-4 text-sky-400" /> }
   ];
 
-  // Đồng bộ đúng khuôn giao diện của "THÔNG BÁO & ZALO GATEWAY"
-  // (`notifications/components/NotificationHeader.tsx`) theo yêu cầu người dùng: banner nền TRẮNG với
-  // icon logo trong khối gradient xanh dương→sky→chàm, dải sub-tab bên dưới đổi hẳn sang nền TỐI. Giữ
-  // nguyên các nút hành động + icon/màu riêng của Kho Vật Tư (amber/emerald), chỉ đổi khung/bố cục banner
-  // và style dải tab cho khớp trang tham chiếu.
+  // Đồng bộ đúng chuẩn "Dashboard ERP Tổng Quan" (dashboard/pages/DashboardPage.tsx) theo yêu cầu người
+  // dùng 2026-09-06 — xem docs/frontend-theme-unification.md. Banner nền gradient sáng
+  // (blue-50→white→indigo-50), KHÔNG còn hộp icon gradient tối, dải tab chuyển sang nền sáng. Giữ nguyên
+  // các nút hành động + icon/màu riêng của Kho Vật Tư (amber/emerald).
   return (
-    <div className="bg-white border-b border-slate-200 -mt-3 -mx-3 sm:-mt-4 sm:-mx-4 md:-mt-6 md:-mx-6 mb-6 px-4 sm:px-6 pt-5 pb-0 shadow-sm">
-      {/* Top Banner (nền trắng) */}
-      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 pb-4 border-b border-slate-200">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-600 via-sky-600 to-indigo-600 p-0.5 flex items-center justify-center shadow-lg shadow-blue-500/20">
-            <div className="w-full h-full bg-white rounded-[14px] flex items-center justify-center">
-              <Warehouse className="w-6 h-6 text-sky-400" />
-            </div>
+    <div className="p-6 bg-gradient-to-r from-blue-50 via-white to-indigo-50 border border-blue-200 rounded-3xl shadow-sm relative overflow-hidden space-y-4">
+      {/* Top Banner */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="space-y-2 relative z-10">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-700 rounded-full border border-blue-200 text-xs font-bold font-mono">
+            <Warehouse className="w-3.5 h-3.5" />
+            <span>MÃ KHO: {WAREHOUSE_INFO.code}</span>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                QUẢN LÝ VẬT TƯ (NHẬP - XUẤT - TỒN KHO EMR)
-              </h1>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-sky-50 text-sky-700 border border-sky-200">
-                Mã kho: {WAREHOUSE_INFO.code}
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Ghi nhận nhập vật tư, xuất vật tư sửa chữa và tự động tính toán số lượng tồn kho theo thời gian thực
-            </p>
-          </div>
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+            Quản Lý Vật Tư (Nhập - Xuất - Tồn Kho EMR)
+          </h2>
+          <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
+            Ghi nhận nhập vật tư, xuất vật tư sửa chữa và tự động tính toán số lượng tồn kho theo thời
+            gian thực.
+          </p>
         </div>
 
         {/* Quick Action Buttons — giữ nguyên màu nghiệp vụ riêng (emerald=nhập, amber=xuất) */}
-        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-between lg:justify-end">
+        <div className="flex flex-wrap items-center gap-2 relative z-10">
           <button
             onClick={onOpenCreateReceipt}
-            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-xl flex items-center gap-1.5 shadow-lg shadow-emerald-600/20 transition whitespace-nowrap cursor-pointer active:scale-95"
+            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-2xl flex items-center gap-1.5 shadow-sm transition whitespace-nowrap cursor-pointer active:scale-95"
           >
             <ArrowDownToLine className="w-4 h-4" />
             <span>+ Nhập Vật Tư</span>
           </button>
           <button
             onClick={onOpenCreateIssue}
-            className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl flex items-center gap-1.5 shadow-lg shadow-amber-500/20 transition whitespace-nowrap cursor-pointer active:scale-95"
+            className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-2xl flex items-center gap-1.5 shadow-sm transition whitespace-nowrap cursor-pointer active:scale-95"
           >
             <ArrowUpFromLine className="w-4 h-4" />
             <span>- Xuất Vật Tư</span>
@@ -74,7 +66,7 @@ export const WarehouseHeader: React.FC<WarehouseHeaderProps> = ({
           {onOpenCreateMaterial && (
             <button
               onClick={onOpenCreateMaterial}
-              className="px-3.5 py-2.5 bg-white hover:bg-slate-50 text-sky-600 font-bold text-xs rounded-xl flex items-center gap-1.5 border border-slate-200 shadow-sm transition whitespace-nowrap cursor-pointer"
+              className="px-3.5 py-2.5 bg-white hover:bg-slate-50 text-sky-600 font-bold text-xs rounded-2xl flex items-center gap-1.5 border border-slate-200 shadow-sm transition whitespace-nowrap cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>+ Thêm Mã Vật Tư</span>
@@ -83,18 +75,18 @@ export const WarehouseHeader: React.FC<WarehouseHeaderProps> = ({
         </div>
       </div>
 
-      {/* Sub Tab Navigation (nền tối — đúng dải tab của trang tham chiếu) */}
-      <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-2 mt-1">
+      {/* Sub Tab Navigation (nền sáng) */}
+      <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none relative z-10">
         {tabs.map((t) => {
           const isActive = activeSubTab === t.id;
           return (
             <button
               key={t.id}
               onClick={() => onSelectSubTab(t.id)}
-              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-t-xl text-xs font-bold transition whitespace-nowrap cursor-pointer border-b-2 ${
+              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
                 isActive
-                  ? 'bg-slate-800/80 text-white border-blue-500 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border-transparent'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-slate-600 bg-white/60 hover:text-slate-900 hover:bg-white border border-transparent hover:border-slate-200'
               }`}
             >
               {t.icon}

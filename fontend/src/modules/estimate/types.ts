@@ -24,6 +24,12 @@ export interface CarrierApprovalInfo {
   rejectReason?: string;
   comments?: string;
   suggestedAction?: string;
+  /** Số Work Order / lệnh duyệt bên hãng tàu (vd AEMS). */
+  workOrderNo?: string;
+  /** Kênh nhận duyệt: EMAIL / AEMS / PHONE / DOCUMENT / API. */
+  channel?: string;
+  /** Nhân viên depot đã ghi nhận lệnh duyệt. */
+  enteredBy?: string;
 }
 
 export interface RepairItem {
@@ -44,6 +50,12 @@ export interface RepairItem {
   totalAmount: number;
   photoUrls?: string[];
   cedexCode?: string;         // e.g. 'PAN-DT-P'
+  /** AEMS: bên chịu chi phí — O (Owner) / U (User) / T (Third Party) / W (Wear and Tear). */
+  tpi?: string;
+  /** AEMS: giờ công cho mỗi PC. unitPrice = vật tư / PC, amount = PCS × vật tư / PC. */
+  manHoursPerPiece?: number;
+  /** Id lỗi giám định (DamageItem) mà dòng này được lấy sang — chỉ dùng trên form để đánh dấu "đã lấy". */
+  sourceDamageId?: number;
 }
 
 export interface EstimateApiTransaction {
@@ -89,17 +101,36 @@ export interface Estimate {
   type: string;
   shippingLine: string;
   condition: 'CL' | 'DM';
-  
+
   // Personnel & Timing
   createdBy: string;
   createdById: string;
   createdAt: string;
   updatedAt: string;
-  
+  updatedBy?: string;
+  /** AEMS: đơn giá giờ công, tổng giờ công, tiền công, tiền vật tư, Mode, Cause. */
+  laborRate?: number;
+  totalManHours?: number;
+  laborCost?: number;
+  materialCost?: number;
+  repairMode?: string;
+  cause?: string;
+  /** AEMS: Shop Code, Vendor Ref No., giờ chuẩn bị, phân bổ giờ thường / OT1 / OT2 / OT3. */
+  shopCode?: string;
+  vendorRefNo?: string;
+  preparationHours?: number;
+  ordinaryHours?: number;
+  ot1Hours?: number;
+  ot2Hours?: number;
+  ot3Hours?: number;
+  /** Người báo giá đã xác nhận (chốt) báo giá — chờ hãng tàu duyệt. Sửa báo giá thì phải xác nhận lại. */
+  confirmedAt?: string;
+  confirmedBy?: string;
+
   // Repair content
   repairSummary: string;
   items: RepairItem[];
-  
+
   // Cost breakdown
   subtotal: number;
   vatRate: number;
@@ -107,10 +138,10 @@ export interface Estimate {
   totalAmount: number;
   currency: 'VND' | 'USD';
   exchangeRate?: number; // VND to USD if applicable
-  
+
   // Statuses
   status: EstimateStatus;
-  
+
   // Inspection & Survey
   surveyReference?: string;
   inspectionPhotos: string[];
@@ -125,17 +156,3 @@ export interface Estimate {
   apiTransactionHistory: EstimateApiTransaction[];
 }
 
-export interface MaerskApiConfig {
-  endpointUrl: string;
-  environment: 'SANDBOX' | 'PRODUCTION';
-  clientId: string;
-  clientSecret: string;
-  apiKey: string;
-  depotCode: string; // e.g. 'VNHCM01'
-  depotName: string; // e.g. 'ICD TAN CANG - CAT LAI'
-  cedexVersion: string; // 'ISO 9897:2002 (CEDEX v2)'
-  autoRetryOnFailure: boolean;
-  maxRetries: number;
-  timeoutMs: number;
-  simulateErrorMode?: 'NONE' | 'BAD_REQUEST_400' | 'AUTH_ERROR_401' | 'VALIDATION_422' | 'SERVER_503';
-}

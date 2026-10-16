@@ -1,27 +1,21 @@
 import React, { useState } from 'react';
-import { SurveyItemRecord, SurveyStatus } from '../types';
+import { SurveyItemRecord } from '../types';
+import { formatDateTime } from '../../../utils/format';
 import {
-  Clock,
   Search,
-  Filter,
-  CheckCircle2,
   AlertTriangle,
   Wrench,
   Sparkles,
   ClipboardCheck,
-  Eye,
   FileText,
-  User,
-  Calendar,
   ChevronLeft,
   ChevronRight,
-  Download,
   AlertCircle,
   Plus,
   Send,
-  Receipt,
   Lock
 } from 'lucide-react';
+import { useShippingLineOptions } from '../../../hooks/useShippingLineOptions';
 
 interface SurveyQueueTableProps {
   title: string;
@@ -53,6 +47,7 @@ export const SurveyQueueTable: React.FC<SurveyQueueTableProps> = ({
   onSearchNonGateIn,
   onCreateNewSurvey
 }) => {
+  const shippingLineOptions = useShippingLineOptions();
   const [searchTerm, setSearchTerm] = useState('');
   const [shippingLineFilter, setShippingLineFilter] = useState('ALL');
   const [conditionFilter, setConditionFilter] = useState('ALL');
@@ -115,7 +110,7 @@ export const SurveyQueueTable: React.FC<SurveyQueueTableProps> = ({
             className="px-4 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl border border-slate-200 transition flex items-center gap-2 cursor-pointer"
           >
             <Search className="w-4 h-4 text-blue-500" />
-            <span>Tra Cứu / Pre-Survey</span>
+            <span>Tra Cứu Container</span>
           </button>
         </div>
       </div>
@@ -146,12 +141,9 @@ export const SurveyQueueTable: React.FC<SurveyQueueTableProps> = ({
             className="px-3 py-2 bg-white border border-slate-200 text-xs text-slate-700 rounded-xl focus:outline-none shadow-sm"
           >
             <option value="ALL">Tất cả hãng tàu</option>
-            <option value="MAERSK">MAERSK Line</option>
-            <option value="MSC">MSC Shipping</option>
-            <option value="ONE">ONE</option>
-            <option value="CMA-CGM">CMA CGM</option>
-            <option value="COSCO">COSCO</option>
-            <option value="EVERGREEN">EVERGREEN</option>
+            {shippingLineOptions.map((l) => (
+              <option key={l.code} value={l.code}>{l.name} ({l.code})</option>
+            ))}
           </select>
 
           <select
@@ -218,11 +210,6 @@ export const SurveyQueueTable: React.FC<SurveyQueueTableProps> = ({
                           <span className="text-[10px] font-mono text-slate-500 block">
                             Mã: {survey.surveyNo}
                           </span>
-                          {survey.isPreSurveyBeforeGateIn && (
-                            <span className="inline-block px-1.5 py-0.2 bg-blue-50 text-blue-700 border border-blue-200 text-[9px] rounded font-bold">
-                              Chưa Gate-In (Pre-Survey)
-                            </span>
-                          )}
                           {lockedByOther && (
                             <span className="inline-flex items-center gap-1 px-1.5 py-0.2 bg-rose-50 text-rose-700 border border-rose-200 text-[9px] rounded font-bold">
                               <Lock className="w-2.5 h-2.5" />
@@ -245,7 +232,7 @@ export const SurveyQueueTable: React.FC<SurveyQueueTableProps> = ({
                       </td>
 
                       <td className="py-3.5 px-4 font-mono text-slate-600">
-                        {survey.gateInTime}
+                        {formatDateTime(survey.gateInTime)}
                       </td>
 
                       <td className="py-3.5 px-4 text-center">

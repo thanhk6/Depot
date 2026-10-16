@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { ServiceOrder, ServiceOrderItem, ServiceCategory } from '../types';
-import { GATE_IN_STANDARD_TARIFFS, StandardTariffItem } from '../mockData';
-import { masterDataApi } from '../../../api';
+import { StandardTariffItem } from '../types';
+import { masterDataApi, containerApi, customerApi } from '../../../api';
+import { getApiErrorMessage } from '../../../utils/apiError';
 import { formatVND } from '../../../utils/format';
 import {
   X,
   Plus,
   Trash2,
   Receipt,
+  Printer,
   Truck,
   Building2,
   CreditCard,
@@ -18,12 +20,17 @@ import {
   Wrench,
   Info
 } from 'lucide-react';
+import { useDepot } from '../../../context/DepotContext';
+import { VietQrCode } from '../../../components/common/VietQrCode';
+import { buildTransferContent } from '../../../utils/vietqr';
+import { useContainerTypeOptions } from '../../masterdata/utils/containerTypeCatalog';
 
 interface ServiceOrderFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (order: ServiceOrder) => Promise<void>;
-  onSaveAndNavigateToPayment?: (order: ServiceOrder) => Promise<void>;
+  onSave: (order: ServiceOrder) => Promise<unknown>;
+  /** Lưu phiếu rồi mở chứng từ để in ngay. */
+  onSaveAndPrint?: (order: ServiceOrder, document: 'ORDER' | 'RECEIPT' | 'EEIR') => Promise<void>;
   prefillContainer?: {
     id?: string;
     containerNo: string;
@@ -40,30 +47,43 @@ interface ServiceOrderFormModalProps {
     surveyDetails?: any;
     cleaningDetails?: any;
   } | null;
+  /** Chế độ lập phiếu mới (không mở từ hàng đợi): danh sách container đang trong bãi, chưa có phiếu dịch vụ. */
+  selectableContainers?: Array<{ id: string; containerNo: string; shippingLine?: string; size?: string }>;
 }
 
 export const ServiceOrderFormModal: React.FC<ServiceOrderFormModalProps> = ({
   isOpen,
   onClose,
   onSave,
-  onSaveAndNavigateToPayment,
-  prefillContainer
+  onSaveAndPrint,
+  prefillContainer,
+  selectableContainers = []
 }) => {
+  const containerTypeOptions = useContainerTypeOptions();
+  // Người thao tác = tài khoản đang đăng nhập thật (thay cho tên người mẫu viết cứng trước đây).
+  const { loggedInUserProfile } = useDepot();
+  const currentUserName = loggedInUserProfile?.fullName || loggedInUserProfile?.username || '';
+  // Mọi thông tin container / khách hàng / xe / giám định lấy từ hồ sơ Gate-In trong DB — chỉ hiển thị, không gõ tay.
   const [containerNo, setContainerNo] = useState('');
-  const [isoCode, setIsoCode] = useState('45G1');
-  const [size, setSize] = useState('40HC');
-  const [type, setType] = useState('Dry High Cube');
-  const [shippingLine, setShippingLine] = useState('MSC');
-  const [customerName, setCustomerName] = useState('Công ty Cổ Phần Tiếp Vận Quốc Tế');
-  const [customerTaxCode, setCustomerTaxCode] = useState('0312345678');
-  const [driverName, setDriverName] = useState('Nguyễn Văn Tiến');
-  const [truckPlate, setTruckPlate] = useState('51C-992.10');
-  const [driverPhone, setDriverPhone] = useState('0909123456');
-  const [condition, setCondition] = useState<'AV' | 'CL' | 'DM'>('AV');
+  const [size, setSize] = useState('');
+  const [type, setType] = useState('');
+  const [shippingLine, setShippingLine] = useState('');
+  const [customerName, setCustomerName] = useState('');
+  const [customerTaxCode, setCustomerTaxCode] = useState('');
+  const [driverName, setDriverName] = useState('');
+  const [truckPlate, setTruckPlate] = useState('');
+  const [driverPhone, setDriverPhone] = useState('');
+  const [condition, setCondition] = useState<'' | 'AV' | 'CL' | 'DM'>('');
   const [surveyNote, setSurveyNote] = useState('');
+  const [surveyInfo, setSurveyInfo] = useState<{ surveyorName?: string; surveyDate?: string; damagesCount: number } | null>(null);
   const [cleaningNote, setCleaningNote] = useState('');
   const [cleaningStatus, setCleaningStatus] = useState<string>('NONE');
-  const [notes, setNotes] = useState('');
+  const [notes] = useState('');
+  const [gateInDate, setGateInDate] = useState<string>('');
+  const [jobLoadedKey, setJobLoadedKey] = useState<string>('');
+  const [jobLoading, setJobLoading] = useState(false);
+  const [jobError, setJobError] = useState<string | null>(null);
+  const itemsBuiltForRef = React.useRef<string>('');
 
   const [items, setItems] = useState<ServiceOrderItem[]>([]);
 
@@ -95,7 +115,8 @@ export const ServiceOrderFormModal: React.FC<ServiceOrderFormModalProps> = ({
       const lolo: StandardTariffItem[] = (loloRes.data || []).map((t: any) => ({
         code: t.code,
         name: t.nameVi || t.nameEn || t.code,
-        category: 'LOLO',
+        // Phân loại theo ServiceTariff.ServiceCategory thật (PTI, giám sát hải quan, đảo chuyển...).
+        category: t.serviceCategory === 'PTI' ? 'PTI' : t.serviceCategory === 'CUSTOMS' ? 'CUSTOMS' : t.serviceCategory === 'SHIFTING' ? 'YARD_SHIFT' : 'LOLO',
         unit: t.unit || 'Lần/Cont',
         rates: {
           '20DC': t.price20GP || 0, '40DC': t.price40HC || 0, '40HC': t.price40HC || 0,
@@ -144,7 +165,7 @@ export const ServiceOrderFormModal: React.FC<ServiceOrderFormModalProps> = ({
   }, []);
 
   const tariffCatalog = React.useMemo<StandardTariffItem[]>(
-    () => [...realTariffs, ...GATE_IN_STANDARD_TARIFFS.filter((t) => !['LOLO', 'STORAGE', 'CLEANING'].includes(t.category))],
+    () => realTariffs,
     [realTariffs]
   );
 
@@ -156,128 +177,124 @@ export const ServiceOrderFormModal: React.FC<ServiceOrderFormModalProps> = ({
     }
   }, [tariffCatalog, selectedTariffCode]);
 
+  // Dòng phí tự động lấy ĐÚNG giá trong biểu cước thật (ServiceTariffs / CLEANING_TARIFF) theo cỡ container.
+  // Trước đây khi không khớp biểu cước thì tự bịa giá (nâng hạ Reefer 350.000/520.000, vệ sinh 420.000/620.000,
+  // PTI 650.000/850.000...) và form mới còn tự sinh số container ngẫu nhiên kèm 1 dòng 420.000đ. Nay không có giá
+  // cấu hình thì KHÔNG thêm dòng — người dùng chọn thêm từ danh sách biểu phí.
+  const priceFromTariff = (tariff: StandardTariffItem | undefined, sizeKey: string) =>
+    tariff ? (tariff.rates[sizeKey as keyof typeof tariff.rates] || tariff.rates['DEFAULT'] || 0) : 0;
+  const makeItem = (tariff: StandardTariffItem, price: number, remarks: string): ServiceOrderItem => ({
+    id: 'ITM-' + Math.random().toString(36).substring(2, 7),
+    serviceCode: tariff.code,
+    serviceName: tariff.name,
+    category: tariff.category as ServiceCategory,
+    quantity: 1,
+    unit: tariff.unit,
+    unitPrice: price,
+    vatPercent: tariff.vatPercent,
+    amount: price,
+    vatAmount: Math.round(price * (tariff.vatPercent / 100)),
+    total: Math.round(price * (1 + tariff.vatPercent / 100)),
+    remarks
+  });
+
+  // Mở form: số container lấy từ hàng đợi (prefill) hoặc chờ người dùng chọn trong danh sách.
   useEffect(() => {
-    if (prefillContainer) {
-      setContainerNo(prefillContainer.containerNo || '');
-      setIsoCode(prefillContainer.isoCode || '45G1');
-      setSize(prefillContainer.size || '40HC');
-      setType(prefillContainer.type || 'Dry High Cube');
-      setShippingLine(prefillContainer.shippingLine || 'MSC');
-      setCustomerName(prefillContainer.customerName || `Khách hàng đại diện Hãng ${prefillContainer.shippingLine || 'Tàu'}`);
-      setDriverName(prefillContainer.driverName || 'Tài xế giao nhận');
-      setTruckPlate(prefillContainer.licensePlate || '51C-000.00');
-      setDriverPhone(prefillContainer.driverPhone || '0909000111');
-      setCondition(prefillContainer.condition || 'AV');
-      setSurveyNote(
-        prefillContainer.condition === 'DM'
-          ? 'Phát hiện hư hỏng cấu kiện IICL-6 tại cổng giám định'
-          : prefillContainer.condition === 'CL'
-          ? 'Yêu cầu xịt rửa vệ sinh theo biên bản giám định e-EIR'
-          : 'Vỏ đạt chuẩn cấp AV sạch đẹp'
+    if (!isOpen) return;
+    setContainerNo(prefillContainer?.containerNo || '');
+    setItems([]);
+    itemsBuiltForRef.current = '';
+    setJobLoadedKey('');
+    if (prefillContainer?.cleaningDetails) {
+      setCleaningStatus(prefillContainer.cleaningDetails.status || 'COMPLETED');
+      setCleaningNote(
+        `Tiếp nhận từ Trạm Vệ Sinh: ${prefillContainer.cleaningDetails.cleaningType || ''} (Chi phí: ${(prefillContainer.cleaningDetails.totalCost || 0).toLocaleString('vi-VN')} đ)`
       );
-
-      if (prefillContainer.cleaningDetails) {
-        setCleaningStatus(prefillContainer.cleaningDetails.status || 'COMPLETED');
-        setCleaningNote(
-          `Tiếp nhận từ Trạm Vệ Sinh: ${prefillContainer.cleaningDetails.cleaningType || 'Xịt rửa hóa chất & nước nóng'} (Chi phí: ${(prefillContainer.cleaningDetails.totalCost || 0).toLocaleString('vi-VN')} đ)`
-        );
-      } else if (prefillContainer.condition === 'CL') {
-        setCleaningStatus('IN_CLEANING');
-        setCleaningNote('Chuyển trạm xịt rửa vệ sinh theo chỉ định giám định');
-      } else {
-        setCleaningStatus('NONE');
-        setCleaningNote('Container chuẩn AV - Không yêu cầu vệ sinh');
-      }
-
-      // Auto generate standard items from tariff
-      const initialItems: ServiceOrderItem[] = [];
-      const isReefer =
-        prefillContainer.type?.toLowerCase().includes('reefer') ||
-        prefillContainer.size?.includes('RF') ||
-        prefillContainer.size?.includes('HR');
-
-      // 1. Phí Nâng Hạ (Lift-Off Gate-In)
-      const loloTariff = tariffCatalog.find(t => t.category === 'LOLO');
-      const sizeKey = (prefillContainer.size || '40HC') as any;
-      const loloPrice = isReefer
-        ? (sizeKey.includes('20') ? 350000 : 520000)
-        : (loloTariff?.rates[sizeKey as keyof typeof loloTariff.rates] || (sizeKey.includes('20') ? 280000 : 420000));
-
-      initialItems.push({
-        id: 'ITM-' + Math.random().toString(36).substring(2, 7),
-        serviceCode: 'LOLO_MT_NORMAL',
-        serviceName: `Phí nâng hạ vỏ rỗng Gate-In (${prefillContainer.size || '40HC'})`,
-        category: 'LOLO',
-        quantity: 1,
-        unit: 'Lần',
-        unitPrice: loloPrice,
-        vatPercent: 8,
-        amount: loloPrice,
-        vatAmount: Math.round(loloPrice * 0.08),
-        total: Math.round(loloPrice * 1.08),
-        remarks: 'Tiếp nhận hạ bãi vỏ rỗng'
-      });
-
-      // 2. Phí Vệ Sinh nếu CL hoặc có cleaningDetails
-      if (prefillContainer.condition === 'CL' || prefillContainer.cleaningDetails) {
-        const cleanPrice = prefillContainer.cleaningDetails?.totalCost || (isReefer ? 620000 : 420000);
-        initialItems.push({
-          id: 'ITM-' + Math.random().toString(36).substring(2, 7),
-          serviceCode: isReefer ? 'CLEAN_CHEM_HOT' : 'CLEAN_WASH_200BAR',
-          serviceName: isReefer ? 'Phí tẩy rửa hóa chất & khử mùi vi sinh Reefer' : 'Phí xịt rửa nước áp lực cao 200 Bar',
-          category: 'CLEANING',
-          quantity: 1,
-          unit: 'Cont',
-          unitPrice: cleanPrice,
-          vatPercent: 8,
-          amount: cleanPrice,
-          vatAmount: Math.round(cleanPrice * 0.08),
-          total: Math.round(cleanPrice * 1.08),
-          remarks: 'Tiếp nhận từ Nghiệp vụ Vệ sinh'
-        });
-      }
-
-      // 3. Phí PTI nếu Reefer
-      if (isReefer) {
-        const ptiPrice = sizeKey.includes('20') ? 650000 : 850000;
-        initialItems.push({
-          id: 'ITM-' + Math.random().toString(36).substring(2, 7),
-          serviceCode: 'PTI_REEFER_STD',
-          serviceName: 'Kiểm tra kỹ thuật máy lạnh trước chuyến (PTI Test)',
-          category: 'PTI',
-          quantity: 1,
-          unit: 'Cont',
-          unitPrice: ptiPrice,
-          vatPercent: 8,
-          amount: ptiPrice,
-          vatAmount: Math.round(ptiPrice * 0.08),
-          total: Math.round(ptiPrice * 1.08),
-          remarks: 'Kiểm tra máy lạnh'
-        });
-      }
-
-      setItems(initialItems);
     } else {
-      // Default new form
-      setContainerNo('TGHU' + Math.floor(1000000 + Math.random() * 9000000));
-      setItems([
-        {
-          id: 'ITM-01',
-          serviceCode: 'LOLO_MT_NORMAL',
-          serviceName: 'Phí nâng hạ vỏ rỗng Gate-In (Lift-Off 40HC)',
-          category: 'LOLO',
-          quantity: 1,
-          unit: 'Lần',
-          unitPrice: 420000,
-          vatPercent: 8,
-          amount: 420000,
-          vatAmount: 33600,
-          total: 453600,
-          remarks: 'Tiếp nhận hạ vỏ rỗng tại bãi'
-        }
-      ]);
+      setCleaningStatus('NONE');
+      setCleaningNote('');
     }
   }, [prefillContainer, isOpen]);
+
+  // Đọc hồ sơ Gate-In thật theo số container + danh mục khách hàng (tên, MST theo mã đơn vị vận tải lúc Gate-In).
+  useEffect(() => {
+    if (!isOpen || !containerNo) return;
+    let alive = true;
+    setJobLoading(true);
+    setJobError(null);
+    Promise.all([containerApi.getById(containerNo), customerApi.getAll().catch(() => ({ data: [] }))])
+      .then(([jobRes, custRes]: any[]) => {
+        if (!alive) return;
+        const job = jobRes?.data;
+        if (!job) throw new Error('Không tìm thấy hồ sơ Gate-In của container này.');
+        const customer = (custRes?.data || []).find((c: any) => c?.code && c.code === job.gateInTruckingCompany);
+        setShippingLine(job.shippingLineCode || '');
+        setSize(job.isoSize || '');
+        setType(job.isoSize || '');
+        setTruckPlate(job.gateInTruckPlate || '');
+        setDriverName(job.gateInDriverName || '');
+        setDriverPhone(job.gateInDriverPhone || '');
+        setCustomerName(customer?.name || job.gateInTruckingCompany || '');
+        setCustomerTaxCode(customer?.taxCode || '');
+        setGateInDate(job.gateInDate || '');
+        const rating = job.survey?.conditionRating;
+        const cond = rating === 'A' ? 'AV' : rating === 'B' ? 'CL' : rating ? 'DM' : '';
+        setCondition(cond);
+        if (job.survey) {
+          const damagesCount = (job.survey.damages || []).length;
+          setSurveyInfo({ surveyorName: job.survey.surveyorName, surveyDate: job.survey.surveyDate, damagesCount });
+          setSurveyNote(
+            [`Cấp ${rating || '—'}${cond ? ` (${cond})` : ''}`, `${damagesCount} hư hỏng`, job.survey.surveyorName ? `GĐV ${job.survey.surveyorName}` : '', job.survey.overallNotes || '']
+              .filter(Boolean)
+              .join(' · ')
+          );
+        } else {
+          setSurveyInfo(null);
+          setSurveyNote('');
+        }
+        setJobLoadedKey(`${containerNo}#${job.id}`);
+      })
+      .catch((error) => {
+        if (alive) setJobError(getApiErrorMessage(error, 'Không đọc được hồ sơ Gate-In của container.'));
+      })
+      .finally(() => {
+        if (alive) setJobLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [isOpen, containerNo]);
+
+  // Dòng phí tự động theo biểu phí thật, tạo 1 lần sau khi đã đọc hồ sơ và có biểu phí.
+  useEffect(() => {
+    if (!jobLoadedKey || tariffCatalog.length === 0 || itemsBuiltForRef.current === jobLoadedKey) return;
+    itemsBuiltForRef.current = jobLoadedKey;
+    const initialItems: ServiceOrderItem[] = [];
+    const sizeKey = size;
+    const isReefer = sizeKey.includes('RF') || sizeKey.includes('RH') || sizeKey.includes('HR');
+
+    // 1. Phí nâng hạ — biểu cước LOLO đầu tiên có giá cho cỡ container này.
+    const lolo = tariffCatalog.find((t) => t.category === 'LOLO' && priceFromTariff(t, sizeKey) > 0);
+    if (lolo) initialItems.push(makeItem(lolo, priceFromTariff(lolo, sizeKey), 'Tiếp nhận hạ bãi vỏ rỗng'));
+
+    // 2. Phí vệ sinh — chi phí thật của lệnh vệ sinh đã bàn giao.
+    if (prefillContainer?.cleaningDetails) {
+      const cleaningTariff = tariffCatalog.find((t) => t.category === 'CLEANING' && priceFromTariff(t, sizeKey) > 0);
+      const cleaningCost = prefillContainer.cleaningDetails.totalCost || priceFromTariff(cleaningTariff, sizeKey);
+      if (cleaningTariff && cleaningCost > 0) initialItems.push(makeItem(cleaningTariff, cleaningCost, 'Tiếp nhận từ Nghiệp vụ Vệ sinh'));
+    }
+
+    // 3. Phí PTI cho container lạnh — chỉ khi biểu cước có dịch vụ PTI.
+    if (isReefer) {
+      const pti = tariffCatalog.find((t) => t.category === 'PTI' && priceFromTariff(t, sizeKey) > 0);
+      if (pti) initialItems.push(makeItem(pti, priceFromTariff(pti, sizeKey), 'Kiểm tra máy lạnh'));
+    }
+    setItems(initialItems);
+  }, [jobLoadedKey, tariffCatalog]);
+
+  // Mã ISO thật theo DM Loại Container (trước đây ghi lại chính mã loại, vd "45HC").
+  const containerType = containerTypeOptions.find((t) => t.typeCode === size);
+  const isoCode = containerType?.isoCode || '';
 
   if (!isOpen) return null;
 
@@ -285,8 +302,7 @@ export const ServiceOrderFormModal: React.FC<ServiceOrderFormModalProps> = ({
     const tariff = tariffCatalog.find(t => t.code === selectedTariffCode);
     if (!tariff) return;
 
-    const sizeKey = (size || '40HC') as any;
-    const price = tariff.rates[sizeKey as keyof typeof tariff.rates] || tariff.rates['DEFAULT'] || 200000;
+    const price = priceFromTariff(tariff, size);
 
     const newItem: ServiceOrderItem = {
       id: 'ITM-' + Math.random().toString(36).substring(2, 7),
@@ -330,25 +346,17 @@ export const ServiceOrderFormModal: React.FC<ServiceOrderFormModalProps> = ({
     );
   };
 
+  const readonlyCls = 'w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl text-slate-900 min-h-[36px]';
   const subtotal = items.reduce((sum, i) => sum + i.amount, 0);
   const totalVat = items.reduce((sum, i) => sum + i.vatAmount, 0);
   const grandTotal = subtotal + totalVat;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!containerNo.trim()) {
-      alert('Vui lòng nhập Số Container');
-      return;
-    }
-    if (items.length === 0) {
-      alert('Vui lòng thêm ít nhất 1 hạng mục dịch vụ theo Tariff');
-      return;
-    }
-
+  // Phiếu dịch vụ dựng từ dữ liệu hồ sơ Gate-In đã đọc (không có giá trị bịa như "Giám Định Viên Depot",
+  // "Xịt rửa áp lực 200 Bar" trước đây).
+  const buildOrder = (): ServiceOrder => {
     const now = new Date().toISOString().replace('T', ' ').substring(0, 16);
     const orderNo = 'SO-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + Math.floor(100 + Math.random() * 900);
-
-    const newOrder: ServiceOrder = {
+    return {
       id: 'SO-' + Math.random().toString(36).substring(2, 9),
       orderNo,
       containerId: prefillContainer?.id,
@@ -362,22 +370,24 @@ export const ServiceOrderFormModal: React.FC<ServiceOrderFormModalProps> = ({
       driverName,
       truckPlate,
       driverPhone,
-      gateInDate: prefillContainer?.gateInDate || now,
+      gateInDate: gateInDate || now,
       createdAt: now,
-      createdBy: 'Lê Hoàng Nam (Khai Thác Cổng)',
-      condition,
+      createdBy: currentUserName,
+      condition: condition || undefined,
       surveyNote,
       cleaningNote,
-      surveyRef: {
-        condition,
-        surveyor: prefillContainer?.surveyDetails?.surveyorName || 'Giám Định Viên Depot',
-        surveyDate: prefillContainer?.surveyDetails?.surveyDate || now,
-        damagesCount: prefillContainer?.surveyDetails?.damages?.length || 0,
-        surveyNote
-      },
+      surveyRef: condition
+        ? {
+            condition,
+            surveyor: surveyInfo?.surveyorName || '',
+            surveyDate: surveyInfo?.surveyDate || '',
+            damagesCount: surveyInfo?.damagesCount || 0,
+            surveyNote
+          }
+        : undefined,
       cleaningRef: {
         cleaningStatus: (cleaningStatus as any) || 'NOT_REQUIRED',
-        cleaningType: condition === 'CL' ? 'Xịt rửa áp lực 200 Bar' : 'Không yêu cầu',
+        cleaningType: prefillContainer?.cleaningDetails?.cleaningType || 'Không yêu cầu',
         cleaningCost: items.find(i => i.category === 'CLEANING')?.total || 0,
         notes: cleaningNote
       },
@@ -386,11 +396,29 @@ export const ServiceOrderFormModal: React.FC<ServiceOrderFormModalProps> = ({
       totalVat,
       grandTotal,
       paymentStatus: 'UNPAID',
-      qrPayload: `STB_SOLUTION_DEPOT_${containerNo.toUpperCase()}_${grandTotal}`,
-      qrImageUrl: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=STB_SOLUTION_DEPOT_${containerNo.toUpperCase()}_${grandTotal}`,
+      qrPayload: '',
+      qrImageUrl: '',
       notes,
       status: 'ISSUED'
-    };
+    } as ServiceOrder;
+  };
+
+  const validateBeforeSave = () => {
+    if (!containerNo.trim() || !jobLoadedKey) {
+      alert('Chọn container (đã Gate-In) cần lập phiếu.');
+      return false;
+    }
+    if (items.length === 0) {
+      alert('Vui lòng thêm ít nhất 1 hạng mục dịch vụ theo Tariff');
+      return false;
+    }
+    return true;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateBeforeSave()) return;
+    const newOrder = buildOrder();
 
     setSubmitError(null);
     setIsSubmitting(true);
@@ -404,69 +432,15 @@ export const ServiceOrderFormModal: React.FC<ServiceOrderFormModalProps> = ({
     }
   };
 
-  const handleSaveAndGoToPayment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!containerNo.trim()) {
-      alert('Vui lòng nhập Số Container');
-      return;
-    }
-    if (items.length === 0) {
-      alert('Vui lòng thêm ít nhất 1 hạng mục dịch vụ theo Tariff');
-      return;
-    }
-
-    const now = new Date().toISOString().replace('T', ' ').substring(0, 16);
-    const orderNo = 'SO-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + Math.floor(100 + Math.random() * 900);
-
-    const newOrder: ServiceOrder = {
-      id: 'SO-' + Math.random().toString(36).substring(2, 9),
-      orderNo,
-      containerId: prefillContainer?.id,
-      containerNo: containerNo.toUpperCase().trim(),
-      isoCode,
-      size,
-      type,
-      shippingLine,
-      customerName,
-      customerTaxCode,
-      driverName,
-      truckPlate,
-      driverPhone,
-      gateInDate: prefillContainer?.gateInDate || now,
-      createdAt: now,
-      createdBy: 'Lê Hoàng Nam (Khai Thác Cổng)',
-      condition,
-      surveyNote,
-      cleaningNote,
-      surveyRef: {
-        condition,
-        surveyor: prefillContainer?.surveyDetails?.surveyorName || 'Giám Định Viên Depot',
-        surveyDate: prefillContainer?.surveyDetails?.surveyDate || now,
-        damagesCount: prefillContainer?.surveyDetails?.damages?.length || 0,
-        surveyNote
-      },
-      cleaningRef: {
-        cleaningStatus: (cleaningStatus as any) || 'NOT_REQUIRED',
-        cleaningType: condition === 'CL' ? 'Xịt rửa áp lực 200 Bar' : 'Không yêu cầu',
-        cleaningCost: items.find(i => i.category === 'CLEANING')?.total || 0,
-        notes: cleaningNote
-      },
-      items,
-      subtotal,
-      totalVat,
-      grandTotal,
-      paymentStatus: 'UNPAID',
-      qrPayload: `STB_SOLUTION_DEPOT_${containerNo.toUpperCase()}_${grandTotal}`,
-      qrImageUrl: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=STB_SOLUTION_DEPOT_${containerNo.toUpperCase()}_${grandTotal}`,
-      notes,
-      status: 'ISSUED'
-    };
+  const handleSaveAndPrint = async (document: 'ORDER' | 'RECEIPT' | 'EEIR') => {
+    if (!validateBeforeSave()) return;
+    const newOrder = buildOrder();
 
     setSubmitError(null);
     setIsSubmitting(true);
     try {
-      if (onSaveAndNavigateToPayment) {
-        await onSaveAndNavigateToPayment(newOrder);
+      if (onSaveAndPrint) {
+        await onSaveAndPrint(newOrder, document);
       } else {
         await onSave(newOrder);
       }
@@ -510,171 +484,96 @@ export const ServiceOrderFormModal: React.FC<ServiceOrderFormModalProps> = ({
 
         {/* Modal Body Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
-          {/* Section 1: Intake from Survey & Cleaning */}
+          {/* Section 1: Dữ liệu container lấy từ hồ sơ Gate-In / Giám định / Vệ sinh — chỉ hiển thị */}
           <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-2 gap-2 flex-wrap">
               <h3 className="text-xs font-bold text-blue-700 uppercase tracking-wider flex items-center gap-1.5">
                 <Truck className="w-4 h-4" />
-                <span>1. Tiếp Nhận Dữ Liệu Từ Nghiệp Vụ Giám Định & Vệ Sinh</span>
+                <span>1. Dữ Liệu Từ Gate-In, Giám Định &amp; Vệ Sinh</span>
               </h3>
               <div className="flex items-center gap-2 text-xs">
                 <span className="text-slate-500">Tình trạng vỏ:</span>
-                <select
-                  value={condition}
-                  onChange={(e) => setCondition(e.target.value as any)}
-                  className="px-2.5 py-1 bg-white border border-slate-200 text-slate-900 rounded-lg font-bold text-xs"
-                >
-                  <option value="AV">AV (Sạch sẽ đạt chuẩn cấp)</option>
-                  <option value="CL">CL (Cần xịt rửa vệ sinh)</option>
-                  <option value="DM">DM (Hư hỏng cần sửa EMR)</option>
-                </select>
+                <span className="px-2.5 py-1 bg-white border border-slate-200 text-slate-900 rounded-lg font-bold">
+                  {condition === 'AV' ? 'AV (Đạt chuẩn)' : condition === 'CL' ? 'CL (Cần vệ sinh)' : condition === 'DM' ? 'DM (Hư hỏng)' : 'Chưa giám định'}
+                </span>
               </div>
             </div>
+
+            {jobError && <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-xs font-bold text-rose-700">{jobError}</div>}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
               <div>
                 <label className="block text-slate-500 font-semibold mb-1">Container No. *</label>
-                <input
-                  type="text"
-                  required
-                  value={containerNo}
-                  onChange={(e) => setContainerNo(e.target.value.toUpperCase())}
-                  placeholder="MSCU1234567"
-                  className="w-full px-3 py-2 bg-white border border-slate-200 focus:border-cyan-500 rounded-xl text-slate-900 font-mono font-bold focus:outline-none"
-                />
+                {prefillContainer ? (
+                  <div className={readonlyCls + ' font-mono font-bold'}>{containerNo}</div>
+                ) : (
+                  <select
+                    value={containerNo}
+                    onChange={(e) => setContainerNo(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 focus:border-cyan-500 rounded-xl text-slate-900 font-mono font-bold focus:outline-none"
+                  >
+                    <option value="">{selectableContainers.length === 0 ? '— Không có container chờ lập phiếu —' : '— Chọn container đã Gate-In —'}</option>
+                    {selectableContainers.map((c) => (
+                      <option key={c.id} value={c.containerNo}>
+                        {c.containerNo}{c.shippingLine ? ` — ${c.shippingLine}` : ''}{c.size ? ` (${c.size})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
-
               <div>
                 <label className="block text-slate-500 font-semibold mb-1">Hãng Tàu</label>
-                <input
-                  type="text"
-                  value={shippingLine}
-                  onChange={(e) => setShippingLine(e.target.value)}
-                  placeholder="MSC, MAERSK, CMA..."
-                  className="w-full px-3 py-2 bg-white border border-slate-200 focus:border-cyan-500 rounded-xl text-slate-900 font-bold focus:outline-none"
-                />
+                <div className={readonlyCls + ' font-bold'}>{shippingLine || '—'}</div>
               </div>
-
               <div>
-                <label className="block text-slate-500 font-semibold mb-1">Kích Cỡ ISO</label>
-                <select
-                  value={size}
-                  onChange={(e) => setSize(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-slate-200 text-slate-900 rounded-xl focus:outline-none"
-                >
-                  <option value="20DC">20' DC (Dry General)</option>
-                  <option value="40DC">40' DC (Dry General)</option>
-                  <option value="40HC">40' HC (High Cube)</option>
-                  <option value="45HC">45' HC (High Cube)</option>
-                  <option value="20RF">20' RF (Reefer Lạnh)</option>
-                  <option value="40HR">40' HR (Reefer Lạnh)</option>
-                </select>
+                <label className="block text-slate-500 font-semibold mb-1">Kích Cỡ / Loại</label>
+                <div className={readonlyCls}>{size ? `${size}${containerType ? ' - ' + (containerType.name || containerType.vietnameseName) : ''}` : '—'}</div>
               </div>
-
               <div>
                 <label className="block text-slate-500 font-semibold mb-1">Mã ISO Code</label>
-                <input
-                  type="text"
-                  value={isoCode}
-                  onChange={(e) => setIsoCode(e.target.value)}
-                  placeholder="45G1, 22G1, 45R1..."
-                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 font-mono focus:outline-none"
-                />
+                <div className={readonlyCls + ' font-mono'}>{isoCode || '—'}</div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1 text-xs">
               <div>
-                <label className="block text-slate-500 text-xs font-semibold mb-1">
-                  1.1. Kết quả từ Giám Định (e-EIR)
-                </label>
-                <input
-                  type="text"
-                  value={surveyNote}
-                  onChange={(e) => setSurveyNote(e.target.value)}
-                  placeholder="Ghi chú tình trạng vỏ từ Giám định viên..."
-                  className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none"
-                />
+                <label className="block text-slate-500 font-semibold mb-1">1.1. Kết quả Giám Định (e-EIR)</label>
+                <div className={readonlyCls}>{surveyNote || 'Chưa có phiếu giám định'}</div>
               </div>
-
               <div>
-                <label className="block text-slate-500 text-xs font-semibold mb-1">
-                  1.2. Kết quả từ Nghiệp Vụ Vệ Sinh
-                </label>
-                <input
-                  type="text"
-                  value={cleaningNote}
-                  onChange={(e) => setCleaningNote(e.target.value)}
-                  placeholder="Dữ liệu trạm xịt rửa / nghiệm thu vệ sinh..."
-                  className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-cyan-700 focus:outline-none"
-                />
+                <label className="block text-slate-500 font-semibold mb-1">1.2. Kết quả Nghiệp Vụ Vệ Sinh</label>
+                <div className={readonlyCls + ' text-cyan-700'}>{cleaningNote || 'Không có lệnh vệ sinh bàn giao'}</div>
               </div>
             </div>
+            {jobLoading && <div className="text-[11px] text-slate-500">Đang đọc hồ sơ Gate-In...</div>}
           </div>
 
-          {/* Section 2: Customer & Driver Info */}
+          {/* Section 2: Khách hàng / xe / tài xế theo hồ sơ Gate-In — chỉ hiển thị */}
           <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
             <h3 className="text-xs font-bold text-purple-700 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-200 pb-2">
               <Building2 className="w-4 h-4" />
-              <span>2. Thông Tin Khách Hàng / Đơn Vị Vận Tải & Xe Đầu Kéo</span>
+              <span>2. Khách Hàng / Đơn Vị Vận Tải &amp; Xe Đầu Kéo (theo Gate-In)</span>
             </h3>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
               <div className="md:col-span-2">
-                <label className="block text-slate-500 font-semibold mb-1">Khách Hàng / Công Ty Vận Tải *</label>
-                <input
-                  type="text"
-                  required
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder="Công ty CP Logistics..."
-                  className="w-full px-3 py-2 bg-white border border-slate-200 text-slate-900 font-semibold rounded-xl focus:outline-none"
-                />
+                <label className="block text-slate-500 font-semibold mb-1">Khách Hàng / Công Ty Vận Tải</label>
+                <div className={readonlyCls + ' font-semibold'}>{customerName || '— (Gate-In không chọn đơn vị vận tải)'}</div>
               </div>
-
               <div>
                 <label className="block text-slate-500 font-semibold mb-1">Mã Số Thuế (MST)</label>
-                <input
-                  type="text"
-                  value={customerTaxCode}
-                  onChange={(e) => setCustomerTaxCode(e.target.value)}
-                  placeholder="0312345678"
-                  className="w-full px-3 py-2 bg-white border border-slate-200 text-slate-900 font-mono rounded-xl focus:outline-none"
-                />
+                <div className={readonlyCls + ' font-mono'}>{customerTaxCode || '—'}</div>
               </div>
-
               <div>
-                <label className="block text-slate-500 font-semibold mb-1">Biển Số Xe Kéo *</label>
-                <input
-                  type="text"
-                  required
-                  value={truckPlate}
-                  onChange={(e) => setTruckPlate(e.target.value.toUpperCase())}
-                  placeholder="51C-889.12"
-                  className="w-full px-3 py-2 bg-white border border-slate-200 text-amber-700 font-mono font-bold rounded-xl focus:outline-none"
-                />
+                <label className="block text-slate-500 font-semibold mb-1">Biển Số Xe Kéo</label>
+                <div className={readonlyCls + ' font-mono font-bold text-amber-700'}>{truckPlate || '—'}</div>
               </div>
-
               <div>
                 <label className="block text-slate-500 font-semibold mb-1">Tên Tài Xế</label>
-                <input
-                  type="text"
-                  value={driverName}
-                  onChange={(e) => setDriverName(e.target.value)}
-                  placeholder="Nguyễn Văn A"
-                  className="w-full px-3 py-2 bg-white border border-slate-200 text-slate-900 rounded-xl focus:outline-none"
-                />
+                <div className={readonlyCls}>{driverName || '—'}</div>
               </div>
-
               <div>
                 <label className="block text-slate-500 font-semibold mb-1">Số Điện Thoại</label>
-                <input
-                  type="text"
-                  value={driverPhone}
-                  onChange={(e) => setDriverPhone(e.target.value)}
-                  placeholder="0909xxxxxx"
-                  className="w-full px-3 py-2 bg-white border border-slate-200 text-slate-900 font-mono rounded-xl focus:outline-none"
-                />
+                <div className={readonlyCls + ' font-mono'}>{driverPhone || '—'}</div>
               </div>
             </div>
           </div>
@@ -804,24 +703,18 @@ export const ServiceOrderFormModal: React.FC<ServiceOrderFormModalProps> = ({
                 <span className="font-mono text-emerald-700 text-xl font-black">{formatVND(grandTotal)}</span>
               </div>
               <p className="text-[11px] text-slate-500 italic pt-1">
-                * Phiếu dịch vụ sau khi tạo sẽ kích hoạt tạo mã VietQR Napas247 và chuyển sang trạng thái chờ thanh toán.
+                * Phiếu dịch vụ sau khi tạo chuyển sang trạng thái chờ thanh toán.
               </p>
             </div>
 
             <div className="flex items-center justify-end gap-3 border-t md:border-t-0 md:border-l border-slate-200 pt-3 md:pt-0 md:pl-4">
-              <div className="p-2 bg-white rounded-xl">
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=STB_DEPOT_${containerNo}_${grandTotal}`}
-                  alt="VietQR Demo"
-                  className="w-20 h-20 object-contain"
-                />
-              </div>
+              <VietQrCode compact amount={grandTotal} addInfo={buildTransferContent(customerName, containerNo)} />
               <div className="text-xs space-y-1">
                 <div className="font-bold text-slate-900 flex items-center gap-1.5">
                   <QrCode className="w-4 h-4 text-purple-700" />
                   <span>VietQR Tự Động</span>
                 </div>
-                <div className="text-slate-500 text-[11px]">Nội dung CK: <strong className="text-cyan-700 font-mono">{containerNo}</strong></div>
+                <div className="text-slate-500 text-[11px]">Nội dung CK: <strong className="text-cyan-700 font-mono">{buildTransferContent(customerName, containerNo)}</strong></div>
                 <div className="text-emerald-700 font-mono font-bold text-xs">{formatVND(grandTotal)}</div>
               </div>
             </div>
@@ -856,15 +749,22 @@ export const ServiceOrderFormModal: React.FC<ServiceOrderFormModalProps> = ({
                 <span>{isSubmitting ? 'Đang lưu...' : 'Lưu Phiếu Dịch Vụ'}</span>
               </button>
 
-              <button
-                type="button"
-                onClick={handleSaveAndGoToPayment}
-                disabled={isSubmitting}
-                className="flex-1 sm:flex-none px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-600/30 transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <CreditCard className="w-4 h-4" />
-                <span>{isSubmitting ? 'Đang lưu...' : 'Lập Phiếu & Chuyển Sang Thanh Toán'}</span>
-              </button>
+              {([
+                ['ORDER', 'Lưu & In Phiếu DV', 'from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500'],
+                ['RECEIPT', 'Lưu & In Phiếu Thu', 'from-cyan-600 to-sky-600 hover:from-cyan-500 hover:to-sky-500'],
+                ['EEIR', 'Lưu & In e-EIR', 'from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500']
+              ] as const).map(([doc, label, color]) => (
+                <button
+                  key={doc}
+                  type="button"
+                  onClick={() => void handleSaveAndPrint(doc)}
+                  disabled={isSubmitting}
+                  className={`flex-1 sm:flex-none px-4 py-2.5 bg-gradient-to-r ${color} text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>{isSubmitting ? 'Đang lưu...' : label}</span>
+                </button>
+              ))}
             </div>
           </div>
         </form>

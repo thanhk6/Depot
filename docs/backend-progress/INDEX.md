@@ -2,6 +2,7 @@
 
 📐 Quy tắc chung bắt buộc đọc trước: [00-quy-tac-backend.md](00-quy-tac-backend.md)
 📐 Quy tắc tạo bảng (entity + EF Core): [00b-quy-tac-tao-bang.md](00b-quy-tac-tao-bang.md)
+📘 Tài liệu kỹ thuật theo menu (frontend → API → controller → service → bảng DB): [../menu/README.md](../menu/README.md)
 
 Quy trình: đi theo đúng thứ tự **menu thật đang chạy trên UI** (`fontend/src/components/layout/Sidebar.tsx`,
 không phải `constants/menus.ts` — file đó là cấu hình cũ không được `App.tsx` dùng), từ trên xuống dưới,
@@ -133,3 +134,49 @@ Billing #21 → Gate-Out #17)** — chạy thật từng bước qua Postgres th
 **Bài học:** audit tĩnh (đọc code, so khớp field/endpoint) không đủ để bắt bug runtime kiểu
 concurrency/EF Core tracking — cần chạy thử thật với DB thật ít nhất 1 lần cho mỗi luồng nghiệp vụ chính
 trước khi coi là "Xong" thật sự.
+
+## Chạy thử thật lần 2 (2026-09-06): test lại #1-#14 theo đúng thứ tự menu trên ảnh Sidebar
+
+Người dùng gửi ảnh chụp Sidebar thật, yêu cầu test lại từ Gate-In đến hết nhóm "QUẢN LÝ CONTAINER & BÃI"
+(dừng trước nhóm Gate-Out). Build + chạy `dotnet run` thật với Postgres thật, gọi trực tiếp từng endpoint
+theo đúng chuỗi 1 container xuyên suốt: Gate-In → Survey → Cleaning → Operation → **Payment** →
+**Estimate** → Approval → Repair Start → Repair Complete → QC → Shipping API → Container List →
+Yard Map → Yard Blocks → **Forklift** → Gate-Out (test thêm để xác nhận fix).
+
+**2 bug thật mới phát hiện + đã sửa** (cùng 1 loại: ghi đè `DepotJob.Status` vô điều kiện, xoá mất trạng
+thái nghiệp vụ thật của 1 luồng khác đang dùng chung field này) — chi tiết đầy đủ ở
+[07-payment.md](07-payment.md#cập-nhật-2026-09-06-chạy-thử-thật-phát-hiện-bug-cross-module-nghiêm-trọng-đã-sửa)
+và [11-forklift.md](11-forklift.md#cập-nhật-2026-09-06-chạy-thử-thật-phát-hiện-bug-cross-module-cùng-loại-với-màn-07-payment-đã-sửa):
+
+1. `ProcessPaymentAsync` (màn Payment #5) ghi đè `job.Status = "PAID"` vô điều kiện → xoá mất
+   `ESTIMATING` → không lập được Estimate cho container vừa trả phí Gate-In. Đã xoá dòng ghi đè.
+2. `CompleteForkliftMoveAsync` (màn Forklift) ghi đè `job.Status = "IN_YARD"` vô điều kiện → xoá mất
+   `READY_FOR_OUT` nếu forklift đảo chuyển 1 container đang chờ Gate-Out → không Gate-Out được nữa. Đã
+   xoá dòng ghi đè.
+
+Đã build lại `dotnet build` solution 0 lỗi sau mỗi lần sửa, verify lại thật bằng cách lặp lại đúng kịch
+bản gây lỗi qua API thật, xác nhận cả 2 luồng chạy đúng sau khi sửa.
+
+**1 bug tiềm ẩn ghi nhận, KHÔNG sửa** (không tái hiện qua UI thật): `POST /DepotJobs/{id}/repair/assign`
+(endpoint tồn tại nhưng UI hiện tại không gọi) nếu được gọi trước `repair/start` sẽ crash 500 do cả 2 cùng
+tạo `RepairOrder` mới nhưng chỉ `assign` có check trùng. Chi tiết: [14-repair.md](14-repair.md).
+
+**Bài học lớn nhất:** 2 bug mới đều thuộc loại "2 module nghiệp vụ độc lập vô tình dùng chung 1 field
+trạng thái, module này ghi đè làm hỏng module kia" — loại lỗi này không lộ ra khi audit tĩnh từng màn
+riêng lẻ (từng ghi "✅ không cần sửa" ở cả 2 file), chỉ lộ ra khi chạy thử thật **đúng thứ tự menu cho
+CÙNG 1 container xuyên suốt nhiều màn liên tiếp** — củng cố thêm bài học đã ghi ở lần chạy thử thật đầu
+tiên (2026-08-23) phía trên.
+
+## Bug thật thứ 3 (2026-09-06): form "Thêm Mới Phiếu Giám Định Container" mất ~20 field khi lưu
+
+Người dùng chỉ tay vào `CreateSurveyModal.tsx`, yêu cầu rà lại — form thu thập đủ 4 tab (Container/Vận
+Hành/Phân Hạng/Hư Hỏng) nhưng chỉ ~10 field trong số đó thật sự tới được backend, phần còn lại
+(~20 field: thông số vật lý container, thông tin tài xế mở rộng, phân hạng chi tiết, toàn bộ 7 field
+Reefer...) bị bỏ qua im lặng khi build payload gửi `createGateIn`/`submitSurvey` — cùng loại lỗi mất dữ
+liệu im lặng với bug thứ 2 ở [04-survey.md](04-survey.md) nhưng phạm vi lớn hơn nhiều lần.
+
+Đã sửa triệt để theo lựa chọn của người dùng: thêm cột DB cho toàn bộ field (không bỏ field nào), viết
+migration `AddSurveyDetailFieldsAndGateInIdentityFields`, nối dây đủ cả 2 chiều (gửi lên + đọc lại khi
+GET). Verify thật qua Postgres: tạo Gate-In + submit survey đủ mọi field qua API thật, `GET` lại xác nhận
+từng field khớp đúng giá trị đã gửi, kể cả `SurveyNo` tự sinh server-side. Chi tiết đầy đủ:
+[04-survey.md](04-survey.md#bug-thật-thứ-3--form-thêm-mới-phiếu-giám-định-container-mất-20-field-khi-lưu-phát-hiện-2026-09-06).

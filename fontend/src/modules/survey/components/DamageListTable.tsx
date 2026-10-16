@@ -4,8 +4,6 @@ import {
   Wrench,
   Trash2,
   Edit2,
-  Eye,
-  Camera,
   Plus,
   AlertCircle,
   Image as ImageIcon

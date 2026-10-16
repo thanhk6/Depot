@@ -53,7 +53,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   const countDM = containers.filter((c) => c.condition === 'DM' && c.status !== 'GATE_OUT').length;
 
   const countRepairing = containers.filter((c) => c.status === 'REPAIRING').length;
-  const countWaitingQC = containers.filter((c) => c.status === 'WAITING_QC').length;
+  // Backend thật (CompleteRepairAsync) đặt "QC_PENDING" khi sửa xong chờ QC, không có "WAITING_QC" —
+  // trước đây App.tsx tự bịa giá trị này nên KPI này từng đúng tạm trong phiên, sai lại sau F5.
+  const countWaitingQC = containers.filter((c) => c.status === 'QC_PENDING').length;
   const countWaitingPayment = containers.filter((c) => c.status === 'WAITING_PAYMENT').length;
   const countWaitingForklift = containers.filter((c) => c.status === 'WAITING_FORKLIFT').length;
 
@@ -69,9 +71,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     const percent = slotsInBlock.length ? Math.min(100, (occupied / slotsInBlock.length) * 100) : 0;
     return { occupied, total: slotsInBlock.length, percent };
   };
-  const blockA = getBlockOccupancy('BLOCK_A');
-  const blockB = getBlockOccupancy('BLOCK_B');
-  const blockQ = getBlockOccupancy('BLOCK_Q');
+  // Mọi block có trong vị trí bãi thật — trước đây cố định 3 block BLOCK_A/B/Q.
+  const blockCodes = Array.from(new Set(yardSlots.map((slot) => slot.blockCode))).filter(Boolean).sort();
 
   return (
     <div className="space-y-6">
@@ -257,35 +258,21 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           </div>
 
           <div className="space-y-3">
-            <div>
-              <div className="flex justify-between text-xs font-semibold mb-1">
-                <span className="text-slate-700">Block A</span>
-                <span className="text-slate-500">{blockA.occupied}/{blockA.total} vị trí</span>
-              </div>
-              <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
-                <div className="h-full bg-sky-500 rounded-full" style={{ width: `${blockA.percent}%` }} />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-xs font-semibold mb-1">
-                <span className="text-slate-700">Block B</span>
-                <span className="text-emerald-600">{blockB.occupied}/{blockB.total} vị trí</span>
-              </div>
-              <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
-                <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${blockB.percent}%` }} />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-xs font-semibold mb-1">
-                <span className="text-slate-700">Block Q</span>
-                <span className="text-slate-500">{blockQ.occupied}/{blockQ.total} vị trí</span>
-              </div>
-              <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
-                <div className="h-full bg-amber-500 rounded-full" style={{ width: `${blockQ.percent}%` }} />
-              </div>
-            </div>
+            {blockCodes.length === 0 && <div className="py-4 text-center text-xs text-slate-500">Chưa có dữ liệu bãi</div>}
+            {blockCodes.map((code) => {
+              const occ = getBlockOccupancy(code);
+              return (
+                <div key={code}>
+                  <div className="flex justify-between text-xs font-semibold mb-1">
+                    <span className="text-slate-700">{code.replace('BLOCK_', 'Block ')}</span>
+                    <span className="text-slate-500">{occ.occupied}/{occ.total} vị trí</span>
+                  </div>
+                  <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+                    <div className="h-full bg-sky-500 rounded-full" style={{ width: `${occ.percent}%` }} />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -329,7 +316,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                   <td className="px-4 py-3">{c.size} ({c.isoCode})</td>
                   <td className="px-4 py-3 font-semibold text-blue-600">{c.shippingLine}</td>
                   <td className="px-4 py-3">
-                    <StatusBadge status={c.condition} size="sm" />
+                    {c.condition ? (
+                      <StatusBadge status={c.condition} size="sm" />
+                    ) : (
+                      <span className="text-slate-500 text-[11px] font-semibold">Chưa giám định</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <StatusBadge status={c.status} size="sm" />

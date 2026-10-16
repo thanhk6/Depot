@@ -12,8 +12,6 @@ namespace Depot.Data.Entities.Depot
         public long DepotJobId { get; set; }
         /// <summary>Mã job nghiệp vụ liên quan.</summary>
         public string JobNo { get; set; } = string.Empty;
-        /// <summary>Thực thể DepotJob gốc.</summary>
-        public virtual DepotJob? DepotJob { get; set; }
 
         /// <summary>Mã nhân sự/đội kỹ thuật phụ trách sửa chữa.</summary>
         public string TechnicianId { get; set; } = string.Empty;

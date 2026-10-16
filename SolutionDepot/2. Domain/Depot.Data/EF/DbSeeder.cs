@@ -20,7 +20,7 @@ namespace Depot.Data.EF
         /// Seed development idempotent. Mỗi lần startup chỉ bổ sung record còn thiếu
         /// theo Business Code/JobNo, không xóa hoặc nhân bản dữ liệu người dùng.
         /// </summary>
-        public static async Task SeedAsync(DepotDbContext context)
+        public static async Task SeedAsync(DepotDbContext context, string defaultUserPassword = "123456")
         {
             await SeedCompanyAsync(context);
             await SeedRolesAsync(context);
@@ -39,7 +39,7 @@ namespace Depot.Data.EF
             await context.SaveChangesAsync();
             await SeedCustomerBookingsAsync(context);
             await SeedCatalogsAsync(context);
-            await SeedUsersAsync(context);
+            await SeedUsersAsync(context, defaultUserPassword);
             await SeedYardAsync(context);
             await SeedYardOverviewAsync(context);
             await SeedNotificationTemplatesAsync(context);
@@ -51,7 +51,9 @@ namespace Depot.Data.EF
             // tiên trên DB rỗng (chưa flush thì query LINQ không thấy).
             await SeedServiceTariffsFromLegacyCatalogAsync(context);
             await SeedStorageTariffsFromLegacyCatalogAsync(context);
-            await SeedSampleJobAsync(context);
+            await SeedEstimateCatalogsAsync(context);
+            // Không seed hồ sơ container mẫu (JOB-SEED-0001) nữa — mọi container phải đi từ Gate-In thật
+            // (yêu cầu 2026-10-07: xoá sạch dữ liệu mẫu để làm lại từ đầu).
         }
 
         private static async Task SeedCompanyAsync(DepotDbContext context)
@@ -268,151 +270,59 @@ namespace Depot.Data.EF
                     new CustomerBooking { BookingNo = "BK-XYZ-0001", CustomerCode = "CUST-XYZ02", ShippingLineId = maeuId, ContainerCount = 5, ContainerSize = "20GP" });
             }
 
-        private static async Task SeedUsersAsync(DepotDbContext context)
+        private static async Task SeedUsersAsync(DepotDbContext context, string defaultUserPassword)
         {
-            var defaultPasswordHash = PasswordHashHelper.HashPassword("123456");
-            var defaultUsers = new[]
+            // Chỉ seed tài khoản quản trị "admin" khi CHƯA có (yêu cầu 2026-10-08: xoá hết nhân viên mẫu, chỉ giữ admin;
+            // nhân viên thật do admin tạo ở màn Quản trị người dùng). Trước đây seed lại 10 tài khoản mẫu mỗi lần
+            // khởi động và ghi đè họ tên / vai trò / bật lại tài khoản đã khoá — xoá đi là tự sống lại.
+            // Mật khẩu ban đầu lấy từ cấu hình Seed:DefaultPassword (Program.cs), chỉ dùng khi tạo mới.
+            var adminRole = await context.Roles.FirstOrDefaultAsync(x => x.RoleCode == "ADMIN");
+            if (adminRole == null) return;
+            var admin = await context.Users.FirstOrDefaultAsync(x => x.Username == "admin");
+            if (admin == null)
             {
-                (
-                    new SystemUser
-                    {
-                        Username = "admin",
-                        FullName = "Nguyễn Văn Hùng",
-                        Email = "hung.nguyen@depotcontainer.vn",
-                        PasswordHash = defaultPasswordHash,
-                        IsActive = true
-                    },
-                    "ADMIN"
-                ),
-                (
-                    new SystemUser
-                    {
-                        Username = "surveyor",
-                        FullName = "Trần Văn Bình",
-                        Email = "binh.survey@depotcontainer.vn",
-                        PasswordHash = defaultPasswordHash,
-                        IsActive = true
-                    },
-                    "SURVEYOR"
-                ),
-                (
-                    new SystemUser
-                    {
-                        Username = "operator",
-                        FullName = "Lê Hoàng Nam",
-                        Email = "nam.operator@depotcontainer.vn",
-                        PasswordHash = defaultPasswordHash,
-                        IsActive = true
-                    },
-                    "GATE_OP"
-                ),
-                (
-                    new SystemUser
-                    {
-                        Username = "accountant",
-                        FullName = "Phạm Thị Thu",
-                        Email = "thu.accountant@depotcontainer.vn",
-                        PasswordHash = defaultPasswordHash,
-                        IsActive = true
-                    },
-                    "CASHIER"
-                ),
-                (
-                    new SystemUser
-                    {
-                        Username = "estimator",
-                        FullName = "Đặng Văn Khoa",
-                        Email = "khoa.estimate@depotcontainer.vn",
-                        PasswordHash = defaultPasswordHash,
-                        IsActive = true
-                    },
-                    "ESTIMATOR"
-                ),
-                (
-                    new SystemUser
-                    {
-                        Username = "maersk",
-                        FullName = "Mr. Hans Nielsen",
-                        Email = "hans.nielsen@maersk.com",
-                        PasswordHash = defaultPasswordHash,
-                        IsActive = true
-                    },
-                    "CARRIER"
-                ),
-                (
-                    new SystemUser
-                    {
-                        Username = "repair",
-                        FullName = "Vũ Quốc Việt",
-                        Email = "viet.repair@depotcontainer.vn",
-                        PasswordHash = defaultPasswordHash,
-                        IsActive = true
-                    },
-                    "TECHNICIAN"
-                ),
-                (
-                    new SystemUser
-                    {
-                        Username = "qc",
-                        FullName = "Nguyễn Văn Hải",
-                        Email = "hai.qc@depotcontainer.vn",
-                        PasswordHash = defaultPasswordHash,
-                        IsActive = true
-                    },
-                    "QC_ENG"
-                ),
-                (
-                    new SystemUser
-                    {
-                        Username = "forklift",
-                        FullName = "Nguyễn Đức Tâm",
-                        Email = "tam.forklift@depotcontainer.vn",
-                        PasswordHash = defaultPasswordHash,
-                        IsActive = true
-                    },
-                    "FORKLIFT"
-                ),
-                (
-                    new SystemUser
-                    {
-                        Username = "cleaning",
-                        FullName = "Nguyễn Văn Hùng",
-                        Email = "hung.cleaning@depotcontainer.vn",
-                        PasswordHash = defaultPasswordHash,
-                        IsActive = true
-                    },
-                    "CLEANING"
-                )
-            };
-
-            foreach (var seed in defaultUsers)
-            {
-                var existingUser = await context.Users.FirstOrDefaultAsync(x => x.Username == seed.Item1.Username);
-                var role = await context.Roles.FirstOrDefaultAsync(x => x.RoleCode == seed.Item2);
-                if (role == null)
+                context.Users.Add(new SystemUser
                 {
-                    continue;
-                }
-
-                seed.Item1.RoleId = role.Id;
-                seed.Item1.Role = role;
-
-                if (existingUser == null)
-                {
-                    context.Users.Add(seed.Item1);
-                    continue;
-                }
-
-                existingUser.FullName = seed.Item1.FullName;
-                existingUser.Email = seed.Item1.Email;
-                existingUser.RoleId = role.Id;
-                existingUser.Role = role;
-                existingUser.IsActive = true;
-                if (string.IsNullOrWhiteSpace(existingUser.PasswordHash))
-                {
-                    existingUser.PasswordHash = seed.Item1.PasswordHash;
-                }
+                    Username = "admin",
+                    FullName = "Quản trị hệ thống",
+                    PasswordHash = PasswordHashHelper.HashPassword(defaultUserPassword),
+                    IsActive = true,
+                    RoleId = adminRole.Id,
+                    Role = adminRole
+                });
             }
+            else if (admin.RoleId == 0)
+            {
+                admin.RoleId = adminRole.Id;
+            }
+        }
+
+        /// <summary>
+        /// Danh mục báo giá (cấu trúc Maersk AEMS) — chỉ seed 2 bảng mã CHUẨN trước đây gõ cứng trong form báo giá:
+        /// TPI (O/U/T/W) và Cause. Damage/Repair code, Rep. loc, đơn giá giờ công, Mode để trống cho người dùng nhập.
+        /// Mã đã có (kể cả đã xoá) thì không seed lại để tôn trọng thao tác xoá của người dùng.
+        /// </summary>
+        private static async Task SeedEstimateCatalogsAsync(DepotDbContext context)
+        {
+            var seeds = new[]
+            {
+                new MasterCatalogItem { CatalogType = "EST_TPI", Code = "O", Name = "Owner", NameVi = "Chủ vỏ chịu", SortOrder = 1 },
+                new MasterCatalogItem { CatalogType = "EST_TPI", Code = "U", Name = "User", NameVi = "Người sử dụng chịu", SortOrder = 2 },
+                new MasterCatalogItem { CatalogType = "EST_TPI", Code = "T", Name = "Third Party", NameVi = "Bên thứ ba chịu", SortOrder = 3 },
+                new MasterCatalogItem { CatalogType = "EST_TPI", Code = "W", Name = "Wear and Tear", NameVi = "Hao mòn tự nhiên", SortOrder = 4 },
+                new MasterCatalogItem { CatalogType = "EST_CAUSE", Code = "WEAR_TEAR", Name = "Wear and Tear", NameVi = "Hao mòn tự nhiên", SortOrder = 1 },
+                new MasterCatalogItem { CatalogType = "EST_CAUSE", Code = "THIRD_PARTY", Name = "Third Party", NameVi = "Bên thứ ba gây ra", SortOrder = 2 },
+                new MasterCatalogItem { CatalogType = "EST_CAUSE", Code = "OWNER", Name = "Owner", NameVi = "Chủ vỏ", SortOrder = 3 },
+                new MasterCatalogItem { CatalogType = "EST_CAUSE", Code = "USER", Name = "User", NameVi = "Người sử dụng", SortOrder = 4 }
+            };
+            var existing = await context.MasterCatalogItems.IgnoreQueryFilters()
+                .Where(x => x.CatalogType == "EST_TPI" || x.CatalogType == "EST_CAUSE")
+                .Select(x => x.CatalogType + "|" + x.Code).ToListAsync();
+            var toAdd = seeds.Where(x => !existing.Contains(x.CatalogType + "|" + x.Code)).ToList();
+            if (toAdd.Count == 0) return;
+            foreach (var item in toAdd) { item.IsActive = true; item.JsonData = "{}"; }
+            context.MasterCatalogItems.AddRange(toAdd);
+            await context.SaveChangesAsync();
         }
 
         /// <summary>
@@ -573,6 +483,31 @@ namespace Depot.Data.EF
                 new MasterCatalogItem { CatalogType = "DEPARTMENT", Code = "YARD_OPS", Name = "Yard Operations", NameVi = "Điều Độ Bãi & Xe Nâng", JsonData = "{\"shortName\":\"ĐĐB\",\"managerName\":\"Nguyễn Đức Tâm\",\"managerPhone\":\"0908.555.666\",\"managerEmail\":\"yard.mgr@depotcontainer.vn\",\"location\":\"Trạm Điều Độ Bãi\",\"headcount\":10,\"primaryRole\":\"Tài Xế Xe Nâng\",\"primaryRoleCode\":\"FORKLIFT\",\"operatingHours\":\"06:00 - 22:00\",\"costCenter\":\"CC-YARD\",\"division\":\"OPERATIONS\",\"divisionName\":\"Khối Khai Thác\",\"tags\":[\"Yard 2D\",\"Forklift\"]}", SortOrder = 6 },
                 new MasterCatalogItem { CatalogType = "DEPARTMENT", Code = "ACCOUNTING", Name = "Accounting / Billing", NameVi = "Kế Toán & Công Nợ", JsonData = "{\"shortName\":\"KT\",\"managerName\":\"Phạm Thị Thu\",\"managerPhone\":\"0908.666.777\",\"managerEmail\":\"accounting.mgr@depotcontainer.vn\",\"location\":\"Văn Phòng Kế Toán\",\"headcount\":6,\"primaryRole\":\"Thu Ngân / Kế Toán\",\"primaryRoleCode\":\"CASHIER\",\"operatingHours\":\"08:00 - 17:00\",\"costCenter\":\"CC-ACC\",\"division\":\"FINANCE\",\"divisionName\":\"Khối Tài Chính\",\"tags\":[\"VietQR\",\"Công nợ AR\"]}", SortOrder = 7 },
                 new MasterCatalogItem { CatalogType = "DEPARTMENT", Code = "ADMIN", Name = "Administration / HR", NameVi = "Hành Chính - Nhân Sự", JsonData = "{\"shortName\":\"HCNS\",\"managerName\":\"Nguyễn Văn Hùng\",\"managerPhone\":\"0908.777.888\",\"managerEmail\":\"admin.mgr@depotcontainer.vn\",\"location\":\"Văn Phòng Điều Hành\",\"headcount\":3,\"primaryRole\":\"Quản Lý Tổng Depot\",\"primaryRoleCode\":\"ADMIN\",\"operatingHours\":\"08:00 - 17:00\",\"costCenter\":\"CC-ADM\",\"division\":\"ADMIN\",\"divisionName\":\"Khối Hành Chính\",\"tags\":[\"RBAC\",\"Nhân sự\"]}", SortOrder = 8 }
+            });
+
+            // ===== SURVEY_CHECKLIST / QC_CHECKLIST — vùng giám định IICL-6 và hạng mục nghiệm thu QC. Trước đây nằm
+            // cứng ở frontend (survey/mockData.ts, qc/data/defaultQCChecklist.ts); nay là danh mục DB, frontend đọc qua
+            // GET /api/MasterData/catalog/{type} (fontend/src/modules/masterdata/utils/checklistCatalog.ts).
+            catalogs.AddRange(new[]
+            {
+                new MasterCatalogItem { CatalogType = "SURVEY_CHECKLIST", Code = "ROOF", Name = "1. Nóc Container (Roof Panel & Bows)", NameVi = "1. Nóc Container (Roof Panel & Bows)", JsonData = "{\"defaultStatus\":\"PASS\"}", SortOrder = 1 },
+                new MasterCatalogItem { CatalogType = "SURVEY_CHECKLIST", Code = "FRONT_WALL", Name = "2. Vách Trước (Front Wall Panel)", NameVi = "2. Vách Trước (Front Wall Panel)", JsonData = "{\"defaultStatus\":\"PASS\"}", SortOrder = 2 },
+                new MasterCatalogItem { CatalogType = "SURVEY_CHECKLIST", Code = "LEFT_WALL", Name = "3. Vách Trái (Left Side Panel)", NameVi = "3. Vách Trái (Left Side Panel)", JsonData = "{\"defaultStatus\":\"PASS\"}", SortOrder = 3 },
+                new MasterCatalogItem { CatalogType = "SURVEY_CHECKLIST", Code = "RIGHT_WALL", Name = "4. Vách Phải (Right Side Panel)", NameVi = "4. Vách Phải (Right Side Panel)", JsonData = "{\"defaultStatus\":\"PASS\"}", SortOrder = 4 },
+                new MasterCatalogItem { CatalogType = "SURVEY_CHECKLIST", Code = "DOOR", Name = "5. Cửa & Khóa (Door, Gasket & Lock Rod)", NameVi = "5. Cửa & Khóa (Door, Gasket & Lock Rod)", JsonData = "{\"defaultStatus\":\"PASS\"}", SortOrder = 5 },
+                new MasterCatalogItem { CatalogType = "SURVEY_CHECKLIST", Code = "FLOOR", Name = "6. Sàn Gỗ (Wooden Floorboard)", NameVi = "6. Sàn Gỗ (Wooden Floorboard)", JsonData = "{\"defaultStatus\":\"PASS\"}", SortOrder = 6 },
+                new MasterCatalogItem { CatalogType = "SURVEY_CHECKLIST", Code = "FRAME", Name = "7. Khung Đỡ (Side Rails & Crossmembers)", NameVi = "7. Khung Đỡ (Side Rails & Crossmembers)", JsonData = "{\"defaultStatus\":\"PASS\"}", SortOrder = 7 },
+                new MasterCatalogItem { CatalogType = "SURVEY_CHECKLIST", Code = "CORNER_CASTING", Name = "8. Gù Góc & Trụ (Corner Castings & Posts)", NameVi = "8. Gù Góc & Trụ (Corner Castings & Posts)", JsonData = "{\"defaultStatus\":\"PASS\"}", SortOrder = 8 },
+                new MasterCatalogItem { CatalogType = "SURVEY_CHECKLIST", Code = "UNDERSTRUCTURE", Name = "9. Gầm Container (Understructure / Fork Pockets)", NameVi = "9. Gầm Container (Understructure / Fork Pockets)", JsonData = "{\"defaultStatus\":\"PASS\"}", SortOrder = 9 },
+                new MasterCatalogItem { CatalogType = "SURVEY_CHECKLIST", Code = "REEFER_UNIT", Name = "10. Thiết Bị Lạnh (Reefer Machinery & PTI)", NameVi = "10. Thiết Bị Lạnh (Reefer Machinery & PTI)", JsonData = "{\"defaultStatus\":\"NA\"}", SortOrder = 10 },
+                new MasterCatalogItem { CatalogType = "SURVEY_CHECKLIST", Code = "CLEANING", Name = "11. Tình Trạng Vệ Sinh (Cleaning Condition)", NameVi = "11. Tình Trạng Vệ Sinh (Cleaning Condition)", JsonData = "{\"defaultStatus\":\"PASS\"}", SortOrder = 11 },
+                new MasterCatalogItem { CatalogType = "QC_CHECKLIST", Code = "QC-01", Name = "1. Thử Kín Sáng Buồng Tối (Light Test In Closed Container)", NameVi = "1. Thử Kín Sáng Buồng Tối (Light Test In Closed Container)", Description = "Đóng kín 2 cánh cửa từ bên trong, không có bất kỳ tia sáng nào lọt qua nóc, vách, góc gù hay gioăng cửa.", JsonData = "{\"category\":\"LIGHT\"}", SortOrder = 1 },
+                new MasterCatalogItem { CatalogType = "QC_CHECKLIST", Code = "QC-02", Name = "2. Thử Kín Nước & Mối Hàn (Water Tightness & Weld Integrity)", NameVi = "2. Thử Kín Nước & Mối Hàn (Water Tightness & Weld Integrity)", Description = "Phun nước áp lực cao vào các mối hàn chắp vá và gioăng cửa. Không rò rỉ hoặc đọng nước vào khoang trong.", JsonData = "{\"category\":\"WATER\"}", SortOrder = 2 },
+                new MasterCatalogItem { CatalogType = "QC_CHECKLIST", Code = "QC-03", Name = "3. Kết Cấu Cơ Khí & Khung Gầm (Structural Geometry & Side Rails)", NameVi = "3. Kết Cấu Cơ Khí & Khung Gầm (Structural Geometry & Side Rails)", Description = "Xà dọc đáy, xà nóc, dầm ngang số 1-5 và góc gù đúc thẳng hàng theo dung sai IICL-6 (độ võng < 15mm).", JsonData = "{\"category\":\"STRUCTURE\"}", SortOrder = 3 },
+                new MasterCatalogItem { CatalogType = "QC_CHECKLIST", Code = "QC-04", Name = "4. Mặt Sàn Gỗ & Bắt Vít (Plywood Floor Flatness & Screws)", NameVi = "4. Mặt Sàn Gỗ & Bắt Vít (Plywood Floor Flatness & Screws)", Description = "Sàn gỗ Apitong 28mm phẳng nhẵn, vít bắt chìm dưới mặt sàn 2-3mm, trám keo polyurethane kín khít mép.", JsonData = "{\"category\":\"FLOOR\"}", SortOrder = 4 },
+                new MasterCatalogItem { CatalogType = "QC_CHECKLIST", Code = "QC-05", Name = "5. Xử Lý Bề Mặt & Độ Dày Màng Sơn (Surface Prep & Paint DFT)", NameVi = "5. Xử Lý Bề Mặt & Độ Dày Màng Sơn (Surface Prep & Paint DFT)", Description = "Mối hàn được mài nhẵn bavia, tẩy gỉ chuẩn Sa 2.5, sơn lót epoxy + sơn phủ đồng màu vỏ, DFT ≥ 80 µm.", JsonData = "{\"category\":\"PAINT\"}", SortOrder = 5 },
+                new MasterCatalogItem { CatalogType = "QC_CHECKLIST", Code = "QC-06", Name = "6. Cánh Cửa, Tay Khóa & Ron Đệm (Door Hardware & Rubber Gaskets)", NameVi = "6. Cánh Cửa, Tay Khóa & Ron Đệm (Door Hardware & Rubber Gaskets)", Description = "Bản lề trơn tru, tay khóa đóng mở nhẹ nhàng, chốt niêm phong hải quan nguyên vẹn, ron cao su đàn hồi tốt.", JsonData = "{\"category\":\"DOOR\"}", SortOrder = 6 },
+                new MasterCatalogItem { CatalogType = "QC_CHECKLIST", Code = "QC-07", Name = "7. Vệ Sinh & Khử Mùi Hóa Chất (Cleanliness & Odor-Free)", NameVi = "7. Vệ Sinh & Khử Mùi Hóa Chất (Cleanliness & Odor-Free)", Description = "Khoang trong khô ráo, quét sạch phoi sắt xỉ hàn, không có mùi dầu mỡ hóa chất độc hại, đạt chuẩn cấp hàng.", JsonData = "{\"category\":\"CLEANLINESS\"}", SortOrder = 7 },
             });
 
             // ===== CUSTOMER_CLASSIFICATION — 5 dòng seed cũ đã đủ, không cần bổ sung. =====
@@ -837,69 +772,6 @@ namespace Depot.Data.EF
             }
 
             await context.SaveChangesAsync();
-        }
-
-        private static async Task SeedSampleJobAsync(DepotDbContext context)
-        {
-            const string jobNo = "JOB-SEED-0001";
-            var job = await context.DepotJobs.FirstOrDefaultAsync(x => x.JobNo == jobNo);
-            if (job == null)
-            {
-                job = new DepotJob
-                {
-                    JobNo = jobNo, ContainerNo = "MSKU0000001", IsoSize = "40HC",
-                    ShippingLineId = await context.ShippingLines.Where(x => x.Code == "MAEU").Select(x => x.Id).FirstAsync(),
-                    ShippingLine = await context.ShippingLines.FirstAsync(x => x.Code == "MAEU"), TareWeightKg = 3820, MaxPayloadKg = 28680,
-                    Status = "ESTIMATING", GateInDate = DateTime.UtcNow.AddHours(-2),
-                    GateInEirNo = "EIR-IN-SEED-0001", BlockCode = "BLOCK_Q", Bay = 1, Row = 1, Tier = 1
-                };
-                job.AuditLogs.Add(new JobAuditLog
-                {
-                    DepotJobId = job.Id, JobNo = job.JobNo, Action = "SEED",
-                    User = "DbSeeder", Timestamp = DateTime.UtcNow, Details = "Du lieu mau development cho Survey/Estimate Queue"
-                });
-                context.DepotJobs.Add(job);
-                await context.SaveChangesAsync();
-            }
-
-            if (!await context.Surveys.AnyAsync(x => x.JobNo == job.JobNo))
-            {
-                var survey = new Survey
-                {
-                    DepotJobId = job.Id, JobNo = job.JobNo, SurveyorId = "SURVEYOR-SEED",
-                    SurveyorName = "Seed Surveyor", SurveyDate = DateTime.UtcNow.AddHours(-1), ConditionRating = "C",
-                    OverallNotes = "Du lieu mau de kiem thu luong giám định."
-                };
-                survey.Damages.Add(new DamageItem
-                {
-                    SurveyId = survey.Id, Component = "Door", LocationCode = "DR1",
-                    DamageCode = "DENT", DamageNameVi = "Mop", RepairCode = "STRAIGHTEN", RepairNameVi = "Nan",
-                    Quantity = 1, Unit = "vi tri", LaborHours = 1.5m, LaborRate = 150000, MaterialCost = 80000,
-                    TotalCost = 305000, Severity = "MEDIUM"
-                });
-                context.Surveys.Add(survey);
-                await context.SaveChangesAsync();
-            }
-
-            if (!await context.ServiceOrders.AnyAsync(x => x.DepotJobId == job.Id))
-            {
-                var serviceOrder = new ServiceOrder
-                {
-                    OrderNo = "SO-SEED-0001", DepotJobId = job.Id,
-                    ContainerNo = job.ContainerNo,
-                    CustomerName = "Seed Customer", DriverName = "Seed Driver", TruckPlate = "51C-SEED-01",
-                    Status = "ISSUED", PaymentStatus = "UNPAID", IssuedAt = DateTime.UtcNow
-                };
-                serviceOrder.Items.Add(new ServiceOrderItem
-                {
-                    ServiceCode = "LIFT_ON_OFF", ServiceName = "Nang ha container",
-                    Category = "LOLO", Quantity = 1, Unit = "Lan", UnitPrice = 420000,
-                    VatPercent = 8, Amount = 420000, VatAmount = 33600, Total = 453600
-                });
-                serviceOrder.Subtotal = 420000; serviceOrder.TotalVat = 33600; serviceOrder.GrandTotal = 453600;
-                context.ServiceOrders.Add(serviceOrder);
-                await context.SaveChangesAsync();
-            }
         }
     }
 }

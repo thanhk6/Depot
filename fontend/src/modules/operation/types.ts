@@ -87,3 +87,21 @@ export interface ServiceOrder {
   notes?: string;
   status: ServiceOrderStatus;
 }
+
+// 1 dòng biểu phí dùng trong phiếu dịch vụ — dựng từ ServiceTariffs / StorageTariffRules / CLEANING_TARIFF thật.
+export interface StandardTariffItem {
+  code: string;
+  name: string;
+  category: 'LOLO' | 'STORAGE' | 'CLEANING' | 'REEFER_POWER' | 'PTI' | 'YARD_SHIFT' | 'CUSTOMS' | 'EXTRA';
+  unit: string;
+  rates: {
+    '20DC': number;
+    '40DC': number;
+    '40HC': number;
+    '45HC': number;
+    '20RF': number;
+    '40HR': number;
+    'DEFAULT': number;
+  };
+  vatPercent: number;
+}

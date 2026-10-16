@@ -25,14 +25,14 @@ export const YardKPIHeader: React.FC<YardKPIHeaderProps> = ({
       {/* 1. Total Containers */}
       <div
         onClick={() => onFilterStatus && onFilterStatus('ALL')}
-        className="p-3.5 bg-slate-900/90 hover:bg-slate-850 border border-slate-800 rounded-2xl cursor-pointer transition flex flex-col justify-between group shadow-sm"
+        className="p-3.5 bg-white hover:bg-slate-850 border border-slate-200 rounded-2xl cursor-pointer transition flex flex-col justify-between group shadow-sm"
       >
-        <div className="flex items-center justify-between text-slate-400 mb-1">
+        <div className="flex items-center justify-between text-slate-500 mb-1">
           <span className="text-[11px] font-bold uppercase tracking-wider">Tổng Container</span>
-          <Boxes className="w-4 h-4 text-sky-400 group-hover:scale-110 transition" />
+          <Boxes className="w-4 h-4 text-sky-600 group-hover:scale-110 transition" />
         </div>
         <div className="flex items-baseline gap-1.5">
-          <span className="text-xl font-black font-mono text-white">
+          <span className="text-xl font-black font-mono text-slate-900">
             {statistics.totalContainers.toLocaleString()}
           </span>
           <span className="text-[10px] text-slate-500 font-mono">/ {statistics.totalCapacity} slot</span>
@@ -42,31 +42,31 @@ export const YardKPIHeader: React.FC<YardKPIHeaderProps> = ({
       {/* 2. Free Slots */}
       <div
         onClick={() => onFilterStatus && onFilterStatus('EMPTY_SLOT')}
-        className="p-3.5 bg-slate-900/90 hover:bg-slate-850 border border-slate-800 rounded-2xl cursor-pointer transition flex flex-col justify-between group shadow-sm"
+        className="p-3.5 bg-white hover:bg-slate-850 border border-slate-200 rounded-2xl cursor-pointer transition flex flex-col justify-between group shadow-sm"
       >
-        <div className="flex items-center justify-between text-slate-400 mb-1">
+        <div className="flex items-center justify-between text-slate-500 mb-1">
           <span className="text-[11px] font-bold uppercase tracking-wider">Vị Trí Trống</span>
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition" />
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition" />
         </div>
         <div className="flex items-baseline gap-1.5">
-          <span className="text-xl font-black font-mono text-emerald-400">
+          <span className="text-xl font-black font-mono text-emerald-600">
             {statistics.availableSlots.toLocaleString()}
           </span>
-          <span className="text-[10px] text-emerald-500/80 font-mono">Slot rỗi</span>
+          <span className="text-[10px] text-emerald-600 font-mono">Slot rỗi</span>
         </div>
       </div>
 
       {/* 3. Occupancy */}
-      <div className="p-3.5 bg-slate-900/90 border border-slate-800 rounded-2xl flex flex-col justify-between shadow-sm">
-        <div className="flex items-center justify-between text-slate-400 mb-1">
+      <div className="p-3.5 bg-white border border-slate-200 rounded-2xl flex flex-col justify-between shadow-sm">
+        <div className="flex items-center justify-between text-slate-500 mb-1">
           <span className="text-[11px] font-bold uppercase tracking-wider">Tỷ Lệ Lấp Đầy</span>
-          <Percent className="w-4 h-4 text-indigo-400" />
+          <Percent className="w-4 h-4 text-indigo-600" />
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xl font-black font-mono text-indigo-300">
+          <span className="text-xl font-black font-mono text-indigo-700">
             {statistics.occupancyRate}%
           </span>
-          <div className="flex-1 bg-slate-800 h-1.5 rounded-full overflow-hidden">
+          <div className="flex-1 bg-slate-100 h-1.5 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full ${
                 statistics.occupancyRate > 85
@@ -84,14 +84,14 @@ export const YardKPIHeader: React.FC<YardKPIHeaderProps> = ({
       {/* 4. Repair */}
       <div
         onClick={() => onFilterStatus && onFilterStatus('REPAIR')}
-        className="p-3.5 bg-slate-900/90 hover:bg-amber-950/30 border border-amber-900/40 rounded-2xl cursor-pointer transition flex flex-col justify-between group shadow-sm"
+        className="p-3.5 bg-white hover:bg-amber-50 border border-amber-200 rounded-2xl cursor-pointer transition flex flex-col justify-between group shadow-sm"
       >
-        <div className="flex items-center justify-between text-amber-300 mb-1">
+        <div className="flex items-center justify-between text-amber-700 mb-1">
           <span className="text-[11px] font-bold uppercase tracking-wider">Sửa Chữa EMR</span>
-          <Wrench className="w-4 h-4 text-amber-400 group-hover:scale-110 transition" />
+          <Wrench className="w-4 h-4 text-amber-600 group-hover:scale-110 transition" />
         </div>
         <div className="flex items-baseline gap-1.5">
-          <span className="text-xl font-black font-mono text-amber-300">
+          <span className="text-xl font-black font-mono text-amber-700">
             {statistics.repairCount}
           </span>
           <span className="text-[10px] text-amber-500 font-mono">Đang sửa</span>
@@ -101,14 +101,14 @@ export const YardKPIHeader: React.FC<YardKPIHeaderProps> = ({
       {/* 5. Cleaning */}
       <div
         onClick={() => onFilterStatus && onFilterStatus('CLEANING')}
-        className="p-3.5 bg-slate-900/90 hover:bg-orange-950/30 border border-orange-900/40 rounded-2xl cursor-pointer transition flex flex-col justify-between group shadow-sm"
+        className="p-3.5 bg-white hover:bg-orange-50 border border-orange-200 rounded-2xl cursor-pointer transition flex flex-col justify-between group shadow-sm"
       >
-        <div className="flex items-center justify-between text-orange-300 mb-1">
+        <div className="flex items-center justify-between text-orange-700 mb-1">
           <span className="text-[11px] font-bold uppercase tracking-wider">Vệ Sinh Rửa</span>
-          <Droplets className="w-4 h-4 text-orange-400 group-hover:scale-110 transition" />
+          <Droplets className="w-4 h-4 text-orange-600 group-hover:scale-110 transition" />
         </div>
         <div className="flex items-baseline gap-1.5">
-          <span className="text-xl font-black font-mono text-orange-300">
+          <span className="text-xl font-black font-mono text-orange-700">
             {statistics.cleaningCount}
           </span>
           <span className="text-[10px] text-orange-500 font-mono">Đang rửa</span>
@@ -118,14 +118,14 @@ export const YardKPIHeader: React.FC<YardKPIHeaderProps> = ({
       {/* 6. Hold */}
       <div
         onClick={() => onFilterStatus && onFilterStatus('HOLD')}
-        className="p-3.5 bg-slate-900/90 hover:bg-rose-950/30 border border-rose-900/40 rounded-2xl cursor-pointer transition flex flex-col justify-between group shadow-sm"
+        className="p-3.5 bg-white hover:bg-rose-50 border border-rose-200 rounded-2xl cursor-pointer transition flex flex-col justify-between group shadow-sm"
       >
-        <div className="flex items-center justify-between text-rose-300 mb-1">
+        <div className="flex items-center justify-between text-rose-700 mb-1">
           <span className="text-[11px] font-bold uppercase tracking-wider">Tạm Giữ (HOLD)</span>
-          <ShieldAlert className="w-4 h-4 text-rose-400 group-hover:scale-110 transition" />
+          <ShieldAlert className="w-4 h-4 text-rose-600 group-hover:scale-110 transition" />
         </div>
         <div className="flex items-baseline gap-1.5">
-          <span className="text-xl font-black font-mono text-rose-400">
+          <span className="text-xl font-black font-mono text-rose-600">
             {statistics.holdCount}
           </span>
           <span className="text-[10px] text-rose-500 font-mono">Bị khóa</span>
@@ -135,28 +135,28 @@ export const YardKPIHeader: React.FC<YardKPIHeaderProps> = ({
       {/* 7. Waiting Gate-Out */}
       <div
         onClick={() => onFilterStatus && onFilterStatus('WAITING_GATE_OUT')}
-        className="p-3.5 bg-slate-900/90 hover:bg-indigo-950/30 border border-indigo-900/40 rounded-2xl cursor-pointer transition flex flex-col justify-between group shadow-sm"
+        className="p-3.5 bg-white hover:bg-indigo-50 border border-indigo-200 rounded-2xl cursor-pointer transition flex flex-col justify-between group shadow-sm"
       >
-        <div className="flex items-center justify-between text-indigo-300 mb-1">
+        <div className="flex items-center justify-between text-indigo-700 mb-1">
           <span className="text-[11px] font-bold uppercase tracking-wider">Chờ Gate-Out</span>
-          <LogOut className="w-4 h-4 text-indigo-400 group-hover:scale-110 transition" />
+          <LogOut className="w-4 h-4 text-indigo-600 group-hover:scale-110 transition" />
         </div>
         <div className="flex items-baseline gap-1.5">
-          <span className="text-xl font-black font-mono text-indigo-300">
+          <span className="text-xl font-black font-mono text-indigo-700">
             {statistics.waitingGateOutCount}
           </span>
-          <span className="text-[10px] text-indigo-400 font-mono">Tại Staging</span>
+          <span className="text-[10px] text-indigo-600 font-mono">Tại Staging</span>
         </div>
       </div>
 
       {/* 8. Active Forklifts */}
-      <div className="p-3.5 bg-slate-900/90 border border-slate-800 rounded-2xl flex flex-col justify-between shadow-sm">
-        <div className="flex items-center justify-between text-slate-400 mb-1">
+      <div className="p-3.5 bg-white border border-slate-200 rounded-2xl flex flex-col justify-between shadow-sm">
+        <div className="flex items-center justify-between text-slate-500 mb-1">
           <span className="text-[11px] font-bold uppercase tracking-wider">Xe Nâng Hoạt Động</span>
-          <Truck className="w-4 h-4 text-yellow-400" />
+          <Truck className="w-4 h-4 text-yellow-600" />
         </div>
         <div className="flex items-baseline gap-1.5">
-          <span className="text-xl font-black font-mono text-yellow-400">
+          <span className="text-xl font-black font-mono text-yellow-600">
             {statistics.activeForklifts}
           </span>
           <span className="text-[10px] text-slate-500 font-mono">Xe sẵn sàng</span>

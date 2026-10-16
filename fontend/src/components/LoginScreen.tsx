@@ -24,21 +24,22 @@ interface LoginScreenProps {
 // `RoleType` (kiểu role mà DepotContext/menu Sidebar đang dùng) là 2 enum khác nhau có sẵn từ trước
 // trong codebase — không phải lỗi mới, chỉ cần map qua lại để hiển thị đúng menu/màu sắc theo vai trò
 // thật của tài khoản vừa đăng nhập.
+// Khoá là đúng 10 RoleCode backend trả về (DbSeeder.SeedRolesAsync). Trước đây dùng mã cũ (GATE_IN, REPAIR_TECH,
+// QC_INSPECTOR...) nên GATE_OP/TECHNICIAN/QC_ENG/FORKLIFT/CLEANING/CARRIER đều rơi về mặc định DEPOT_MANAGER —
+// nhãn vai trò hiện "Admin" và chức danh "Giám Đốc" cho mọi người. Vai trò lạ không được quy về quản lý.
 const mapSystemRoleToRoleType = (role: string): RoleType => {
-  switch (role) {
-    case 'ADMIN': return 'ADMIN';
-    case 'DEPOT_MANAGER': return 'DEPOT_MANAGER';
-    case 'GATE_IN': return 'OPERATOR';
-    case 'GATE_OUT': return 'OPERATOR';
+  switch ((role || '').toUpperCase()) {
+    case 'ADMIN': return 'DEPOT_MANAGER';
+    case 'GATE_OP': return 'OPERATOR';
     case 'SURVEYOR': return 'SURVEYOR';
     case 'ESTIMATOR': return 'ESTIMATOR';
-    case 'REPAIR_TECH': return 'REPAIR_TECH';
-    case 'QC_INSPECTOR': return 'QC_INSPECTOR';
-    case 'YARD_OPERATOR': return 'CLEANING_STAFF';
-    case 'FORKLIFT_DRIVER': return 'FORKLIFT_DRIVER';
+    case 'TECHNICIAN': return 'REPAIR_TECH';
+    case 'QC_ENG': return 'QC_INSPECTOR';
+    case 'CLEANING': return 'CLEANING_STAFF';
+    case 'FORKLIFT': return 'FORKLIFT_DRIVER';
     case 'CASHIER': return 'ACCOUNTANT';
-    case 'SHIPPING_LINE': return 'SHIPPING_LINE';
-    default: return 'DEPOT_MANAGER';
+    case 'CARRIER': return 'SHIPPING_LINE';
+    default: return 'OPERATOR';
   }
 };
 

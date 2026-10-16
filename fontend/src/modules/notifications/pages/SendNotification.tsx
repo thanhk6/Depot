@@ -53,20 +53,21 @@ export const SendNotification: React.FC<SendNotificationProps> = ({
   const [customContent, setCustomContent] = useState('');
 
   // Variables state for parameter injection
+  // Giá trị biến để người gửi tự nhập — trước đây điền sẵn container/tài xế/báo giá bịa.
   const [variablesState, setVariablesState] = useState<Record<string, string>>({
-    '{{ContainerNumber}}': 'MSKU1234567',
-    '{{CustomerName}}': 'MAERSK LINE VIỆT NAM',
-    '{{ContainerSize}}': '40HC',
-    '{{GateInTime}}': '16:30 17/08/2026',
-    '{{YardLocation}}': 'Block A-04-02',
-    '{{LicensePlate}}': '51C-889.22',
-    '{{DriverName}}': 'Nguyễn Văn Hùng',
-    '{{DriverPhone}}': '0912112233',
-    '{{WorkOrderNo}}': 'WO-2026-00125',
-    '{{EstimateNo}}': 'EST-2026-0842',
-    '{{Amount}}': '4,550,000',
-    '{{Status}}': 'SẴN SÀNG',
-    '{{InspectorName}}': 'Nguyễn Văn An'
+    '{{ContainerNumber}}': '',
+    '{{CustomerName}}': '',
+    '{{ContainerSize}}': '',
+    '{{GateInTime}}': '',
+    '{{YardLocation}}': '',
+    '{{LicensePlate}}': '',
+    '{{DriverName}}': '',
+    '{{DriverPhone}}': '',
+    '{{WorkOrderNo}}': '',
+    '{{EstimateNo}}': '',
+    '{{Amount}}': '',
+    '{{Status}}': '',
+    '{{InspectorName}}': ''
   });
 
   // UI state
@@ -211,24 +212,24 @@ export const SendNotification: React.FC<SendNotificationProps> = ({
       )}
 
       {/* Page Title & Channel Bar */}
-      <div className="p-5 rounded-3xl bg-[#0b132b] border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
+      <div className="p-5 rounded-3xl bg-[#0b132b] border border-slate-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
         <div>
-          <h2 className="text-lg font-black text-white flex items-center gap-2">
-            <Send className="w-5 h-5 text-emerald-400" />
+          <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+            <Send className="w-5 h-5 text-emerald-600" />
             <span>GỬI THÔNG BÁO ZALO & HỆ THỐNG</span>
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 mt-0.5">
             Tạo và phát thông báo tức thì đến Nhân viên kỹ thuật hoặc Khách hàng hãng tàu
           </p>
         </div>
 
         {/* Channel Switcher */}
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-slate-300">Kênh Gửi:</span>
+          <span className="text-xs font-bold text-slate-700">Kênh Gửi:</span>
           <select
             value={channel}
             onChange={(e) => setChannel(e.target.value as NotificationChannel)}
-            className="px-3.5 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs font-bold text-sky-400 focus:outline-none focus:border-blue-500 cursor-pointer shadow"
+            className="px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-sky-600 focus:outline-none focus:border-blue-500 cursor-pointer shadow"
           >
             <option value="ZALO_OA">🟢 Zalo Official Account (OA)</option>
             <option value="ZALO_ZNS">🔵 Zalo ZNS Template (CSKH)</option>
@@ -266,13 +267,13 @@ export const SendNotification: React.FC<SendNotificationProps> = ({
           />
 
           {/* Action Buttons Bar */}
-          <div className="p-4 rounded-2xl bg-[#0b132b] border border-slate-800 flex items-center justify-between gap-2 shadow-xl">
+          <div className="p-4 rounded-2xl bg-[#0b132b] border border-slate-200 flex items-center justify-between gap-2 shadow-xl">
             <button
               type="button"
               onClick={() => {
                 alert('Đã lưu bản nháp thông báo vào bộ nhớ tạm.');
               }}
-              className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+              className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
             >
               <Save className="w-3.5 h-3.5" />
               <span>Lưu Nháp</span>
@@ -282,7 +283,7 @@ export const SendNotification: React.FC<SendNotificationProps> = ({
               type="button"
               onClick={handleSend}
               disabled={sending || selectedRecipientIds.length === 0}
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 text-white font-extrabold text-xs flex items-center gap-2 transition cursor-pointer shadow-lg shadow-emerald-600/30 active:scale-95"
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 text-white font-extrabold text-xs flex items-center gap-2 transition cursor-pointer shadow-lg  active:scale-95"
             >
               <Send className="w-4 h-4" />
               <span>{sending ? 'Đang Gửi...' : `Gửi Thông Báo (${selectedRecipientIds.length})`}</span>
@@ -293,11 +294,11 @@ export const SendNotification: React.FC<SendNotificationProps> = ({
         {/* Column 3: Live Smartphone Preview (4 Cols) */}
         <div className="lg:col-span-4 sticky top-6">
           <div className="mb-2 flex items-center justify-between">
-            <span className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-              <Smartphone className="w-4 h-4 text-sky-400" />
+            <span className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+              <Smartphone className="w-4 h-4 text-sky-600" />
               <span>Xem Trước Màn Hình Điện Thoại</span>
             </span>
-            <span className="text-[10px] text-emerald-400 font-bold">Live Zalo Preview</span>
+            <span className="text-[10px] text-emerald-600 font-bold">Live Zalo Preview</span>
           </div>
 
           <MessagePreview

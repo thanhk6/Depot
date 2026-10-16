@@ -8,9 +8,7 @@ import {
   Trash2,
   CheckCircle2,
   XCircle,
-  AlertTriangle,
-  Layers,
-  BookOpen
+  AlertTriangle
 } from 'lucide-react';
 
 interface DamageCodeMasterProps {

@@ -7,6 +7,7 @@ using Depot.Data.EF;
 using Depot.Data.Entities.Cleaning;
 using Depot.Data.Entities.Depot;
 using Depot.Data.Entities.Finance;
+using Depot.Data.Entities.Storage;
 using Depot.Data.Entities.System;
 using Depot.ViewModels;
 
@@ -26,25 +27,9 @@ namespace Depot.Application.Services
         }
 
         /// <summary>Đọc danh sách hồ sơ kèm Survey, Estimate, Repair, Payment và audit để phục vụ màn hình chi tiết.</summary>
-        public async Task<List<DepotJob>> GetAllJobsAsync(DepotJobFilterRequest? filter = null)
+        public async Task<List<DepotJobDto>> GetAllJobsAsync(DepotJobFilterRequest? filter = null)
         {
-            var query = _db.DepotJobs
-                .Include(j => j.ShippingLine)
-                .Include(j => j.Survey)
-                    .ThenInclude(s => s!.Damages)
-                .Include(j => j.Survey)
-                    .ThenInclude(s => s!.CleaningItems)
-                .Include(j => j.Survey)
-                    .ThenInclude(s => s!.ChecklistItems)
-                .Include(j => j.Survey)
-                    .ThenInclude(s => s!.Photos)
-                .Include(j => j.Estimate)
-                    .ThenInclude(e => e!.Items)
-                .Include(j => j.RepairOrder)
-                .Include(j => j.Payment)
-                .Include(j => j.AuditLogs)
-                .AsSplitQuery()
-                .AsQueryable();
+            var query = _db.DepotJobs.AsQueryable();
 
             if (filter != null)
             {
@@ -56,7 +41,11 @@ namespace Depot.Application.Services
 
                 if (!string.IsNullOrWhiteSpace(filter.ShippingLine))
                 {
-                    query = query.Where(j => j.ShippingLine != null && j.ShippingLine.Code == filter.ShippingLine);
+                    var shippingLineId = await _db.ShippingLines
+                        .Where(s => s.Code == filter.ShippingLine)
+                        .Select(s => (long?)s.Id)
+                        .FirstOrDefaultAsync();
+                    query = query.Where(j => shippingLineId != null && j.ShippingLineId == shippingLineId);
                 }
 
                 if (!string.IsNullOrWhiteSpace(filter.Status))
@@ -75,64 +64,202 @@ namespace Depot.Application.Services
                 }
             }
 
-            return await query.OrderByDescending(j => j.GateInDate).ToListAsync();
+            // BUG-034: hỗ trợ phân trang phía server (tuỳ chọn) — danh sách đầy đủ kèm survey/estimate/audit lồng nhau
+            // tăng tuyến tính theo số hồ sơ.
+            var ordered = query.OrderByDescending(j => j.GateInDate).ThenByDescending(j => j.Id);
+            if (filter?.Page is > 0 && filter.PageSize is > 0)
+            {
+                filter.TotalCount = await ordered.CountAsync();
+                var size = Math.Min(filter.PageSize.Value, 500);
+                var paged = await ordered.Skip((filter.Page.Value - 1) * size).Take(size).ToListAsync();
+                return await MapToDtosAsync(paged);
+            }
+            var jobs = await ordered.ToListAsync();
+            if (filter != null) filter.TotalCount = jobs.Count;
+            return await MapToDtosAsync(jobs);
         }
 
         /// <summary>Tra cứu theo khóa chính; trả null để Controller phản hồi 404.</summary>
-        public async Task<DepotJob?> GetJobByIdAsync(long id)
+        public async Task<DepotJobDto?> GetJobByIdAsync(long id)
         {
-            return await _db.DepotJobs
-                .Include(j => j.ShippingLine)
-                .Include(j => j.Survey)
-                    .ThenInclude(s => s!.Damages)
-                .Include(j => j.Survey)
-                    .ThenInclude(s => s!.CleaningItems)
-                .Include(j => j.Survey)
-                    .ThenInclude(s => s!.ChecklistItems)
-                .Include(j => j.Survey)
-                    .ThenInclude(s => s!.Photos)
-                .Include(j => j.Estimate)
-                    .ThenInclude(e => e!.Items)
-                .Include(j => j.RepairOrder)
-                .Include(j => j.Payment)
-                .Include(j => j.AuditLogs)
-                .AsSplitQuery()
-                .FirstOrDefaultAsync(j => j.Id == id);
+            var job = await _db.DepotJobs.FirstOrDefaultAsync(j => j.Id == id);
+            if (job == null) return null;
+            return (await MapToDtosAsync(new List<DepotJob> { job })).FirstOrDefault();
         }
 
         /// <summary>Tra cứu theo số container, dùng cho cổng và tìm kiếm vận hành.</summary>
-        public async Task<DepotJob?> GetJobByContainerNoAsync(string containerNo)
+        public async Task<DepotJobDto?> GetJobByContainerNoAsync(string containerNo)
         {
             var upper = containerNo.Trim().ToUpper();
-            return await _db.DepotJobs
-                .Include(j => j.ShippingLine)
-                .Include(j => j.Survey)
-                    .ThenInclude(s => s!.Damages)
-                .Include(j => j.Survey)
-                    .ThenInclude(s => s!.CleaningItems)
-                .Include(j => j.Survey)
-                    .ThenInclude(s => s!.ChecklistItems)
-                .Include(j => j.Survey)
-                    .ThenInclude(s => s!.Photos)
-                .Include(j => j.Estimate)
-                    .ThenInclude(e => e!.Items)
-                .Include(j => j.RepairOrder)
-                .Include(j => j.Payment)
-                .Include(j => j.AuditLogs)
-                .AsSplitQuery()
-                .FirstOrDefaultAsync(j => j.ContainerNo == upper);
+            var job = await _db.DepotJobs.FirstOrDefaultAsync(j => j.ContainerNo == upper);
+            if (job == null) return null;
+            return (await MapToDtosAsync(new List<DepotJob> { job })).FirstOrDefault();
         }
 
-        public async Task<List<DepotJobHistoryDto>> GetHistoryAsync(long jobId)
+        /// <summary>Map 1 lô DepotJob sang DTO phẳng — không còn navigation property nên tự query rời từng
+        /// bảng con theo FK (DepotJobId/SurveyId/EstimateId) rồi gộp lại trong bộ nhớ, hiệu năng tương đương
+        /// AsSplitQuery() cũ (đều là nhiều round-trip SQL riêng thay vì 1 JOIN khổng lồ).</summary>
+        private static List<string> ParsePhotoUrls(string? json)
         {
-            return await _db.DepotJobs
-                .Where(j => j.Id == jobId)
-                .SelectMany(j => j.AuditLogs.Select(log => new DepotJobHistoryDto
+            if (string.IsNullOrWhiteSpace(json)) return new List<string>();
+            try { return System.Text.Json.JsonSerializer.Deserialize<List<string>>(json) ?? new List<string>(); }
+            catch (System.Text.Json.JsonException) { return new List<string>(); }
+        }
+
+        private async Task<List<DepotJobDto>> MapToDtosAsync(List<DepotJob> jobs)
+        {
+            var jobIds = jobs.Select(j => j.Id).ToList();
+            var shippingLineIds = jobs.Select(j => j.ShippingLineId).Distinct().ToList();
+
+            var shippingLineCodes = await _db.ShippingLines
+                .Where(s => shippingLineIds.Contains(s.Id))
+                .ToDictionaryAsync(s => s.Id, s => s.Code);
+
+            var surveys = await _db.Surveys.Where(s => jobIds.Contains(s.DepotJobId)).ToListAsync();
+            var surveyIds = surveys.Select(s => s.Id).ToList();
+            var damages = await _db.Set<DamageItem>().Where(d => surveyIds.Contains(d.SurveyId)).ToListAsync();
+            var cleaningItems = await _db.Set<SurveyCleaningItem>().Where(c => surveyIds.Contains(c.SurveyId)).ToListAsync();
+            var checklistItems = await _db.Set<SurveyChecklistItem>().Where(c => surveyIds.Contains(c.SurveyId)).ToListAsync();
+            var photos = await _db.Set<SurveyPhotoItem>().Where(p => surveyIds.Contains(p.SurveyId)).ToListAsync();
+
+            var estimates = await _db.Estimates.Where(e => jobIds.Contains(e.DepotJobId)).ToListAsync();
+            var estimateIds = estimates.Select(e => e.Id).ToList();
+            var estimateItems = await _db.Set<EstimateItem>().Where(i => estimateIds.Contains(i.EstimateId)).ToListAsync();
+
+            var repairOrders = await _db.RepairOrders.Where(r => jobIds.Contains(r.DepotJobId)).ToListAsync();
+            var payments = await _db.Payments.Where(p => jobIds.Contains(p.DepotJobId)).ToListAsync();
+            var auditLogs = await _db.AuditLogs.Where(a => jobIds.Contains(a.DepotJobId)).ToListAsync();
+
+            return jobs.Select(j =>
+            {
+                var survey = surveys.FirstOrDefault(s => s.DepotJobId == j.Id);
+                var estimate = estimates.FirstOrDefault(e => e.DepotJobId == j.Id);
+                var repairOrder = repairOrders.FirstOrDefault(r => r.DepotJobId == j.Id);
+                var payment = payments.FirstOrDefault(p => p.DepotJobId == j.Id);
+
+                return new DepotJobDto
                 {
-                    JobNo = j.JobNo, ContainerNo = j.ContainerNo, Action = log.Action,
+                    Id = j.Id, JobNo = j.JobNo, ContainerNo = j.ContainerNo, IsoSize = j.IsoSize,
+                    ShippingLineId = j.ShippingLineId,
+                    ShippingLineCode = shippingLineCodes.TryGetValue(j.ShippingLineId, out var code) ? code : null,
+                    TareWeightKg = j.TareWeightKg, MaxPayloadKg = j.MaxPayloadKg, Status = j.Status,
+                    GateInDate = j.GateInDate, GateOutDate = j.GateOutDate,
+                    GateOutTruckPlate = j.GateOutTruckPlate, GateOutDriverName = j.GateOutDriverName,
+                    GateOutTrailerPlate = j.GateOutTrailerPlate, GateOutSealNo = j.GateOutSealNo,
+                    GateInEirNo = j.GateInEirNo, GateOutEirNo = j.GateOutEirNo,
+                    GateInTruckPlate = j.GateInTruckPlate, GateInTrailerPlate = j.GateInTrailerPlate,
+                    GateInDriverName = j.GateInDriverName, GateInDriverPhone = j.GateInDriverPhone,
+                    GateInSealNo = j.GateInSealNo, GateInBookingNo = j.GateInBookingNo,
+                    GateInDriverLicense = j.GateInDriverLicense, GateInCustomsSealNo = j.GateInCustomsSealNo,
+                    GateInTruckingCompany = j.GateInTruckingCompany, GateInRemarks = j.GateInRemarks,
+                    GateInStaffId = j.GateInStaffId, GateInStaffName = j.GateInStaffName,
+                    SurveyClaimedByStaffId = j.SurveyClaimedByStaffId, SurveyClaimedByName = j.SurveyClaimedByName,
+                    SurveyClaimedAt = j.SurveyClaimedAt,
+                    ForkliftClaimedByOperatorId = j.ForkliftClaimedByOperatorId, ForkliftClaimedByOperatorName = j.ForkliftClaimedByOperatorName,
+                    ForkliftAssignedVehicleCode = j.ForkliftAssignedVehicleCode, ForkliftClaimedAt = j.ForkliftClaimedAt, ForkliftStartedAt = j.ForkliftStartedAt,
+                    BlockCode = j.BlockCode, Bay = j.Bay, Row = j.Row, Tier = j.Tier,
+                    CreatedAt = j.CreatedAt,
+                    Survey = survey == null ? null : new SurveyDto
+                    {
+                        Id = survey.Id, CreatedAt = survey.CreatedAt, DepotJobId = survey.DepotJobId, JobNo = survey.JobNo,
+                        SurveyorId = survey.SurveyorId, SurveyorName = survey.SurveyorName, SurveyDate = survey.SurveyDate,
+                        ConditionRating = survey.ConditionRating, OverallNotes = survey.OverallNotes,
+                        CleaningReason = survey.CleaningReason, CleaningMethod = survey.CleaningMethod, CleaningRemarks = survey.CleaningRemarks,
+                        SurveyNo = survey.SurveyNo, Owner = survey.Owner, ContainerTypeName = survey.ContainerTypeName,
+                        ManufactureMonthYear = survey.ManufactureMonthYear, MaxGrossWeightKg = survey.MaxGrossWeightKg,
+                        Material = survey.Material, FloorType = survey.FloorType, CscPlateNo = survey.CscPlateNo,
+                        Standard = survey.Standard, StandardNotes = survey.StandardNotes, QualityGrade = survey.QualityGrade,
+                        ActionRequired = survey.ActionRequired, Shift = survey.Shift, YardLocationNote = survey.YardLocationNote,
+                        CargoStatus = survey.CargoStatus, ReeferBrand = survey.ReeferBrand, ReeferModel = survey.ReeferModel,
+                        ReeferSetTemperatureC = survey.ReeferSetTemperatureC, PtiStatus = survey.PtiStatus,
+                        CompressorHours = survey.CompressorHours, HumidityPercent = survey.HumidityPercent, VentilationCmh = survey.VentilationCmh,
+                        Damages = damages.Where(d => d.SurveyId == survey.Id).Select(d => new DamageItemDto
+                        {
+                            Id = d.Id, Component = d.Component, DamageCode = d.DamageCode, DamageNameVi = d.DamageNameVi,
+                            LocationCode = d.LocationCode, RepairCode = d.RepairCode, RepairNameVi = d.RepairNameVi,
+                            Quantity = d.Quantity, Unit = d.Unit, LaborHours = d.LaborHours, LaborRate = d.LaborRate,
+                            MaterialCost = d.MaterialCost, TotalCost = d.TotalCost, Severity = d.Severity, Notes = d.Notes,
+                            LengthMm = d.LengthMm, WidthMm = d.WidthMm, PhotoUrl = d.PhotoUrl
+                        }).ToList(),
+                        CleaningItems = cleaningItems.Where(c => c.SurveyId == survey.Id).Select(c => new SurveyCleaningItemDto
+                        {
+                            Id = c.Id, CleaningCode = c.CleaningCode, CleaningName = c.CleaningName, Category = c.Category,
+                            ChemicalRequired = c.ChemicalRequired, ChemicalName = c.ChemicalName, Quantity = c.Quantity,
+                            UnitPrice = c.UnitPrice, TotalPrice = c.TotalPrice, ResponsibleParty = c.ResponsibleParty,
+                            Status = c.Status, Notes = c.Notes, WasherName = c.WasherName, CompletedAt = c.CompletedAt
+                        }).ToList(),
+                        ChecklistItems = checklistItems.Where(c => c.SurveyId == survey.Id).Select(c => new SurveyChecklistItemDto
+                        {
+                            Id = c.Id, ZoneKey = c.ZoneKey, ZoneName = c.ZoneName, Status = c.Status,
+                            Notes = c.Notes, DamageCount = c.DamageCount
+                        }).ToList(),
+                        Photos = photos.Where(p => p.SurveyId == survey.Id).Select(p => new SurveyPhotoItemDto
+                        {
+                            Id = p.Id, Url = p.Url, Type = p.Type, Caption = p.Caption, SurveyorName = p.SurveyorName,
+                            UploadedAt = p.UploadedAt, FileSizeKb = p.FileSizeKb
+                        }).ToList()
+                    },
+                    Estimate = estimate == null ? null : new EstimateDto
+                    {
+                        Id = estimate.Id, CreatedAt = estimate.CreatedAt, CreatedBy = estimate.CreatedBy,
+                        LastModifiedAt = estimate.LastModifiedAt, LastModifiedBy = estimate.LastModifiedBy, Notes = estimate.Notes,
+                        LaborRate = estimate.LaborRate, TotalManHours = estimate.TotalManHours, RepairMode = estimate.RepairMode, Cause = estimate.Cause,
+                        ShopCode = estimate.ShopCode, VendorRefNo = estimate.VendorRefNo, PreparationHours = estimate.PreparationHours,
+                        OrdinaryHours = estimate.OrdinaryHours, Ot1Hours = estimate.Ot1Hours, Ot2Hours = estimate.Ot2Hours, Ot3Hours = estimate.Ot3Hours,
+                        SurveyReference = estimate.SurveyReference, InspectionPhotos = ParsePhotoUrls(estimate.InspectionPhotoUrlsJson),
+                        ConfirmedAt = estimate.ConfirmedAt, ConfirmedBy = estimate.ConfirmedBy,
+                        CarrierWorkOrderNo = estimate.CarrierWorkOrderNo, CarrierAuthCode = estimate.CarrierAuthCode,
+                        CarrierApproverName = estimate.CarrierApproverName, ApprovedAmount = estimate.ApprovedAmount,
+                        ApprovalChannel = estimate.ApprovalChannel, ApprovalNotes = estimate.ApprovalNotes, DepotJobId = estimate.DepotJobId, JobNo = estimate.JobNo, EstimateNo = estimate.EstimateNo,
+                        TotalLaborCost = estimate.TotalLaborCost, TotalMaterialCost = estimate.TotalMaterialCost,
+                        TotalTax = estimate.TotalTax, GrandTotal = estimate.GrandTotal, Currency = estimate.Currency,
+                        Status = estimate.Status, ApprovedAt = estimate.ApprovedAt, ApprovedBy = estimate.ApprovedBy,
+                        Items = estimateItems.Where(i => i.EstimateId == estimate.Id).Select(i => new EstimateItemDto
+                        {
+                            Id = i.Id, ItemDescription = i.ItemDescription,
+                            LocationCode = i.LocationCode, LocationName = i.LocationName, DamageCode = i.DamageCode, DamageName = i.DamageName,
+                            RepairCode = i.RepairCode, RepairMethod = i.RepairMethod, Unit = i.Unit, VatPercent = i.VatPercent,
+                            Tpi = i.Tpi, ManHoursPerPiece = i.ManHoursPerPiece,
+                            Quantity = i.Quantity, UnitPrice = i.UnitPrice, Amount = i.Amount
+                        }).ToList()
+                    },
+                    RepairOrder = repairOrder == null ? null : new RepairOrderDto
+                    {
+                        Id = repairOrder.Id, CreatedAt = repairOrder.CreatedAt, DepotJobId = repairOrder.DepotJobId, JobNo = repairOrder.JobNo,
+                        TechnicianId = repairOrder.TechnicianId, TechnicianName = repairOrder.TechnicianName,
+                        StartedAt = repairOrder.StartedAt, CompletedAt = repairOrder.CompletedAt,
+                        QcStatus = repairOrder.QcStatus, QcNotes = repairOrder.QcNotes, InspectorName = repairOrder.InspectorName
+                    },
+                    Payment = payment == null ? null : new PaymentDto
+                    {
+                        Id = payment.Id, CreatedAt = payment.CreatedAt, DepotJobId = payment.DepotJobId, InvoiceNo = payment.InvoiceNo, Amount = payment.Amount,
+                        Tax = payment.Tax, TotalAmount = payment.TotalAmount, Status = payment.Status, PaidAt = payment.PaidAt,
+                        PaymentMethod = payment.PaymentMethod, CashierName = payment.CashierName
+                    },
+                    AuditLogs = auditLogs.Where(a => a.DepotJobId == j.Id).OrderByDescending(a => a.Timestamp).Select(a => new JobAuditLogDto
+                    {
+                        Id = a.Id, DepotJobId = a.DepotJobId, JobNo = a.JobNo, Action = a.Action, User = a.User,
+                        Timestamp = a.Timestamp, Details = a.Details
+                    }).ToList()
+                };
+            }).ToList();
+        }
+
+        // null = hồ sơ không tồn tại (controller trả 404) — trước đây trả 200 danh sách rỗng (BUG-029).
+        public async Task<List<DepotJobHistoryDto>?> GetHistoryAsync(long jobId)
+        {
+            var job = await _db.DepotJobs.Where(j => j.Id == jobId).Select(j => new { j.JobNo, j.ContainerNo }).FirstOrDefaultAsync();
+            if (job == null) return null;
+            var jobNo = job.JobNo;
+            var containerNo = job.ContainerNo;
+            return await _db.AuditLogs
+                .Where(log => log.DepotJobId == jobId)
+                .OrderByDescending(log => log.Timestamp)
+                .Select(log => new DepotJobHistoryDto
+                {
+                    JobNo = jobNo ?? log.JobNo, ContainerNo = containerNo ?? string.Empty, Action = log.Action,
                     User = log.User, Timestamp = log.Timestamp, Details = log.Details
-                }))
-                .OrderByDescending(x => x.Timestamp)
+                })
                 .ToListAsync();
         }
 
@@ -147,14 +274,39 @@ namespace Depot.Application.Services
             return true;
         }
 
-            public async Task<bool> UpdateJobStatusAsync(long jobId, UpdateJobStatusRequest request)
+            public async Task<bool> UpdateJobStatusAsync(long jobId, UpdateJobStatusRequest request, string? actor = null)
             {
                 var allowed = new[] { "SURVEYING", "CLEANING", "PAYMENT_PENDING", "WAITING_FORKLIFT", "REPAIRING", "READY_FOR_OUT", "IN_YARD", "CANCELLED" };
                 if (!allowed.Contains(request.Status)) return false;
                 var job = await _db.DepotJobs.FirstOrDefaultAsync(x => x.Id == jobId);
                 if (job == null) return false;
+
+                // Hồ sơ đã Gate-Out là vòng đời đã đóng — đưa container vào lại bãi phải Gate-In hồ sơ mới.
+                if (job.Status == "GATE_OUT")
+                    throw new ArgumentException("Hồ sơ đã Gate-Out, không đổi trạng thái được. Container vào lại bãi phải Gate-In hồ sơ mới.");
+
+                // Trước đây cho phép set thẳng bất kỳ trạng thái nào trong whitelist mà không kiểm tra
+                // điều kiện tiên quyết — 1 job đang REPAIRING/QC_PENDING (QC chưa đạt) có thể bị set thẳng
+                // "READY_FOR_OUT" qua endpoint chung này, bỏ qua hoàn toàn CompleteQcInspectionAsync, rồi
+                // Gate-Out bình thường theo đúng Status. Chặn đúng con đường vòng này: nếu job có
+                // RepairOrder (đã đi qua nhánh sửa chữa) mà QC chưa đạt, không cho set thẳng READY_FOR_OUT
+                // qua endpoint này — container không qua nhánh sửa chữa (AV/CL) không có RepairOrder nào
+                // nên không bị ảnh hưởng, vẫn set được bình thường như trước.
+                // Container chưa từng giám định cũng không có RepairOrder nên lọt qua kiểm tra trên — trước đây set
+                // thẳng SURVEYING → READY_FOR_OUT rồi Gate-Out được container chưa giám định (BUG-003).
+                if (request.Status == "READY_FOR_OUT")
+                {
+                    if (!await _db.Surveys.AnyAsync(s => s.DepotJobId == job.Id))
+                        throw new ArgumentException("Container chưa có phiếu giám định — không thể chuyển sang Sẵn sàng xuất.");
+                    var hasUnqualifiedRepair = await _db.RepairOrders.AnyAsync(r => r.DepotJobId == job.Id && r.QcStatus != "PASSED");
+                    if (hasUnqualifiedRepair)
+                        throw new ArgumentException("Container còn lệnh sửa chữa chưa qua QC đạt — không thể chuyển sang Sẵn sàng xuất.");
+                }
+
+                var fromStatus = job.Status;
                 job.Status = request.Status;
-                _db.AuditLogs.Add(CreateAudit(job.JobNo, job.Id, "STATUS_UPDATED", "Container UI", $"Đổi trạng thái sang {request.Status}."));
+                _db.AuditLogs.Add(CreateAudit(job.JobNo, job.Id, "STATUS_UPDATED", string.IsNullOrWhiteSpace(actor) ? "Container UI" : actor,
+                    $"Đổi trạng thái thủ công {fromStatus} → {request.Status}."));
                 await _db.SaveChangesAsync();
                 return true;
             }
@@ -163,6 +315,17 @@ namespace Depot.Application.Services
         public async Task<DepotJob> CreateGateInJobAsync(CreateDepotJobRequest request)
         {
             ValidateGateInRequest(request);
+            // `isoSize` phải là mã loại (cột Name) của 1 dòng đang áp dụng trong "DM Loại Container (ISO)"
+            // — cùng nguồn với các nút chọn trên màn Gate-In, không còn danh sách cứng.
+            request.IsoSize = request.IsoSize.Trim().ToUpperInvariant();
+            var containerTypeCodes = await _db.MasterCatalogItems
+                .Where(x => x.CatalogType == "CONTAINER_TYPE" && x.IsActive && !x.IsDeleted)
+                .Select(x => x.Name.ToUpper())
+                .ToListAsync();
+            if (!containerTypeCodes.Contains(request.IsoSize))
+                throw new ArgumentException($"Loại container '{request.IsoSize}' không có (hoặc đang tạm ngưng) trong danh mục DM Loại Container (ISO). Đang áp dụng: {string.Join(", ", containerTypeCodes)}.");
+            if (request.IsoSize.Length > 10)
+                throw new ArgumentException($"Mã loại container '{request.IsoSize}' dài quá 10 ký tự — sửa lại mã loại trong DM Loại Container (ISO).");
             var containerNo = request.ContainerNo.Trim().ToUpperInvariant();
             var shippingLineCode = request.ShippingLine.Trim().ToUpperInvariant();
             var shippingLine = await _db.ShippingLines.FirstOrDefaultAsync(x => x.Code == shippingLineCode && !x.IsDeleted);
@@ -192,20 +355,23 @@ namespace Depot.Application.Services
                 ContainerNo = containerNo,
                 IsoSize = request.IsoSize,
                 ShippingLineId = shippingLine.Id,
-                ShippingLine = shippingLine,
                 TareWeightKg = request.TareWeightKg,
                 MaxPayloadKg = request.MaxPayloadKg,
                 Status = "SURVEYING",
                 GateInDate = DateTime.UtcNow,
-                BlockCode = "BLOCK_A",
-                Bay = 1,
-                Row = 1,
-                Tier = 1,
+                // Chưa có vị trí bãi: sau Gate-In container đứng ở khu giám định (và khu vệ sinh nếu CL), vị trí
+                // chỉ ghi khi xe nâng hạ bãi (CompleteForkliftMoveAsync).
+                BlockCode = string.Empty,
+                Bay = 0,
+                Row = 0,
+                Tier = 0,
                 GateInTruckPlate = request.TruckPlate.Trim().ToUpperInvariant(),
                 GateInDriverName = request.DriverName.Trim(),
                 GateInDriverPhone = request.DriverPhone.Trim(),
                 GateInTrailerPlate = string.IsNullOrWhiteSpace(request.TrailerPlate) ? null : request.TrailerPlate.Trim().ToUpperInvariant(),
                 GateInSealNo = string.IsNullOrWhiteSpace(request.SealNo) ? null : request.SealNo.Trim(),
+                GateInDriverLicense = string.IsNullOrWhiteSpace(request.DriverLicense) ? null : request.DriverLicense.Trim(),
+                GateInCustomsSealNo = string.IsNullOrWhiteSpace(request.CustomsSealNo) ? null : request.CustomsSealNo.Trim(),
                 GateInBookingNo = string.IsNullOrWhiteSpace(request.BookingNo) ? null : request.BookingNo.Trim(),
                 GateInTruckingCompany = string.IsNullOrWhiteSpace(request.TruckingCompany) ? null : request.TruckingCompany.Trim(),
                 GateInRemarks = string.IsNullOrWhiteSpace(request.Remarks) ? null : request.Remarks.Trim(),
@@ -215,17 +381,28 @@ namespace Depot.Application.Services
             };
             newJob.GateInEirNo = $"EIR-IN-{DateTime.UtcNow:yyyyMMdd}-{Random.Shared.Next(100000, 999999)}";
 
-            newJob.AuditLogs.Add(new JobAuditLog
+            _db.DepotJobs.Add(newJob);
+            // DepotJob không còn navigation AuditLogs — lưu job trước để có Id thật rồi mới tạo audit log
+            // qua DbSet (không còn cơ chế graph-fixup tự nối FK cho 2 entity mới cùng lúc).
+            try
+            {
+                await _db.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("UX_depot_jobs_ContainerNo_Active") == true)
+            {
+                // Request Gate-In khác cùng container vừa lưu trước (lọt qua kiểm tra AnyAsync ở trên) — unique index chặn.
+                _db.Entry(newJob).State = EntityState.Detached;
+                throw new InvalidOperationException($"Container {containerNo} đã có hồ sơ đang hoạt động trong depot.");
+            }
+            _db.AuditLogs.Add(new JobAuditLog
             {
                 DepotJobId = newJob.Id,
                 JobNo = newJob.JobNo,
                 Action = "GATE_IN",
                 User = staff.FullName,
                 Timestamp = DateTime.UtcNow,
-                Details = $"Tiếp nhận Container {newJob.ContainerNo} ({newJob.IsoSize}) Hãng tàu: {newJob.ShippingLine?.Code ?? shippingLineCode}"
+                Details = $"Tiếp nhận Container {newJob.ContainerNo} ({newJob.IsoSize}) Hãng tàu: {shippingLineCode}"
             });
-
-            _db.DepotJobs.Add(newJob);
             await _db.SaveChangesAsync();
             return newJob;
         }
@@ -233,10 +410,20 @@ namespace Depot.Application.Services
         /// <summary>Survey ghi hư hỏng và chuyển sang ESTIMATING; không có hư hỏng thì chuyển READY_FOR_OUT.</summary>
         public async Task<bool> SubmitSurveyAsync(long jobId, SurveyRecordViewModel surveyVm)
         {
-            var job = await _db.DepotJobs.Include(j => j.Survey).Include(j => j.ShippingLine).FirstOrDefaultAsync(j => j.Id == jobId);
-            if (job == null || job.Status is "GATE_OUT" or "READY_FOR_OUT") return false;
-            if (surveyVm.ConditionRating is not ("A" or "B" or "C" or "D")) return false;
-            if (surveyVm.Damages.Any(d => d.Quantity <= 0 || d.LaborHours < 0 || d.LaborRate < 0 || d.MaterialCost < 0)) return false;
+            var job = await _db.DepotJobs.FirstOrDefaultAsync(j => j.Id == jobId);
+            if (job == null) return false;
+            // Mỗi lỗi báo đúng lý do — trước đây mọi trường hợp đều thành "Mã công việc không tồn tại" (BUG-023).
+            if (job.Status is "GATE_OUT" or "READY_FOR_OUT")
+                throw new ArgumentException($"Container đang ở trạng thái {job.Status}, không giám định lại được.");
+            var existingSurvey = await _db.Surveys.FirstOrDefaultAsync(s => s.DepotJobId == jobId);
+            if (surveyVm.ConditionRating is not ("A" or "B" or "C" or "D"))
+                throw new ArgumentException($"Hạng container '{surveyVm.ConditionRating}' không hợp lệ — chỉ nhận A, B, C hoặc D.");
+            if (surveyVm.Damages.Any(d => d.Quantity <= 0 || d.LaborHours < 0 || d.LaborRate < 0 || d.MaterialCost < 0))
+                throw new ArgumentException("Hư hỏng có số lượng phải lớn hơn 0; giờ công, đơn giá công và chi phí vật tư không được âm.");
+            // Quy trình (yêu cầu 2026-10-07): hoàn tất giám định thì MỌI container đều chuyển Tổ Vệ Sinh — nên phiếu
+            // nộp thật phải có ít nhất 1 dịch vụ vệ sinh (lệnh vệ sinh rỗng không bàn giao Khai thác được).
+            if (!surveyVm.IsDraft && surveyVm.CleaningItems.Count == 0)
+                throw new ArgumentException("Chọn ít nhất 01 dịch vụ vệ sinh ở tab Vệ Sinh — mọi container sau giám định đều chuyển Tổ Vệ Sinh.");
 
             // Giám định viên lấy tự động theo tài khoản đang đăng nhập (Users.Id), không cho nhập tay.
             // Bắt buộc phải resolve được thật trong bảng Users, giống nguyên tắc đã áp dụng ở Gate-In.
@@ -246,16 +433,22 @@ namespace Depot.Application.Services
             if (surveyor == null)
                 throw new ArgumentException("Không xác định được giám định viên từ phiên đăng nhập. Vui lòng đăng nhập lại.");
 
+            // Survey mới cần lưu riêng 1 bước để lấy Id thật trước khi thêm bảng con (không còn navigation
+            // để EF tự nối FK) — bọc cả khối trong 1 transaction tường minh để vẫn giữ tính atomic như khi
+            // còn dùng navigation (nếu bước sau lỗi, Survey vừa lưu tạm cũng bị rollback theo).
+            await using var tx = await _db.Database.BeginTransactionAsync();
+
             // Cả 2 thao tác Lưu Nháp và Hoàn Tất đều gọi chung endpoint này, nên phải cập nhật
             // lại đúng bản ghi Survey đã có thay vì tạo mới (tránh trùng DepotJobId).
-            var survey = job.Survey ?? new Survey
+            var isNewSurvey = existingSurvey == null;
+            var survey = existingSurvey ?? new Survey
             {
                 DepotJobId = jobId,
                 JobNo = job.JobNo
             };
             survey.SurveyorId = surveyor.Id.ToString();
             survey.JobNo = job.JobNo;
-            if (job.Survey == null)
+            if (isNewSurvey)
             {
                 survey.CreatedBy = surveyor.FullName;
             }
@@ -264,7 +457,7 @@ namespace Depot.Application.Services
                 survey.LastModifiedAt = DateTime.UtcNow;
                 survey.LastModifiedBy = surveyor.FullName;
             }
-            if (job.Survey != null)
+            if (!isNewSurvey)
             {
                 // Dùng ExecuteDelete để xoá thẳng dưới SQL, không nạp các dòng cũ vào ChangeTracker —
                 // tránh xung đột optimistic-concurrency khi lưu nháp nhiều lần liên tiếp. Áp dụng chung
@@ -284,12 +477,49 @@ namespace Depot.Application.Services
             survey.CleaningRemarks = surveyVm.CleaningRemarks;
             survey.CleaningReason = surveyVm.CleaningReason.Count > 0 ? string.Join(",", surveyVm.CleaningReason) : null;
 
+            // SurveyNo là business key hiển thị/in ấn, backend tự sinh 1 lần duy nhất lúc tạo mới —
+            // không nhận số phiếu client tự sinh (tránh trùng/giả mạo), và không sinh lại khi lưu nháp/sửa.
+            if (isNewSurvey)
+            {
+                survey.SurveyNo = $"SRV-{DateTime.UtcNow:yyyyMMdd}-{Random.Shared.Next(100000, 999999)}";
+            }
+            survey.Owner = surveyVm.Owner;
+            survey.ContainerTypeName = surveyVm.ContainerTypeName;
+            survey.ManufactureMonthYear = surveyVm.ManufactureMonthYear;
+            survey.MaxGrossWeightKg = surveyVm.MaxGrossWeightKg;
+            survey.Material = surveyVm.Material;
+            survey.FloorType = surveyVm.FloorType;
+            survey.CscPlateNo = surveyVm.CscPlateNo;
+            survey.Standard = surveyVm.Standard;
+            survey.StandardNotes = surveyVm.StandardNotes;
+            survey.QualityGrade = surveyVm.QualityGrade;
+            survey.ActionRequired = surveyVm.ActionRequired;
+            survey.Shift = surveyVm.Shift;
+            survey.YardLocationNote = surveyVm.YardLocationNote;
+            survey.CargoStatus = surveyVm.CargoStatus;
+            survey.ReeferBrand = surveyVm.ReeferBrand;
+            survey.ReeferModel = surveyVm.ReeferModel;
+            survey.ReeferSetTemperatureC = surveyVm.ReeferSetTemperatureC;
+            survey.PtiStatus = surveyVm.PtiStatus;
+            survey.CompressorHours = surveyVm.CompressorHours;
+            survey.HumidityPercent = surveyVm.HumidityPercent;
+            survey.VentilationCmh = surveyVm.VentilationCmh;
+
+            // Survey không còn navigation collection (Damages/CleaningItems/ChecklistItems/Photos) nên phải
+            // lưu Survey trước để có Id thật rồi mới thêm bảng con qua DbSet — mất cơ chế graph-fixup tự
+            // nối FK cho Parent+Children mới cùng lúc (xem docs/backend-progress/00-quy-tac-backend.md).
+            if (isNewSurvey)
+            {
+                _db.Surveys.Add(survey);
+                await _db.SaveChangesAsync();
+            }
+
             foreach (var d in surveyVm.Damages)
             {
                 var laborTotal = d.LaborHours * d.LaborRate;
                 var itemTotal = laborTotal + d.MaterialCost;
 
-                survey.Damages.Add(new DamageItem
+                _db.Set<DamageItem>().Add(new DamageItem
                 {
                     SurveyId = survey.Id,
                     Component = d.Component,
@@ -314,7 +544,7 @@ namespace Depot.Application.Services
 
             foreach (var c in surveyVm.CleaningItems)
             {
-                survey.CleaningItems.Add(new SurveyCleaningItem
+                _db.Set<SurveyCleaningItem>().Add(new SurveyCleaningItem
                 {
                     SurveyId = survey.Id,
                     CleaningCode = c.CleaningCode,
@@ -334,7 +564,7 @@ namespace Depot.Application.Services
 
             foreach (var chk in surveyVm.Checklist)
             {
-                survey.ChecklistItems.Add(new SurveyChecklistItem
+                _db.Set<SurveyChecklistItem>().Add(new SurveyChecklistItem
                 {
                     SurveyId = survey.Id,
                     ZoneKey = chk.ZoneKey,
@@ -347,7 +577,7 @@ namespace Depot.Application.Services
 
             foreach (var p in surveyVm.Photos)
             {
-                survey.Photos.Add(new SurveyPhotoItem
+                _db.Set<SurveyPhotoItem>().Add(new SurveyPhotoItem
                 {
                     SurveyId = survey.Id,
                     Url = p.Url,
@@ -372,9 +602,10 @@ namespace Depot.Application.Services
                 // READY_FOR_OUT, cho phép Gate-Out ngay mà chưa hề qua bước vệ sinh nào. Theo đúng luồng đã
                 // thiết kế (WorkflowController: GRADING → CL chuyển CLEANING), cấp B (CL) phải luôn dừng ở
                 // trạng thái CLEANING trước, không được set READY_FOR_OUT/ESTIMATING dựa theo Damages nữa.
-                job.Status = surveyVm.ConditionRating == "B"
-                    ? "CLEANING"
-                    : surveyVm.Damages.Count == 0 ? "READY_FOR_OUT" : "ESTIMATING";
+                // Mọi container sau giám định đều qua vệ sinh trước (Gate-In → Giám định → Vệ sinh → Khai thác →
+                // Thanh toán → Báo giá). Container có hư hỏng được chuyển ESTIMATING khi Tổ Vệ Sinh bàn giao
+                // (CleaningService.HandoverAsync), không còn nhảy thẳng sang ESTIMATING/READY_FOR_OUT ở đây.
+                job.Status = "CLEANING";
                 job.SurveyClaimedByStaffId = null;
                 job.SurveyClaimedByName = null;
                 job.SurveyClaimedAt = null;
@@ -382,11 +613,22 @@ namespace Depot.Application.Services
                 // CleaningRecord.cs ghi rõ trong doc comment "phát sinh từ e-EIR có kết luận CL" nhưng
                 // trước đây KHÔNG nơi nào tự tạo cả — Tổ Vệ Sinh phải tự tra container rồi nhập lại từ đầu
                 // toàn bộ lý do/dịch vụ/giá mà surveyor đã chọn sẵn ở tab Vệ Sinh. Giờ tự sinh lệnh vệ sinh
-                // ngay khi Hoàn Tất Giám Định với cấp B (CL), tái dùng đúng cleaningItems đã nhập, để module
-                // Cleaning thấy container này ngay mà không cần nhập lại. Chặn tạo trùng nếu job đã có sẵn 1
-                // lệnh vệ sinh còn hoạt động (chưa HANDOVER_TO_OPERATION) — tránh nộp lại phiếu nhiều lần
-                // (VD sửa remarks rồi Hoàn Tất lại) sinh ra nhiều lệnh vệ sinh trùng cho cùng 1 job.
-                if (surveyVm.ConditionRating == "B")
+                // ngay khi Hoàn Tất Giám Định, tái dùng đúng cleaningItems đã nhập, để module Cleaning thấy
+                // container này ngay mà không cần nhập lại. Chặn tạo trùng nếu job đã có sẵn 1 lệnh vệ sinh
+                // còn hoạt động (chưa HANDOVER_TO_OPERATION) — tránh nộp lại phiếu nhiều lần (VD sửa remarks
+                // rồi Hoàn Tất lại) sinh ra nhiều lệnh vệ sinh trùng cho cùng 1 job.
+                //
+                // Trước đây điều kiện là `ConditionRating == "B"` (chỉ cấp CL thuần) — nhưng container vừa
+                // hư hỏng (DM) vừa cần vệ sinh (rất phổ biến thực tế) bị `handleAddCleaningItem` phía
+                // frontend cố tình giữ condition = 'DM' (ưu tiên định tuyến sang Sửa Chữa, xem comment ở
+                // SurveyDetailForm.tsx) nên nhánh này không bao giờ chạy: toàn bộ dịch vụ vệ sinh + chi phí
+                // surveyor đã chọn chỉ nằm im trong SurveyCleaningItem, KHÔNG BAO GIỜ sinh lệnh vệ sinh thật
+                // — Tổ Vệ Sinh không hề biết container này tồn tại, và CompleteQcInspectionAsync sau đó đưa
+                // thẳng job từ QC Passed sang READY_FOR_OUT, bỏ qua hẳn khâu vệ sinh. Giờ xét theo việc
+                // surveyor CÓ chọn dịch vụ vệ sinh hay không, độc lập với ConditionRating — nếu vẫn còn
+                // damage thì job.Status phía trên vẫn ưu tiên đi ESTIMATING/REPAIRING trước như cũ,
+                // CompleteQcInspectionAsync sẽ chuyển tiếp sang CLEANING thay vì READY_FOR_OUT khi QC đạt.
+                if (surveyVm.CleaningItems.Count > 0)
                 {
                     var hasActiveCleaningRecord = await _db.CleaningRecords
                         .AnyAsync(c => c.JobNo == job.JobNo && c.Status != "HANDOVER_TO_OPERATION");
@@ -411,6 +653,13 @@ namespace Depot.Application.Services
                         // phải tự tra lại hồ sơ giám định. Trước đây bỏ trống IsoCode/TypeName (hiện "40HC "
                         // cụt lủn không có tên loại trên UI Cleaning) và bỏ hẳn CleaningReason (lý do surveyor
                         // chọn — bụi bẩn/dầu mỡ/mùi...) vì CleaningRecord không có cột riêng cho lý do.
+                        // Mã ISO + tên loại tra từ "DM Loại Container (ISO)" theo mã loại của job; chỉ đoán
+                        // theo chuỗi IsoSize khi loại đó không còn trong danh mục (job cũ).
+                        var jobSize = (job.IsoSize ?? string.Empty).ToUpper();
+                        var containerType = await _db.MasterCatalogItems
+                            .Where(x => x.CatalogType == "CONTAINER_TYPE" && !x.IsDeleted && x.Name.ToUpper() == jobSize)
+                            .Select(x => new { x.Code, x.Name, x.NameVi })
+                            .FirstOrDefaultAsync();
                         var isReefer = job.IsoSize?.Contains("RF") == true || job.IsoSize?.Contains("RH") == true;
                         var reasonPrefix = surveyVm.CleaningReason.Count > 0
                             ? $"Lý do cần vệ sinh (từ giám định): {string.Join(", ", surveyVm.CleaningReason)}."
@@ -427,10 +676,10 @@ namespace Depot.Application.Services
                             Code = cleaningCode,
                             JobNo = job.JobNo,
                             ContainerNo = job.ContainerNo,
-                            IsoCode = job.IsoSize?.StartsWith("20") == true ? (isReefer ? "22R1" : "22G1") : (isReefer ? "45R1" : "45G1"),
+                            IsoCode = containerType?.Code ?? (job.IsoSize?.StartsWith("20") == true ? (isReefer ? "22R1" : "22G1") : (isReefer ? "45R1" : "45G1")),
                             SizeType = job.IsoSize,
-                            TypeName = isReefer ? "Reefer" : "Dry High Cube",
-                            ShippingLine = job.ShippingLine?.Code,
+                            TypeName = containerType?.NameVi ?? containerType?.Name ?? (isReefer ? "Reefer" : "Dry High Cube"),
+                            ShippingLine = await _db.ShippingLines.Where(s => s.Id == job.ShippingLineId).Select(s => s.Code).FirstOrDefaultAsync(),
                             // Trước đây bỏ trống — Tổ Vệ Sinh không tra được số e-EIR gốc của lô hàng dù
                             // job đã có sẵn từ lúc Gate-In, khiến UI Cleaning luôn hiện "Số e-EIR:" trống.
                             EeirNo = job.GateInEirNo,
@@ -443,10 +692,6 @@ namespace Depot.Application.Services
                         });
                     }
                 }
-            }
-            if (job.Survey == null)
-            {
-                _db.Surveys.Add(survey);
             }
 
             _db.AuditLogs.Add(new JobAuditLog
@@ -462,8 +707,11 @@ namespace Depot.Application.Services
             });
 
             await _db.SaveChangesAsync();
+            await tx.CommitAsync();
             return true;
         }
+
+
 
         /// <summary>
         /// Giám định viên "nhận" một container đang chờ giám định để khóa lại, không cho người khác nhận trùng.
@@ -484,19 +732,40 @@ namespace Depot.Application.Services
             if (staff == null)
                 throw new ArgumentException("Không xác định được giám định viên từ phiên đăng nhập. Vui lòng đăng nhập lại.");
 
-            var lockedByAnotherActive = job.SurveyClaimedByStaffId.HasValue
-                && job.SurveyClaimedByStaffId.Value != staffId
-                && job.SurveyClaimedAt.HasValue
-                && DateTime.UtcNow - job.SurveyClaimedAt.Value < ClaimLockTimeout;
-            if (lockedByAnotherActive)
-                throw new InvalidOperationException($"Container đang được giám định bởi {job.SurveyClaimedByName}. Vui lòng chọn container khác.");
+            // Ghi có điều kiện ngay trong 1 câu UPDATE (WHERE ở tầng SQL) thay vì đọc-rồi-ghi — trước đây
+            // đọc SurveyClaimedByStaffId ở bộ nhớ rồi mới gán, 2 request "Nhận giám định" gần như đồng
+            // thời đều đọc thấy "chưa khoá" trước khi cái nào SaveChangesAsync, khiến người ghi sau âm
+            // thầm đè khoá người ghi trước (double-claim, không exception, không cảnh báo). Đẩy điều
+            // kiện tranh chấp xuống DB để chỉ 1 request khớp WHERE tại đúng 1 thời điểm.
+            var lockCutoff = DateTime.UtcNow - ClaimLockTimeout;
+            var claimedRows = await _db.DepotJobs
+                .Where(j => j.Id == jobId
+                    && (j.SurveyClaimedByStaffId == null
+                        || j.SurveyClaimedByStaffId == staffId
+                        || j.SurveyClaimedAt == null
+                        || j.SurveyClaimedAt < lockCutoff))
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(j => j.SurveyClaimedByStaffId, staff.Id)
+                    .SetProperty(j => j.SurveyClaimedByName, staff.FullName)
+                    .SetProperty(j => j.SurveyClaimedAt, DateTime.UtcNow));
 
-            job.SurveyClaimedByStaffId = staff.Id;
-            job.SurveyClaimedByName = staff.FullName;
-            job.SurveyClaimedAt = DateTime.UtcNow;
+            if (claimedRows == 0)
+            {
+                // Đọc lại để báo đúng tên người đang giữ khoá — có thể đã đổi giữa lúc kiểm tra ở trên
+                // và lúc UPDATE chạy.
+                var currentHolder = await _db.DepotJobs.AsNoTracking().Where(j => j.Id == jobId).Select(j => j.SurveyClaimedByName).FirstOrDefaultAsync();
+                throw new InvalidOperationException($"Container đang được giám định bởi {currentHolder}. Vui lòng chọn container khác.");
+            }
 
             _db.AuditLogs.Add(CreateAudit(job.JobNo, job.Id, "SURVEY_CLAIMED", staff.FullName, $"Nhận giám định container {job.ContainerNo}."));
             await _db.SaveChangesAsync();
+
+            // job là entity đã tracked từ lần đọc đầu bài hàm — ExecuteUpdateAsync ghi thẳng xuống DB,
+            // không tự đồng bộ lại vào entity đang giữ trong bộ nhớ, nên gán lại thủ công để trả về
+            // đúng state thật cho caller.
+            job.SurveyClaimedByStaffId = staff.Id;
+            job.SurveyClaimedByName = staff.FullName;
+            job.SurveyClaimedAt = DateTime.UtcNow;
             return job;
         }
 
@@ -514,22 +783,48 @@ namespace Depot.Application.Services
         }
 
         /// <summary>Estimate chỉ được lập sau Survey, tự tính subtotal/tax khi request không gửi đủ tổng tiền.</summary>
+        /// <summary>Lỗi nghiệp vụ có lý do rõ ràng khi không được lập báo giá (controller trả 400 kèm thông điệp).</summary>
+        public sealed class EstimateNotAllowedException : Exception
+        {
+            public EstimateNotAllowedException(string message) : base(message) { }
+        }
+
         public async Task<bool> CreateOrUpdateEstimateAsync(long jobId, EstimateViewModel estimateVm)
         {
-            var job = await _db.DepotJobs
-                .Include(j => j.Survey)
-                .Include(j => j.Estimate)
-                .FirstOrDefaultAsync(j => j.Id == jobId);
-            if (job == null || job.Survey == null || job.Status != "ESTIMATING") return false;
-            if (estimateVm.Items.Any(i => i.Quantity <= 0 || i.UnitPrice < 0)) return false;
+            var job = await _db.DepotJobs.FirstOrDefaultAsync(j => j.Id == jobId);
+            var hasSurvey = job != null && await _db.Surveys.AnyAsync(s => s.DepotJobId == jobId);
+            var existingEstimate = job == null ? null : await _db.Estimates.FirstOrDefaultAsync(e => e.DepotJobId == jobId);
+            if (job == null || !hasSurvey || job.Status != "ESTIMATING") return false;
+            if (estimateVm.Items.Count == 0 || estimateVm.Items.Any(i => i.Quantity <= 0 || i.UnitPrice < 0 || i.ManHoursPerPiece < 0)) return false;
+            if (estimateVm.LaborRate < 0) return false;
+            if (new[] { estimateVm.PreparationHours, estimateVm.OrdinaryHours, estimateVm.Ot1Hours, estimateVm.Ot2Hours, estimateVm.Ot3Hours }.Any(h => h < 0))
+                throw new EstimateNotAllowedException("Giờ chuẩn bị / giờ thường / OT không được âm.");
+            if (existingEstimate?.Status == "APPROVED")
+                throw new EstimateNotAllowedException($"Báo giá {existingEstimate.EstimateNo} đã được hãng tàu duyệt — không sửa được nữa.");
+            // Chỉ lập báo giá sửa chữa cho container đã thu tiền phiếu dịch vụ (yêu cầu nghiệp vụ 2026-10-04).
+            var paidOrder = await _db.ServiceOrders.AnyAsync(so => so.DepotJobId == jobId && so.Status != "CANCELLED" && so.PaymentStatus == "PAID");
+            if (!paidOrder)
+                throw new EstimateNotAllowedException($"Container {job.ContainerNo} chưa thu tiền phiếu dịch vụ — thu tiền ở màn Thanh Toán trước khi lập báo giá.");
 
-            var calculatedSubtotal = estimateVm.Items.Sum(i => i.Quantity * i.UnitPrice);
-            var laborCost = estimateVm.TotalLaborCost >= 0 ? estimateVm.TotalLaborCost : 0;
-            var materialCost = estimateVm.TotalMaterialCost >= 0 ? estimateVm.TotalMaterialCost : 0;
-            var tax = estimateVm.TotalTax >= 0 ? estimateVm.TotalTax : (calculatedSubtotal + laborCost + materialCost) * 0.1m;
-            var grandTotal = estimateVm.GrandTotal > 0 ? estimateVm.GrandTotal : calculatedSubtotal + laborCost + materialCost + tax;
+            // Tổng tiền luôn tính lại ở server từ hạng mục — trước đây lưu nguyên GrandTotal client gửi (BUG-008),
+            // gửi 999đ cho báo giá 440.000đ vẫn được lưu và chuyển hãng tàu duyệt. TotalLaborCost/TotalMaterialCost
+            // do EstimatePage gửi là phần chia nhỏ (giờ công / vật tư) CỦA CHÍNH các hạng mục, không cộng thêm vào tổng.
+            // Cách tính theo Maersk AEMS: mỗi dòng = PCS × (giờ công/PC, vật tư/PC). Tiền công = tổng giờ công × đơn giá
+            // giờ; vật tư = Σ PCS × vật tư/PC; trước thuế = công + vật tư; VAT theo thuế suất dòng. Tính hoàn toàn ở server.
+            // Tổng giờ công AEMS = Σ PCS × giờ công/PC của các dòng + giờ chuẩn bị (Preparation Time).
+            var totalManHours = estimateVm.Items.Sum(i => i.Quantity * i.ManHoursPerPiece) + estimateVm.PreparationHours;
+            var laborCost = Math.Round(totalManHours * estimateVm.LaborRate, 0, MidpointRounding.AwayFromZero);
+            var materialCost = estimateVm.Items.Sum(i => i.Quantity * i.UnitPrice);
+            var calculatedSubtotal = laborCost + materialCost;
+            var vatPercent = estimateVm.Items.Max(i => i.VatPercent);
+            if (vatPercent < 0 || vatPercent > 100) return false;
+            var tax = Math.Round(calculatedSubtotal * vatPercent / 100m, 0, MidpointRounding.AwayFromZero);
+            var grandTotal = calculatedSubtotal + tax;
 
-            var estimate = job.Estimate ?? new Estimate
+            var isNewEstimate = existingEstimate == null;
+            var oldTotal = existingEstimate?.GrandTotal ?? 0;
+            var oldItemCount = isNewEstimate ? 0 : await _db.Set<EstimateItem>().CountAsync(i => i.EstimateId == existingEstimate!.Id);
+            var estimate = existingEstimate ?? new Estimate
             {
                 DepotJobId = jobId,
                 JobNo = job.JobNo,
@@ -541,64 +836,145 @@ namespace Depot.Application.Services
             estimate.TotalTax = tax;
             estimate.GrandTotal = grandTotal;
             estimate.Currency = estimateVm.Currency;
+            estimate.Notes = string.IsNullOrWhiteSpace(estimateVm.Notes) ? null : estimateVm.Notes.Trim();
+            estimate.LaborRate = estimateVm.LaborRate;
+            estimate.TotalManHours = totalManHours;
+            estimate.RepairMode = string.IsNullOrWhiteSpace(estimateVm.RepairMode) ? null : estimateVm.RepairMode.Trim();
+            estimate.Cause = string.IsNullOrWhiteSpace(estimateVm.Cause) ? null : estimateVm.Cause.Trim();
+            estimate.ShopCode = string.IsNullOrWhiteSpace(estimateVm.ShopCode) ? null : estimateVm.ShopCode.Trim();
+            estimate.VendorRefNo = string.IsNullOrWhiteSpace(estimateVm.VendorRefNo) ? null : estimateVm.VendorRefNo.Trim();
+            estimate.PreparationHours = estimateVm.PreparationHours;
+            estimate.OrdinaryHours = estimateVm.OrdinaryHours;
+            estimate.Ot1Hours = estimateVm.Ot1Hours;
+            estimate.Ot2Hours = estimateVm.Ot2Hours;
+            estimate.Ot3Hours = estimateVm.Ot3Hours;
+            estimate.SurveyReference = string.IsNullOrWhiteSpace(estimateVm.SurveyReference) ? null : estimateVm.SurveyReference.Trim();
+            var photoUrls = (estimateVm.InspectionPhotos ?? new List<string>()).Where(u => !string.IsNullOrWhiteSpace(u)).Select(u => u.Trim()).Distinct().ToList();
+            estimate.InspectionPhotoUrlsJson = photoUrls.Count == 0 ? null : System.Text.Json.JsonSerializer.Serialize(photoUrls);
             estimate.Status = "PENDING_APPROVAL";
+            estimate.ConfirmedAt = null;
+            estimate.ConfirmedBy = null;
+            // Sửa chỉ hạng mục (tổng không đổi) vẫn phải ghi nhận là bản mới — màn Báo giá dựa vào đây để biết bản này đã gửi hãng tàu chưa.
+            if (!isNewEstimate) estimate.LastModifiedAt = DateTime.UtcNow;
 
-            if (job.Estimate != null)
+            // Estimate không còn navigation Items — Estimate mới phải lưu riêng 1 bước để có Id thật trước
+            // khi thêm EstimateItem qua DbSet (cùng nguyên tắc đã áp dụng cho Survey/DamageItem).
+            await using var tx = await _db.Database.BeginTransactionAsync();
+            if (isNewEstimate)
             {
-                estimate.Items.Clear();
+                _db.Estimates.Add(estimate);
+                await _db.SaveChangesAsync();
+            }
+            else
+            {
+                await _db.Set<EstimateItem>().Where(i => i.EstimateId == estimate.Id).ExecuteDeleteAsync();
             }
             foreach (var item in estimateVm.Items)
             {
-                estimate.Items.Add(new EstimateItem
+                _db.Set<EstimateItem>().Add(new EstimateItem
                 {
                     EstimateId = estimate.Id,
                     ItemDescription = item.ItemDescription,
+                    LocationCode = item.LocationCode, LocationName = item.LocationName,
+                    DamageCode = item.DamageCode, DamageName = item.DamageName,
+                    RepairCode = item.RepairCode, RepairMethod = item.RepairMethod,
+                    Unit = item.Unit, VatPercent = item.VatPercent,
+                    Tpi = string.IsNullOrWhiteSpace(item.Tpi) ? null : item.Tpi.Trim().ToUpperInvariant(),
+                    ManHoursPerPiece = item.ManHoursPerPiece,
                     Quantity = item.Quantity,
                     UnitPrice = item.UnitPrice,
-                    Amount = item.Amount
+                    // Item total theo AEMS = PCS × vật tư/PC (tính lại ở server, không tin số client gửi).
+                    Amount = item.Quantity * item.UnitPrice
                 });
             }
 
-            if (job.Estimate == null)
-            {
-                _db.Estimates.Add(estimate);
-            }
             job.Status = "ESTIMATING";
 
             _db.AuditLogs.Add(new JobAuditLog
             {
                 DepotJobId = jobId,
                 JobNo = job.JobNo,
-                Action = "ESTIMATE_CREATED",
-                User = "Phòng Báo Giá",
+                Action = isNewEstimate ? "ESTIMATE_CREATED" : "ESTIMATE_UPDATED",
+                User = "", // AuditActorInterceptor điền người đăng nhập
                 Timestamp = DateTime.UtcNow,
-                Details = $"Lập báo giá {estimate.EstimateNo} tổng cộng {estimate.GrandTotal:N0} {estimate.Currency}"
+                Details = isNewEstimate
+                    ? $"Lập báo giá {estimate.EstimateNo}: {estimateVm.Items.Count} hạng mục, tổng cộng {estimate.GrandTotal:N0} {estimate.Currency}"
+                    : $"Sửa/bổ sung báo giá {estimate.EstimateNo}: {oldItemCount} → {estimateVm.Items.Count} hạng mục, tổng {oldTotal:N0} → {estimate.GrandTotal:N0} {estimate.Currency}"
             });
 
             await _db.SaveChangesAsync();
+            await tx.CommitAsync();
             return true;
         }
 
         /// <summary>Approval chỉ nhận estimate PENDING_APPROVAL và chuyển hồ sơ sang REPAIRING.</summary>
-        public async Task<bool> ApproveEstimateAsync(long jobId, string approverName)
+        public async Task ConfirmEstimateAsync(long jobId, string confirmedBy)
         {
-            var job = await _db.DepotJobs.Include(j => j.Estimate).FirstOrDefaultAsync(j => j.Id == jobId);
-            if (job == null || job.Estimate == null || job.Estimate.Status != "PENDING_APPROVAL" || job.Status != "ESTIMATING") return false;
+            var job = await _db.DepotJobs.FirstOrDefaultAsync(j => j.Id == jobId)
+                ?? throw new EstimateNotAllowedException("Không tìm thấy hồ sơ container.");
+            var estimate = await _db.Estimates.FirstOrDefaultAsync(e => e.DepotJobId == jobId)
+                ?? throw new EstimateNotAllowedException($"Container {job.ContainerNo} chưa có báo giá.");
+            if (estimate.Status != "PENDING_APPROVAL")
+                throw new EstimateNotAllowedException($"Báo giá {estimate.EstimateNo} đang ở trạng thái {estimate.Status}, không cần xác nhận.");
+            if (estimate.ConfirmedAt != null)
+                throw new EstimateNotAllowedException($"Báo giá {estimate.EstimateNo} đã được xác nhận lúc {estimate.ConfirmedAt:dd/MM/yyyy HH:mm} (UTC).");
 
-            job.Estimate.Status = "APPROVED";
-            job.Estimate.ApprovedAt = DateTime.UtcNow;
-            job.Estimate.ApprovedBy = string.IsNullOrWhiteSpace(approverName) ? "Hãng tàu" : approverName;
+            estimate.ConfirmedAt = DateTime.UtcNow;
+            estimate.ConfirmedBy = string.IsNullOrWhiteSpace(confirmedBy) ? null : confirmedBy.Trim();
+            _db.AuditLogs.Add(new JobAuditLog
+            {
+                DepotJobId = jobId,
+                JobNo = job.JobNo,
+                Action = "ESTIMATE_CONFIRMED",
+                User = "", // AuditActorInterceptor điền người đăng nhập
+                Timestamp = DateTime.UtcNow,
+                Details = $"Xác nhận báo giá {estimate.EstimateNo}: tổng {estimate.GrandTotal:N0} {estimate.Currency} — chờ hãng tàu duyệt."
+            });
+            await _db.SaveChangesAsync();
+        }
+
+        public async Task<bool> ApproveEstimateAsync(long jobId, ApproveEstimateRequest request, string enteredBy)
+        {
+            request ??= new ApproveEstimateRequest();
+            static string? T(string? v) => string.IsNullOrWhiteSpace(v) ? null : v.Trim();
+            if (request.ApprovedAmount is < 0)
+                throw new EstimateNotAllowedException("Số tiền hãng tàu duyệt không được âm.");
+            if (request.ApprovedAt is { } at && at.ToUniversalTime() > DateTime.UtcNow.AddMinutes(5))
+                throw new EstimateNotAllowedException("Ngày hãng tàu duyệt không được ở tương lai.");
+            var job = await _db.DepotJobs.FirstOrDefaultAsync(j => j.Id == jobId);
+            var estimate = job == null ? null : await _db.Estimates.FirstOrDefaultAsync(e => e.DepotJobId == jobId);
+            if (job == null || estimate == null || estimate.Status != "PENDING_APPROVAL" || job.Status != "ESTIMATING") return false;
+            if (estimate.ConfirmedAt == null)
+                throw new EstimateNotAllowedException($"Báo giá {estimate.EstimateNo} chưa được xác nhận — người báo giá phải bấm \"Xác nhận báo giá\" trước khi ghi nhận hãng tàu duyệt.");
+
+            estimate.Status = "APPROVED";
+            estimate.ApprovedAt = request.ApprovedAt?.ToUniversalTime() ?? DateTime.UtcNow;
+            // ApprovedBy = nhân viên depot ghi nhận; thông tin phía hãng tàu lưu ở các cột Carrier* riêng.
+            estimate.ApprovedBy = T(enteredBy) ?? "Depot";
+            estimate.CarrierWorkOrderNo = T(request.CarrierWorkOrderNo);
+            estimate.CarrierAuthCode = T(request.CarrierAuthCode);
+            estimate.CarrierApproverName = T(request.CarrierApproverName);
+            estimate.ApprovedAmount = request.ApprovedAmount ?? estimate.GrandTotal;
+            estimate.ApprovalChannel = T(request.ApprovalChannel)?.ToUpperInvariant();
+            estimate.ApprovalNotes = T(request.Notes);
 
             job.Status = "REPAIRING";
 
+            var parts = new List<string>();
+            if (estimate.CarrierWorkOrderNo != null) parts.Add($"WO hãng tàu {estimate.CarrierWorkOrderNo}");
+            if (estimate.CarrierAuthCode != null) parts.Add($"mã duyệt {estimate.CarrierAuthCode}");
+            if (estimate.CarrierApproverName != null) parts.Add($"người duyệt {estimate.CarrierApproverName}");
+            parts.Add($"duyệt {estimate.ApprovedAmount:N0} {estimate.Currency}");
+            if (estimate.ApprovalChannel != null) parts.Add($"qua {estimate.ApprovalChannel}");
             _db.AuditLogs.Add(new JobAuditLog
             {
                 DepotJobId = jobId,
                 JobNo = job.JobNo,
                 Action = "ESTIMATE_APPROVED",
-                User = approverName,
+                User = "", // AuditActorInterceptor điền nhân viên đăng nhập
                 Timestamp = DateTime.UtcNow,
-                Details = $"Phê duyệt báo giá sửa chữa. Chuyển trạng thái sang REPAIRING"
+                Details = $"Ghi nhận hãng tàu duyệt báo giá {estimate.EstimateNo}: {string.Join(", ", parts)}" +
+                          (estimate.ApprovalNotes != null ? $". Ghi chú: {estimate.ApprovalNotes}" : "") + " → chuyển Sửa chữa."
             });
 
             await _db.SaveChangesAsync();
@@ -612,16 +988,15 @@ namespace Depot.Application.Services
         /// <summary>Reject lưu lý do audit và đưa estimate về ESTIMATING để chỉnh sửa lại.</summary>
         public async Task<bool> RejectEstimateAsync(long jobId, RejectEstimateRequest request)
         {
-            var job = await _db.DepotJobs
-                .Include(j => j.Estimate)
-                .FirstOrDefaultAsync(j => j.Id == jobId);
-            if (job?.Estimate == null || job.Estimate.Status != "PENDING_APPROVAL" || string.IsNullOrWhiteSpace(request.Reason)) return false;
+            var job = await _db.DepotJobs.FirstOrDefaultAsync(j => j.Id == jobId);
+            var estimate = job == null ? null : await _db.Estimates.FirstOrDefaultAsync(e => e.DepotJobId == jobId);
+            if (job == null || estimate == null || estimate.Status != "PENDING_APPROVAL" || string.IsNullOrWhiteSpace(request.Reason)) return false;
 
-            job.Estimate.Status = "REJECTED";
-            job.Estimate.ApprovedBy = string.IsNullOrWhiteSpace(request.RejectedBy) ? "Hãng tàu" : request.RejectedBy;
-            job.Estimate.ApprovedAt = DateTime.UtcNow;
+            estimate.Status = "REJECTED";
+            estimate.ApprovedBy = string.IsNullOrWhiteSpace(request.RejectedBy) ? "Hãng tàu" : request.RejectedBy;
+            estimate.ApprovedAt = DateTime.UtcNow;
             job.Status = "ESTIMATING";
-            _db.AuditLogs.Add(CreateAudit(job.JobNo, jobId, "ESTIMATE_REJECTED", job.Estimate.ApprovedBy, request.Reason.Trim()));
+            _db.AuditLogs.Add(CreateAudit(job.JobNo, jobId, "ESTIMATE_REJECTED", estimate.ApprovedBy, request.Reason.Trim()));
             await _db.SaveChangesAsync();
             return true;
         }
@@ -629,26 +1004,88 @@ namespace Depot.Application.Services
         /// <summary>Khớp giao dịch VietQR theo JobNo/container; số tiền không dương bị từ chối.</summary>
         public async Task<bool> ProcessBankWebhookPaymentAsync(BankWebhookPaymentRequest webhook)
         {
-            var jobs = await _db.DepotJobs.Include(j => j.Payment).ToListAsync();
+            // Mọi lần ngân hàng gọi webhook đều ghi PaymentLogs (kể cả không khớp hồ sơ / sai số tiền).
+            var log = new PaymentLog
+            {
+                Method = "VIETQR_WEBHOOK",
+                Amount = webhook.Amount,
+                TransactionRef = Truncate(webhook.TransactionRef, 100),
+                Notes = Truncate(webhook.Content, 500),
+                CashierName = "VietQR Webhook",
+                LoggedAt = DateTime.UtcNow
+            };
+            async Task<bool> Reject(string message)
+            {
+                log.Status = "REJECTED";
+                log.Message = Truncate(message, 500);
+                _db.ChangeTracker.Clear();
+                _db.PaymentLogs.Add(log);
+                await _db.SaveChangesAsync();
+                return false;
+            }
+
+            var jobs = await _db.DepotJobs.ToListAsync();
             var targetJob = jobs.FirstOrDefault(j =>
                 webhook.Content.Contains(j.JobNo, StringComparison.OrdinalIgnoreCase) ||
                 webhook.Content.Contains(j.ContainerNo, StringComparison.OrdinalIgnoreCase));
 
-            if (targetJob == null) return false;
-            if (webhook.Amount <= 0) return false;
+            if (targetJob == null) return await Reject("Nội dung chuyển khoản không khớp số hồ sơ / số container nào.");
+            log.DepotJobId = targetJob.Id; log.JobNo = targetJob.JobNo; log.ContainerNo = targetJob.ContainerNo;
+            if (webhook.Amount <= 0) return await Reject("Số tiền không hợp lệ.");
 
-            targetJob.Payment = new Payment
+            // Idempotency theo TransactionRef — trước đây webhook luôn Add() Payment mới vô điều kiện,
+            // không dò trùng giao dịch. Payment.DepotJobId có unique index nên gọi lặp trước đây sẽ crash
+            // DbUpdateException (500) thay vì trả 200 idempotent như chuẩn webhook yêu cầu (ngân hàng/cổng
+            // thanh toán luôn có cơ chế retry). Nếu đã ghi nhận đúng giao dịch này rồi thì coi như thành
+            // công, không ghi lại; nếu job đã PAID bởi 1 giao dịch KHÁC thì từ chối rõ ràng thay vì âm thầm
+            // tạo Payment thứ 2 (vẫn sẽ vi phạm unique index).
+            var existingPayment = await _db.Payments.FirstOrDefaultAsync(p => p.DepotJobId == targetJob.Id);
+            if (existingPayment?.Status == "PAID")
             {
-                DepotJobId = targetJob.Id,
-                InvoiceNo = $"INV-{DateTime.UtcNow:yyyyMMdd}-{new Random().Next(100, 999)}",
-                Amount = webhook.Amount,
-                Tax = webhook.Amount * 0.1m,
-                TotalAmount = webhook.Amount * 1.1m,
-                Status = "PAID",
-                PaidAt = webhook.TransactionTime,
-                PaymentMethod = "VIETQR_BANK_TRANSFER",
-                CashierName = "Hệ thống VietQR AutoMatch"
-            };
+                var sameTransaction = !string.IsNullOrWhiteSpace(webhook.TransactionRef)
+                    && existingPayment.TransactionRef == webhook.TransactionRef;
+                // Ngân hàng gọi lại cùng giao dịch: trả thành công (idempotent), không ghi log trùng.
+                return sameTransaction || await Reject("Hồ sơ đã được thanh toán bởi một giao dịch khác.");
+            }
+
+            // Đối chiếu Amount với công nợ thực (ServiceOrder.GrandTotal) — trước đây chỉ kiểm tra
+            // Amount > 0, nghĩa là chuyển khoản 1.000đ với đúng nội dung JobNo vẫn đủ đánh dấu TOÀN BỘ
+            // job đã thanh toán. Áp dụng đúng kiểu đối chiếu đã có sẵn ở luồng thanh toán thủ công
+            // (ProcessPaymentAsync). Nếu job này không có ServiceOrder nào (không phát sinh qua Khai Thác
+            // Gate-In), giữ nguyên hành vi cũ — không có "công nợ thực" nào để đối chiếu.
+            var serviceOrder = await _db.ServiceOrders.FirstOrDefaultAsync(so => so.DepotJobId == targetJob.Id && so.Status != "CANCELLED");
+            if (serviceOrder != null)
+            {
+                log.ServiceOrderNo = serviceOrder.OrderNo; log.OrderTotal = serviceOrder.GrandTotal;
+                if (webhook.Amount != serviceOrder.GrandTotal)
+                    return await Reject($"Số tiền {webhook.Amount:N0} đ không khớp tổng phiếu {serviceOrder.OrderNo} ({serviceOrder.GrandTotal:N0} đ).");
+            }
+
+            // Payment không còn navigation trên DepotJob — thêm tường minh qua DbSet (giống pattern
+            // RepairOrder đã áp dụng) thay vì gán navigation-only.
+            if (existingPayment == null)
+            {
+                existingPayment = new Payment { DepotJobId = targetJob.Id, InvoiceNo = $"INV-{DateTime.UtcNow:yyyyMMdd}-{new Random().Next(100, 999)}" };
+                _db.Payments.Add(existingPayment);
+            }
+            // Tiền nhận = tổng phiếu (đã gồm VAT). Trước đây ghi Tax = 10% và Total = 110% số tiền nhận → phiếu thu
+            // bị thổi phồng thêm 10% so với số tiền thật.
+            existingPayment.Amount = serviceOrder?.Subtotal ?? webhook.Amount;
+            existingPayment.Tax = serviceOrder?.TotalVat ?? 0;
+            existingPayment.TotalAmount = webhook.Amount;
+            existingPayment.Status = "PAID";
+            existingPayment.PaidAt = webhook.TransactionTime;
+            existingPayment.PaymentMethod = "VIETQR_BANK_TRANSFER";
+            existingPayment.CashierName = "Hệ thống VietQR AutoMatch";
+            existingPayment.TransactionRef = webhook.TransactionRef;
+
+            if (serviceOrder != null)
+            {
+                serviceOrder.PaymentStatus = "PAID";
+                serviceOrder.Status = "PAID";
+                serviceOrder.PaidAt = webhook.TransactionTime;
+                serviceOrder.TransactionId = webhook.TransactionRef;
+            }
             if (targetJob.Status == "PAYMENT_PENDING") targetJob.Status = "PAID";
 
             _db.AuditLogs.Add(new JobAuditLog
@@ -660,17 +1097,132 @@ namespace Depot.Application.Services
                 Timestamp = DateTime.UtcNow,
                 Details = $"Ghi nhận thanh toán {webhook.Amount:N0} VNĐ qua VietQR. Mã GD: {webhook.TransactionRef}"
             });
+            log.Status = "SUCCESS";
+            log.Message = "Thanh toán thành công";
+            log.InvoiceNo = existingPayment.InvoiceNo;
+            _db.PaymentLogs.Add(log);
 
             await _db.SaveChangesAsync();
             return true;
         }
 
-        public async Task<bool> ProcessPaymentAsync(long jobId, ProcessPaymentRequest request)
+        public async Task<List<PaymentLogItem>> GetPaymentLogsAsync(PaymentLogFilter filter)
         {
+            var query = _db.PaymentLogs.AsNoTracking().Where(x => !x.IsDeleted);
+            if (filter.From.HasValue) query = query.Where(x => x.LoggedAt >= filter.From.Value.ToUniversalTime());
+            if (filter.To.HasValue) query = query.Where(x => x.LoggedAt < filter.To.Value.ToUniversalTime());
+            if (!string.IsNullOrWhiteSpace(filter.Method)) { var m = filter.Method.Trim().ToUpper(); query = query.Where(x => x.Method == m); }
+            if (!string.IsNullOrWhiteSpace(filter.Status)) { var st = filter.Status.Trim().ToUpper(); query = query.Where(x => x.Status == st); }
+            if (!string.IsNullOrWhiteSpace(filter.Keyword))
+            {
+                var k = filter.Keyword.Trim().ToLower();
+                query = query.Where(x =>
+                    (x.ContainerNo != null && x.ContainerNo.ToLower().Contains(k)) ||
+                    (x.ServiceOrderNo != null && x.ServiceOrderNo.ToLower().Contains(k)) ||
+                    (x.InvoiceNo != null && x.InvoiceNo.ToLower().Contains(k)) ||
+                    (x.TransactionRef != null && x.TransactionRef.ToLower().Contains(k)) ||
+                    (x.CashierName != null && x.CashierName.ToLower().Contains(k)));
+            }
+            return await query.OrderByDescending(x => x.LoggedAt).Take(Math.Clamp(filter.Take, 1, 2000))
+                .Select(x => new PaymentLogItem
+                {
+                    Id = x.Id, LoggedAt = x.LoggedAt, DepotJobId = x.DepotJobId, JobNo = x.JobNo, ContainerNo = x.ContainerNo,
+                    ServiceOrderNo = x.ServiceOrderNo, InvoiceNo = x.InvoiceNo, Method = x.Method, Status = x.Status,
+                    Amount = x.Amount, OrderTotal = x.OrderTotal, CashReceived = x.CashReceived, ChangeAmount = x.ChangeAmount,
+                    TransactionRef = x.TransactionRef, Notes = x.Notes, CashierName = x.CashierName, Message = x.Message
+                }).ToListAsync();
+        }
+
+        /// <summary>Thu tại quầy + luôn ghi 1 dòng PaymentLogs (thành công hoặc bị từ chối kèm lý do).</summary>
+        public async Task<ProcessPaymentResult> ProcessPaymentAsync(long jobId, ProcessPaymentRequest request, string? cashierName)
+        {
+            var log = new PaymentLog
+            {
+                DepotJobId = jobId,
+                Method = Truncate((request.Method ?? string.Empty).Trim().ToUpperInvariant(), 30) ?? string.Empty,
+                Amount = request.Amount,
+                CashReceived = request.CashReceived,
+                Notes = Truncate(request.Notes?.Trim(), 500),
+                CashierName = Truncate(string.IsNullOrWhiteSpace(cashierName) ? "Thu ngân" : cashierName.Trim(), 150),
+                TransactionRef = Truncate(request.TransactionRef?.Trim(), 100),
+                LoggedAt = DateTime.UtcNow
+            };
+            var result = await ProcessPaymentCoreAsync(jobId, request, cashierName, log);
+            log.Status = result.Success ? "SUCCESS" : "REJECTED";
+            log.Message = Truncate(result.Message, 500);
+            if (result.Success)
+            {
+                log.TransactionRef = result.TransactionRef;
+                log.InvoiceNo = result.InvoiceNo;
+                log.Amount = result.Amount;
+                if (log.Method == "CASH" && request.CashReceived.HasValue) log.ChangeAmount = request.CashReceived.Value - result.Amount;
+            }
+            if (log.DepotJobId.HasValue && !await _db.DepotJobs.AnyAsync(j => j.Id == log.DepotJobId.Value)) log.DepotJobId = null;
+            _db.PaymentLogs.Add(log);
+            await _db.SaveChangesAsync();
+            return result;
+        }
+
+        private static string? Truncate(string? value, int max) => value == null ? null : value.Length <= max ? value : value[..max];
+
+        private async Task<ProcessPaymentResult> ProcessPaymentCoreAsync(long jobId, ProcessPaymentRequest request, string? cashierName, PaymentLog log)
+        {
+            static ProcessPaymentResult Fail(string message) => new() { Success = false, Message = message };
+            var method = (request.Method ?? string.Empty).Trim().ToUpperInvariant();
+            // Thu tại quầy chỉ nhận tiền mặt hoặc chuyển khoản đã đối chiếu; VietQR tự động đi qua webhook ngân hàng.
+            if (method is not ("CASH" or "BANK_TRANSFER")) return Fail("Hình thức thanh toán không hợp lệ (chỉ nhận Tiền mặt hoặc Chuyển khoản).");
+
             var job = await _db.DepotJobs.FirstOrDefaultAsync(x => x.Id == jobId);
-            if (job == null || request.Amount <= 0) return false;
+            if (job == null) return Fail("Không tìm thấy hồ sơ container.");
+            log.JobNo = job.JobNo; log.ContainerNo = job.ContainerNo;
             var serviceOrder = await _db.ServiceOrders.FirstOrDefaultAsync(x => x.DepotJobId == job.Id && x.Status != "CANCELLED");
-            if (serviceOrder == null || serviceOrder.PaymentStatus == "PAID" || request.Amount != serviceOrder.GrandTotal) return false;
+            if (serviceOrder == null) return Fail("Container chưa có phiếu dịch vụ nào để thu tiền.");
+            log.ServiceOrderNo = serviceOrder.OrderNo; log.OrderTotal = serviceOrder.GrandTotal;
+            if (serviceOrder.PaymentStatus == "PAID") return Fail($"Phiếu {serviceOrder.OrderNo} đã được thanh toán trước đó.");
+            if (request.Amount <= 0 || request.Amount != serviceOrder.GrandTotal)
+                return Fail($"Số tiền {request.Amount:N0} đ không khớp tổng phiếu {serviceOrder.OrderNo} ({serviceOrder.GrandTotal:N0} đ).");
+
+            string transactionRef;
+            if (method == "BANK_TRANSFER")
+            {
+                // Nhân viên kiểm tra tiền về rồi xác nhận — mã giao dịch ngân hàng không bắt buộc; có thì chống dùng trùng,
+                // không có thì tự sinh mã phiếu thu chuyển khoản.
+                transactionRef = (request.TransactionRef ?? string.Empty).Trim();
+                if (transactionRef.Length > 100) return Fail("Mã giao dịch ngân hàng quá dài.");
+                if (transactionRef.Length > 0)
+                {
+                    var duplicated = await _db.Payments.AnyAsync(p => p.TransactionRef == transactionRef)
+                        || await _db.ServiceOrders.AnyAsync(so => so.TransactionId == transactionRef);
+                    if (duplicated) return Fail($"Mã giao dịch {transactionRef} đã được dùng cho một khoản thanh toán khác.");
+                }
+                else
+                {
+                    transactionRef = $"CK-{DateTime.UtcNow:yyyyMMddHHmmss}-{job.Id}";
+                }
+            }
+            else
+            {
+                if (request.CashReceived.HasValue && request.CashReceived.Value < serviceOrder.GrandTotal)
+                    return Fail($"Tiền khách đưa ({request.CashReceived.Value:N0} đ) chưa đủ số phải thu ({serviceOrder.GrandTotal:N0} đ).");
+                transactionRef = $"CASH-{DateTime.UtcNow:yyyyMMddHHmmss}-{job.Id}";
+            }
+            var cashier = string.IsNullOrWhiteSpace(cashierName) ? "Thu ngân" : cashierName.Trim();
+
+            // Chặn race condition double-payment: đọc PaymentStatus rồi mới ghi (2 bước tách rời) khiến 2
+            // request thanh toán đồng thời cho cùng job (double-click, 2 tab) đều có thể đọc "chưa PAID"
+            // trước khi cái nào SaveChangesAsync. Đẩy điều kiện "chưa PAID" xuống ngay câu UPDATE để DB
+            // đảm bảo chỉ đúng 1 request thắng — request thua trả về false, không tạo thêm Payment nào.
+            var paidAt = DateTime.UtcNow;
+            var claimedRows = await _db.ServiceOrders
+                .Where(so => so.Id == serviceOrder.Id && so.PaymentStatus != "PAID")
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(so => so.PaymentStatus, "PAID")
+                    .SetProperty(so => so.Status, "PAID")
+                    .SetProperty(so => so.PaymentMethod, method)
+                    .SetProperty(so => so.TransactionId, transactionRef)
+                    .SetProperty(so => so.PaidAt, paidAt));
+            if (claimedRows == 0) return Fail($"Phiếu {serviceOrder.OrderNo} vừa được thanh toán ở nơi khác.");
+
             var payment = await _db.Payments.FirstOrDefaultAsync(x => x.DepotJobId == job.Id);
             if (payment == null)
             {
@@ -678,21 +1230,56 @@ namespace Depot.Application.Services
                 _db.Payments.Add(payment);
             }
             payment.Amount = serviceOrder.Subtotal; payment.Tax = serviceOrder.TotalVat; payment.TotalAmount = serviceOrder.GrandTotal;
-            payment.Status = "PAID"; payment.PaidAt = DateTime.UtcNow; payment.PaymentMethod = request.Method; payment.CashierName = "System";
-            serviceOrder.PaymentStatus = "PAID"; serviceOrder.Status = "PAID";
-            serviceOrder.PaymentMethod = request.Method; serviceOrder.TransactionId = request.TransactionRef; serviceOrder.PaidAt = payment.PaidAt;
-            job.Status = "PAID";
-            _db.AuditLogs.Add(CreateAudit(job.JobNo, job.Id, "PAYMENT_RECEIVED", "System", $"Thanh toán {request.Amount:N0} qua {request.Method}."));
+            payment.Status = "PAID"; payment.PaidAt = paidAt; payment.PaymentMethod = method; payment.CashierName = cashier;
+            payment.TransactionRef = transactionRef;
+            // Trước đây ghi đè job.Status = "PAID" vô điều kiện — phiếu dịch vụ Khai Thác Gate-In (LOLO/lưu
+            // bãi, không liên quan tới hư hỏng) và luồng Estimate sửa chữa CÙNG dùng chung DepotJob.Status,
+            // nên thanh toán phí Gate-In cho 1 container đang ở ESTIMATING (chờ báo giá sửa chữa) sẽ xoá mất
+            // trạng thái đó, khiến CreateOrUpdateEstimateAsync (yêu cầu Status == "ESTIMATING") luôn từ chối
+            // vĩnh viễn. Không nơi nào khác trong hệ thống đọc DepotJob.Status == "PAID" (chỉ
+            // ServiceOrder.PaymentStatus/Payment.Status mới thật sự được dùng để biết đã thu tiền) nên bỏ
+            // hẳn dòng ghi đè này, giữ nguyên trạng thái vòng đời thật của job.
+            var details = method == "CASH"
+                ? $"Thu tiền mặt {serviceOrder.GrandTotal:N0} đ (phiếu {serviceOrder.OrderNo})"
+                  + (request.CashReceived.HasValue ? $", khách đưa {request.CashReceived.Value:N0} đ, trả lại {request.CashReceived.Value - serviceOrder.GrandTotal:N0} đ" : string.Empty)
+                : $"Nhận chuyển khoản {serviceOrder.GrandTotal:N0} đ (phiếu {serviceOrder.OrderNo}), mã GD ngân hàng {transactionRef}";
+            if (!string.IsNullOrWhiteSpace(request.Notes)) details += $". Ghi chú: {request.Notes.Trim()}";
+            _db.AuditLogs.Add(CreateAudit(job.JobNo, job.Id, "PAYMENT_RECEIVED", cashier, details.Length > 1000 ? details[..1000] : details));
             await _db.SaveChangesAsync();
-            return true;
+            return new ProcessPaymentResult
+            {
+                Success = true,
+                Message = "Thanh toán thành công",
+                TransactionRef = transactionRef,
+                InvoiceNo = payment.InvoiceNo,
+                Amount = serviceOrder.GrandTotal,
+                CashierName = cashier,
+                PaidAt = paidAt
+            };
         }
 
         public async Task<object?> CreateServiceOrderAsync(CreateServiceOrderRequest request)
         {
             var job = await _db.DepotJobs.FirstOrDefaultAsync(x => x.JobNo == request.JobNo && x.ContainerNo == request.ContainerNo);
-            if (job == null || request.Items.Count == 0 || request.Items.Any(x => x.Quantity <= 0 || x.UnitPrice < 0)) return null;
-            var existingOrder = await _db.ServiceOrders.AnyAsync(x => x.DepotJobId == job.Id);
-            if (existingOrder) return null;
+            // VatPercent trước đây không bị chặn biên nào — nhập âm hoặc số vô lý (vd 100000%) vẫn được
+            // chấp nhận, tạo hoá đơn sai lệch (VatAmount âm hoặc phóng đại tuỳ tiện GrandTotal).
+            // Báo rõ lý do thay vì 400 chung chung "Không thể tạo phiếu dịch vụ".
+            if (job == null) throw new InvalidOperationException($"Không tìm thấy hồ sơ {request.JobNo} / container {request.ContainerNo}.");
+            // Vòng đời khép kín: Gate-In → Giám định xong → Vệ sinh xong & bàn giao (nếu giám định yêu cầu) → mới lập phiếu
+            // dịch vụ. Mỗi hồ sơ chỉ có 1 phiếu nên lập sớm thì phí phát sinh sau (vệ sinh) không còn chỗ thu.
+            if (job.Status is "GATE_IN" or "SURVEYING")
+                throw new InvalidOperationException($"Container {job.ContainerNo} chưa giám định xong — hoàn tất giám định trước khi lập phiếu dịch vụ.");
+            var pendingCleaning = await _db.CleaningRecords.AsNoTracking()
+                .FirstOrDefaultAsync(c => c.JobNo == job.JobNo && c.Status != "HANDOVER_TO_OPERATION" && !c.IsDeleted);
+            if (job.Status == "CLEANING" || pendingCleaning != null)
+                throw new InvalidOperationException($"Container {job.ContainerNo} đang vệ sinh{(pendingCleaning != null ? $" (lệnh {pendingCleaning.Code})" : string.Empty)} — chờ Tổ Vệ Sinh làm xong và bàn giao Khai thác rồi mới lập phiếu.");
+            if (request.Items.Count == 0) throw new InvalidOperationException("Phiếu dịch vụ phải có ít nhất 1 hạng mục.");
+            if (request.Items.Any(x => x.Quantity <= 0 || x.UnitPrice < 0 || x.VatPercent < 0 || x.VatPercent > 100))
+                throw new InvalidOperationException("Hạng mục không hợp lệ: số lượng phải > 0, đơn giá ≥ 0, VAT 0–100%.");
+            // Mỗi hồ sơ chỉ có 1 phiếu dịch vụ (DB có unique index DepotJobId, kể cả phiếu đã huỷ).
+            var existingOrder = await _db.ServiceOrders.AsNoTracking().FirstOrDefaultAsync(x => x.DepotJobId == job.Id);
+            if (existingOrder != null)
+                throw new InvalidOperationException($"Container {job.ContainerNo} đã có phiếu dịch vụ {existingOrder.OrderNo} ({(existingOrder.Status == "CANCELLED" ? "đã huỷ" : existingOrder.PaymentStatus == "PAID" ? "đã thu tiền" : "chưa thu tiền")}) — mỗi hồ sơ chỉ lập 1 phiếu.");
             var order = new Depot.Data.Entities.Finance.ServiceOrder
             {
                 OrderNo = $"SO-{DateTime.UtcNow:yyyyMMdd}-{Random.Shared.Next(100, 999)}",
@@ -724,9 +1311,12 @@ namespace Depot.Application.Services
             var cleaningItemsInOrder = request.Items.Where(i => i.Category == "CLEANING").ToList();
             if (cleaningItemsInOrder.Count > 0)
             {
-                var hasActiveCleaningRecord = await _db.CleaningRecords
-                    .AnyAsync(c => c.JobNo == job.JobNo && c.Status != "HANDOVER_TO_OPERATION");
-                if (!hasActiveCleaningRecord)
+                // Chỉ tạo lệnh vệ sinh khi hồ sơ CHƯA TỪNG có lệnh vệ sinh. Container đã vệ sinh xong & bàn giao thì dòng phí
+                // vệ sinh trên phiếu là thu tiền cho việc đã làm — trước đây vẫn tạo thêm lệnh mới, đẩy container quay lại
+                // hàng đợi vệ sinh.
+                var hasAnyCleaningRecord = await _db.CleaningRecords
+                    .AnyAsync(c => c.JobNo == job.JobNo && !c.IsDeleted);
+                if (!hasAnyCleaningRecord)
                 {
                     var cleaningCode = "CL-" + DateTime.UtcNow.ToString("yyyyMMddHHmmss") + "-" + Random.Shared.Next(100, 999);
                     var cleaningWorkItems = cleaningItemsInOrder.Select(i => new CleaningWorkItem
@@ -775,7 +1365,7 @@ namespace Depot.Application.Services
         {
             var order = await _db.ServiceOrders.Include(x => x.Items).Include(x => x.DepotJob).FirstOrDefaultAsync(x => x.Id == orderId);
             if (order == null || order.Status is "PAID" or "CANCELLED") return null;
-            if (request.Items.Count == 0 || request.Items.Any(x => x.Quantity <= 0 || x.UnitPrice < 0)) return null;
+            if (request.Items.Count == 0 || request.Items.Any(x => x.Quantity <= 0 || x.UnitPrice < 0 || x.VatPercent < 0 || x.VatPercent > 100)) return null;
 
             if (request.CustomerName is not null) order.CustomerName = request.CustomerName;
             if (request.CustomerTaxCode is not null) order.CustomerTaxCode = request.CustomerTaxCode;
@@ -822,13 +1412,125 @@ namespace Depot.Application.Services
             if (string.IsNullOrWhiteSpace(request.TargetBlock) || request.TargetBay <= 0 || request.TargetRow <= 0 || request.TargetTier <= 0) return false;
             var job = await _db.DepotJobs.FirstOrDefaultAsync(x => x.Id == jobId);
             if (job == null) return false;
-            job.BlockCode = request.TargetBlock.Trim().ToUpperInvariant();
+
+            // Trước đây không kiểm tra gì trước khi hạ bãi: container đã Gate-Out vẫn "hạ bãi" lại được
+            // (tạo dữ liệu ma), Block không tồn tại trong danh mục vẫn ghi được, và ô đích đã có container
+            // khác chiếm vẫn bị ghi đè vô điều kiện (2 container "cùng 1 ô" thật sự xảy ra). Áp dụng đúng
+            // 3 lớp kiểm tra đã có sẵn ở YardOverviewService.MoveContainerAsync cho cùng nghiệp vụ "đổi vị
+            // trí container", để 2 endpoint không còn lệch mức kiểm tra với nhau.
+            if (job.Status == "GATE_OUT") return false;
+
+            var targetBlockCode = request.TargetBlock.Trim().ToUpperInvariant();
+            var blockLayout = await _db.YardBlockLayouts.AsNoTracking().FirstOrDefaultAsync(x => x.Code == targetBlockCode);
+            if (blockLayout == null) return false;
+            if (request.TargetTier > blockLayout.MaxTier || request.TargetBay > blockLayout.BayCount || request.TargetRow > blockLayout.RowCount) return false;
+
+            var occupant = await _db.DepotJobs.AsNoTracking().FirstOrDefaultAsync(x =>
+                x.Status != "GATE_OUT" && x.BlockCode == targetBlockCode && x.Bay == request.TargetBay
+                && x.Row == request.TargetRow && x.Tier == request.TargetTier && x.Id != job.Id);
+            if (occupant != null) return false;
+
+            // Điểm lấy container ghi vào nhật ký (vd "từ Khu vệ sinh") để dòng thời gian thể hiện đúng đường đi.
+            var fromLabel = !string.IsNullOrEmpty(job.BlockCode)
+                ? $"{job.BlockCode}-{job.Bay}-{job.Row}-{job.Tier}"
+                : await _db.CleaningRecords.AnyAsync(c => c.JobNo == job.JobNo) ? "Khu vệ sinh" : "khu giám định / hạ tạm";
+            job.BlockCode = targetBlockCode;
             job.Bay = request.TargetBay; job.Row = request.TargetRow; job.Tier = request.TargetTier;
-            job.Status = "IN_YARD";
+            // Trước đây ghi đè job.Status = "IN_YARD" vô điều kiện — xe nâng có thể đảo chuyển vị trí
+            // container ở BẤT KỲ giai đoạn nào trong vòng đời (kể cả khi đang REPAIRING, hoặc đang
+            // READY_FOR_OUT chờ xe tới lấy), không riêng lúc mới hạ bãi sau Gate-In. Ghi đè status như cũ
+            // sẽ xoá mất trạng thái nghiệp vụ thật đang có — cùng loại lỗi với `job.Status = "PAID"` đã sửa
+            // ở ProcessPaymentAsync. Ví dụ thật: container đã QC đạt (READY_FOR_OUT) nhưng bị dời chỗ trong
+            // lúc chờ xe tới nhận thì sẽ kẹt mãi ở IN_YARD, GateOutAsync (yêu cầu đúng READY_FOR_OUT) từ
+            // chối vĩnh viễn. Không nơi nào khác đọc DepotJob.Status == "IN_YARD" làm điều kiện thật (chỉ
+            // xuất hiện trong danh sách "allowed" của endpoint set-status thủ công) nên bỏ hẳn dòng ghi đè,
+            // vị trí vật lý đã được cập nhật đủ qua BlockCode/Bay/Row/Tier + YardPosition bên dưới.
             var slot = await _db.YardPositions.FirstOrDefaultAsync(x => x.BlockCode == job.BlockCode && x.Bay == job.Bay && x.Row == job.Row && x.Tier == job.Tier);
             if (slot == null) _db.YardPositions.Add(new Depot.Data.Entities.Yard.YardPosition { BlockCode = job.BlockCode, Bay = job.Bay, Row = job.Row, Tier = job.Tier, IsOccupied = true, OccupiedContainerNo = job.ContainerNo });
             else { slot.IsOccupied = true; slot.OccupiedContainerNo = job.ContainerNo; }
-            _db.AuditLogs.Add(CreateAudit(job.JobNo, job.Id, "FORKLIFT_MOVE_COMPLETED", request.OperatorName ?? "Forklift", $"Hạ bãi {job.BlockCode}-{job.Bay}-{job.Row}-{job.Tier}, xe {request.ForkliftCode ?? "-"}."));
+            // Di chuyển đã hoàn tất — trả khoá nhận lệnh xe nâng về trống để job sẵn sàng cho lần di
+            // chuyển KẾ TIẾP trong vòng đời container (vd. Bãi -> Xưởng sửa chữa sau khi vừa Vệ sinh ->
+            // Bãi xong). Không xoá thì job kẹt mãi ở trạng thái "đã nhận" dù việc đã xong.
+            job.ForkliftClaimedByOperatorId = null;
+            job.ForkliftClaimedByOperatorName = null;
+            job.ForkliftAssignedVehicleCode = null;
+            job.ForkliftClaimedAt = null;
+            job.ForkliftStartedAt = null;
+            _db.AuditLogs.Add(CreateAudit(job.JobNo, job.Id, "FORKLIFT_MOVE_COMPLETED", request.OperatorName ?? "Forklift", $"Từ {fromLabel} hạ bãi {job.BlockCode}-{job.Bay}-{job.Row}-{job.Tier}, xe {request.ForkliftCode ?? "-"}."));
+            await _db.SaveChangesAsync();
+            return true;
+        }
+
+        /// <summary>Các trạng thái DepotJob.Status đang chờ 1 lần di chuyển xe nâng — khớp đúng 3 case
+        /// ForkliftPage.tsx tự suy ra phía frontend (Vệ sinh/Thanh toán xong -> Bãi; Nhận sửa -> Xưởng;
+        /// Sửa+QC xong -> Bãi). Dùng để chặn nhận lệnh cho job không thật sự cần xe nâng lúc này.</summary>
+        private static readonly string[] ForkliftPendingStatuses = { "PAYMENT_SUCCESS", "WAITING_FORKLIFT", "REPAIRING", "APPROVED", "READY_FOR_OUT" };
+
+        /// <summary>Tài xế xe nâng "nhận" 1 lệnh di chuyển đang chờ để khoá lại, không cho tài xế khác trên
+        /// tablet khác nhận trùng. Trước đây việc "nhận lệnh" hoàn toàn cục bộ trên trình duyệt (state React
+        /// riêng từng tablet) — 2 tài xế mở 2 tablet khác nhau có thể cùng nhận và cùng di chuyển 1 container
+        /// mà hệ thống không hề hay biết. Dùng đúng pattern ExecuteUpdateAsync có điều kiện WHERE đã áp dụng
+        /// cho ClaimSurveyAsync để tránh race condition đọc-rồi-ghi.</summary>
+        public async Task<DepotJob> ClaimForkliftJobAsync(long jobId, string operatorId, string operatorName, string vehicleCode)
+        {
+            var job = await _db.DepotJobs.FirstOrDefaultAsync(j => j.Id == jobId);
+            if (job == null)
+                throw new ArgumentException("Không tìm thấy hồ sơ container.");
+            // Vệ sinh bàn giao xong mà chưa hạ bãi = container còn nằm ở Khu vệ sinh, chờ xe nâng đưa vào bãi
+            // (hồ sơ lúc này ở ESTIMATING/READY_FOR_OUT tuỳ có hư hỏng hay không).
+            var awaitingFromCleaning = string.IsNullOrEmpty(job.BlockCode) && job.Status is not ("GATE_OUT" or "CLEANING")
+                && await _db.CleaningRecords.AnyAsync(c => c.JobNo == job.JobNo && c.Status == "HANDOVER_TO_OPERATION");
+            if (!awaitingFromCleaning && !ForkliftPendingStatuses.Contains(job.Status))
+                throw new ArgumentException("Container không còn ở trạng thái chờ xe nâng di chuyển (có thể đã được xử lý xong).");
+
+            var claimedRows = await _db.DepotJobs
+                .Where(j => j.Id == jobId && j.ForkliftClaimedByOperatorId == null)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(j => j.ForkliftClaimedByOperatorId, operatorId)
+                    .SetProperty(j => j.ForkliftClaimedByOperatorName, operatorName)
+                    .SetProperty(j => j.ForkliftAssignedVehicleCode, vehicleCode)
+                    .SetProperty(j => j.ForkliftClaimedAt, DateTime.UtcNow));
+
+            if (claimedRows == 0)
+            {
+                var currentHolder = await _db.DepotJobs.AsNoTracking().Where(j => j.Id == jobId).Select(j => j.ForkliftClaimedByOperatorName).FirstOrDefaultAsync();
+                throw new InvalidOperationException($"Container đã được tài xế {currentHolder} nhận lệnh trước đó. Vui lòng chọn container khác.");
+            }
+
+            _db.AuditLogs.Add(CreateAudit(job.JobNo, job.Id, "FORKLIFT_CLAIMED", operatorName, $"Nhận lệnh xe nâng container {job.ContainerNo}, xe {vehicleCode}."));
+            await _db.SaveChangesAsync();
+
+            job.ForkliftClaimedByOperatorId = operatorId;
+            job.ForkliftClaimedByOperatorName = operatorName;
+            job.ForkliftAssignedVehicleCode = vehicleCode;
+            job.ForkliftClaimedAt = DateTime.UtcNow;
+            return job;
+        }
+
+        /// <summary>Tài xế đã nhận lệnh bấm "Bắt đầu thực hiện" — chỉ chính người đang giữ khoá mới được thao tác.</summary>
+        public async Task<bool> StartForkliftExecutionAsync(long jobId, string operatorId)
+        {
+            var job = await _db.DepotJobs.FirstOrDefaultAsync(j => j.Id == jobId);
+            if (job == null || job.ForkliftClaimedByOperatorId != operatorId) return false;
+
+            job.ForkliftStartedAt = DateTime.UtcNow;
+            _db.AuditLogs.Add(CreateAudit(job.JobNo, job.Id, "FORKLIFT_STARTED", job.ForkliftClaimedByOperatorName ?? operatorId, $"Bắt đầu di chuyển container {job.ContainerNo}."));
+            await _db.SaveChangesAsync();
+            return true;
+        }
+
+        /// <summary>Huỷ nhận lệnh, trả container về hàng đợi chờ — chỉ chính người đang giữ khoá mới được tự huỷ.</summary>
+        public async Task<bool> CancelForkliftClaimAsync(long jobId, string operatorId)
+        {
+            var job = await _db.DepotJobs.FirstOrDefaultAsync(j => j.Id == jobId);
+            if (job == null || job.ForkliftClaimedByOperatorId != operatorId) return false;
+
+            job.ForkliftClaimedByOperatorId = null;
+            job.ForkliftClaimedByOperatorName = null;
+            job.ForkliftAssignedVehicleCode = null;
+            job.ForkliftClaimedAt = null;
+            job.ForkliftStartedAt = null;
+            _db.AuditLogs.Add(CreateAudit(job.JobNo, job.Id, "FORKLIFT_CLAIM_CANCELLED", operatorId, $"Huỷ nhận lệnh xe nâng container {job.ContainerNo}, trả về hàng đợi."));
             await _db.SaveChangesAsync();
             return true;
         }
@@ -836,11 +1538,13 @@ namespace Depot.Application.Services
         /// <summary>Tạo Work Order bắt đầu thi công; chỉ chạy sau khi hãng tàu duyệt estimate.</summary>
         public async Task<bool> StartRepairAsync(long jobId, string technicianId, string technicianName)
         {
-            var job = await _db.DepotJobs
-                .Include(j => j.Estimate)
-                .Include(j => j.RepairOrder)
-                .FirstOrDefaultAsync(j => j.Id == jobId);
-            if (job == null || job.Estimate?.Status != "APPROVED" || job.Status != "REPAIRING") return false;
+            var job = await _db.DepotJobs.FirstOrDefaultAsync(j => j.Id == jobId);
+            var estimateStatus = job == null ? null : await _db.Estimates.Where(e => e.DepotJobId == jobId).Select(e => e.Status).FirstOrDefaultAsync();
+            if (job == null || estimateStatus != "APPROVED" || job.Status != "REPAIRING") return false;
+            // Bấm "Bắt đầu" lần 2 (hoặc 2 thợ cùng bấm) trước đây thêm RepairOrder thứ 2 cho cùng hồ sơ, vi phạm
+            // quan hệ 1-1 → HTTP 500 (BUG-009).
+            if (await _db.RepairOrders.AnyAsync(r => r.DepotJobId == jobId))
+                throw new InvalidOperationException("Lệnh sửa chữa của container này đã được bắt đầu.");
 
             var repairOrder = new RepairOrder
             {
@@ -892,7 +1596,7 @@ namespace Depot.Application.Services
             };
             _db.RepairOrders.Add(repairOrder);
             job.Status = "REPAIRING";
-            _db.AuditLogs.Add(CreateAudit(job.JobNo, jobId, "REPAIR_ASSIGNED", request.Team, $"Phân công đội {request.Team}, {request.Workers.Count} kỹ thuật viên."));
+            _db.AuditLogs.Add(CreateAudit(job.JobNo, jobId, "REPAIR_ASSIGNED", "", $"Phân công đội {request.Team}, {request.Workers.Count} kỹ thuật viên."));
             await _db.SaveChangesAsync();
             return true;
         }
@@ -900,17 +1604,33 @@ namespace Depot.Application.Services
         /// <summary>Đóng Work Order và chuyển sang QC_PENDING; ảnh được ghi nhận ở audit note hiện tại.</summary>
         public async Task<bool> CompleteRepairAsync(long jobId, RepairCompleteRequest request)
         {
-            var job = await _db.DepotJobs.Include(j => j.RepairOrder).FirstOrDefaultAsync(j => j.Id == jobId);
-            if (job == null || job.RepairOrder == null || job.Status != "REPAIRING") return false;
+            var job = await _db.DepotJobs.FirstOrDefaultAsync(j => j.Id == jobId);
+            var repairOrder = job == null ? null : await _db.RepairOrders.FirstOrDefaultAsync(r => r.DepotJobId == jobId);
+            if (job == null || repairOrder == null || job.Status != "REPAIRING") return false;
 
-            job.RepairOrder.StartedAt ??= DateTime.UtcNow;
-            job.RepairOrder.CompletedAt = DateTime.UtcNow;
-            job.RepairOrder.QcStatus = "PENDING";
-            job.RepairOrder.QcNotes = request.Photos.Count == 0 ? "Hoàn thành không kèm ảnh." : $"Đã đính kèm {request.Photos.Count} ảnh.";
+            repairOrder.StartedAt ??= DateTime.UtcNow;
+            repairOrder.CompletedAt = DateTime.UtcNow;
+            repairOrder.QcStatus = "PENDING";
+            // Ảnh sau sửa đã được lưu thật từng tấm lúc chụp (bảng DepotFiles, TableName="RepairOrder") —
+            // đếm theo DB thay vì tin `request.Photos` (trước đây frontend gửi base64 lên đây rồi bị bỏ đi,
+            // chỉ ghi lại con số).
+            var afterPhotoCount = await _db.Set<DepotFile>()
+                .CountAsync(f => f.TableName == RepairAfterPhotoTable && f.IdTable == repairOrder.Id && !f.IsDeleted);
+            repairOrder.QcNotes = afterPhotoCount == 0 ? "Hoàn thành không kèm ảnh." : $"Đã đính kèm {afterPhotoCount} ảnh sau sửa.";
             job.Status = "QC_PENDING";
-            _db.AuditLogs.Add(CreateAudit(job.JobNo, jobId, "REPAIR_COMPLETED", job.RepairOrder.TechnicianName, "Hoàn tất thi công, chuyển QC."));
+            _db.AuditLogs.Add(CreateAudit(job.JobNo, jobId, "REPAIR_COMPLETED", repairOrder.TechnicianName, "Hoàn tất thi công, chuyển QC."));
             await _db.SaveChangesAsync();
             return true;
+        }
+
+        /// <summary>TableName trong DepotFiles cho ảnh sau sửa — IdTable = RepairOrder.Id.</summary>
+        public const string RepairAfterPhotoTable = "RepairOrder";
+
+        public async Task<long?> GetRepairOrderIdAsync(long jobId, bool requireRepairing)
+        {
+            var job = await _db.DepotJobs.FirstOrDefaultAsync(j => j.Id == jobId && !j.IsDeleted);
+            if (job == null || (requireRepairing && job.Status != "REPAIRING")) return null;
+            return await _db.RepairOrders.Where(r => r.DepotJobId == jobId).Select(r => (long?)r.Id).FirstOrDefaultAsync();
         }
 
         /// <summary>QC đạt chuyển READY_FOR_OUT, QC trượt chuyển ngược REPAIRING để sửa lại.</summary>
@@ -918,18 +1638,22 @@ namespace Depot.Application.Services
         {
             if (!long.TryParse(qcReq.JobId, out var jobId)) return false;
 
-            var job = await _db.DepotJobs.Include(j => j.RepairOrder).FirstOrDefaultAsync(j => j.Id == jobId);
-            if (job == null || job.RepairOrder == null || job.Status != "QC_PENDING") return false;
+            var job = await _db.DepotJobs.FirstOrDefaultAsync(j => j.Id == jobId);
+            var repairOrder = job == null ? null : await _db.RepairOrders.FirstOrDefaultAsync(r => r.DepotJobId == jobId);
+            if (job == null || repairOrder == null || job.Status != "QC_PENDING") return false;
 
-            if (job.RepairOrder != null)
-            {
-                job.RepairOrder.CompletedAt = DateTime.UtcNow;
-                job.RepairOrder.QcStatus = qcReq.Passed ? "PASSED" : "FAILED";
-                job.RepairOrder.QcNotes = qcReq.Comments;
-                job.RepairOrder.InspectorName = qcReq.InspectorName;
-            }
+            repairOrder.CompletedAt = DateTime.UtcNow;
+            repairOrder.QcStatus = qcReq.Passed ? "PASSED" : "FAILED";
+            repairOrder.QcNotes = qcReq.Comments;
+            repairOrder.InspectorName = qcReq.InspectorName;
 
-            job.Status = qcReq.Passed ? "READY_FOR_OUT" : "REPAIRING";
+            // QC đạt trước đây luôn cho READY_FOR_OUT ngay — nhưng container vừa sửa chữa vừa có lệnh vệ
+            // sinh song song (tự sinh từ SubmitSurveyAsync khi surveyor chọn dịch vụ vệ sinh cho container
+            // vừa hư hỏng) thì phải dừng ở CLEANING để Tổ Vệ Sinh xử lý trước, không được bỏ qua khâu vệ
+            // sinh chỉ vì QC sửa chữa đã đạt.
+            var hasActiveCleaningRecord = qcReq.Passed && await _db.CleaningRecords
+                .AnyAsync(c => c.JobNo == job.JobNo && c.Status != "HANDOVER_TO_OPERATION");
+            job.Status = qcReq.Passed ? (hasActiveCleaningRecord ? "CLEANING" : "READY_FOR_OUT") : "REPAIRING";
 
             _db.AuditLogs.Add(new JobAuditLog
             {
@@ -956,7 +1680,7 @@ namespace Depot.Application.Services
             var occupied = await _db.YardPositions.AnyAsync(p => p.IsOccupied && p.BlockCode == moveReq.TargetBlock && p.Bay == moveReq.TargetBay && p.Row == moveReq.TargetRow && p.Tier == moveReq.TargetTier && p.OccupiedContainerNo != job.ContainerNo);
             if (occupied) return false;
 
-            var oldPos = $"Block {job.BlockCode} Bay {job.Bay}-Row {job.Row}-Tier {job.Tier}";
+            var oldPos = string.IsNullOrEmpty(job.BlockCode) ? "Ngoài bãi (khu giám định/vệ sinh)" : $"Block {job.BlockCode} Bay {job.Bay}-Row {job.Row}-Tier {job.Tier}";
 
             job.BlockCode = moveReq.TargetBlock;
             job.Bay = moveReq.TargetBay;
@@ -984,6 +1708,15 @@ namespace Depot.Application.Services
             var job = await _db.DepotJobs.FirstOrDefaultAsync(j => j.Id == jobId);
             if (job == null || job.Status != "READY_FOR_OUT" || string.IsNullOrWhiteSpace(request.TruckPlate) || string.IsNullOrWhiteSpace(request.DriverName)) return false;
 
+            // Trước đây không hề kiểm tra đã thanh toán chưa — container còn nợ phí lưu bãi/nâng hạ
+            // (ServiceOrder phát sinh từ Khai Thác Gate-In) vẫn Gate-Out được bình thường miễn Status đúng
+            // READY_FOR_OUT. Chỉ chặn khi THẬT SỰ có phiếu dịch vụ phát sinh phí (GrandTotal > 0) và chưa
+            // thanh toán — container AV không phát sinh dịch vụ gì (không có ServiceOrder nào) vẫn được
+            // Gate-Out bình thường như thiết kế cũ, không đổi hành vi cho trường hợp đó.
+            var hasUnpaidServiceOrder = await _db.ServiceOrders.AnyAsync(so =>
+                so.DepotJobId == job.Id && so.Status != "CANCELLED" && so.GrandTotal > 0 && so.PaymentStatus != "PAID");
+            if (hasUnpaidServiceOrder) return false;
+
             job.Status = "GATE_OUT";
             job.GateOutDate = DateTime.UtcNow;
             job.GateOutTruckPlate = request.TruckPlate.Trim().ToUpperInvariant();
@@ -998,7 +1731,7 @@ namespace Depot.Application.Services
                 position.IsOccupied = false;
                 position.OccupiedContainerNo = null;
             }
-            _db.AuditLogs.Add(CreateAudit(job.JobNo, jobId, "GATE_OUT", request.DriverName, $"Cấp vỏ cho xe {job.GateOutTruckPlate}, EIR {job.GateOutEirNo}."));
+            _db.AuditLogs.Add(CreateAudit(job.JobNo, jobId, "GATE_OUT", "", $"Cấp vỏ cho xe {job.GateOutTruckPlate}, tài xế {request.DriverName}, EIR {job.GateOutEirNo}."));
             await _db.SaveChangesAsync();
             return true;
         }
@@ -1012,15 +1745,24 @@ namespace Depot.Application.Services
         private static void ValidateGateInRequest(CreateDepotJobRequest request)
         {
             var containerNo = request.ContainerNo.Trim().ToUpperInvariant().Replace("-", string.Empty);
-            var validSizes = new[] { "20GP", "40GP", "40HC", "45HC", "20RF", "40RH" };
             if (string.IsNullOrWhiteSpace(request.ContainerNo))
                 throw new ArgumentException("Thiếu số container.");
 
             if (containerNo.Length != 11 || !containerNo.All(char.IsLetterOrDigit))
                 throw new ArgumentException("Số container phải có đúng 11 ký tự, chỉ gồm chữ và số.");
 
-            if (!validSizes.Contains(request.IsoSize.ToUpperInvariant()))
-                throw new ArgumentException($"Loại ISO '{request.IsoSize}' không hợp lệ. Hỗ trợ: {string.Join(", ", validSizes)}.");
+            // Trước đây chỉ kiểm tra độ dài + toàn chữ/số — số container gõ sai 1 ký tự (vd nhầm 0/O,
+            // 1/I) vẫn qua được nếu đủ 11 ký tự, không hề tính check-digit thật theo chuẩn ISO 6346.
+            if (!TryGetIso6346CheckDigit(containerNo, out var expectedCheckDigit))
+                throw new ArgumentException($"Số container '{containerNo}' không đúng định dạng ISO 6346 (4 chữ cái + 6 số + 1 số kiểm tra).");
+            var actualCheckDigit = containerNo[10] - '0';
+            if (actualCheckDigit != expectedCheckDigit)
+                throw new ArgumentException($"Số container '{containerNo}' sai check-digit ISO 6346 — số kiểm tra đúng phải là {expectedCheckDigit}, không phải {actualCheckDigit}. Kiểm tra lại có gõ nhầm ký tự nào không.");
+
+            if (string.IsNullOrWhiteSpace(request.IsoSize))
+                throw new ArgumentException("Thiếu kích thước & loại container.");
+            // Loại container có hợp lệ hay không kiểm tra theo danh mục CONTAINER_TYPE thật trong
+            // CreateGateInJobAsync (trước đây là danh sách cứng 6 loại ở đây).
 
             if (string.IsNullOrWhiteSpace(request.ShippingLine))
                 throw new ArgumentException("Thiếu hãng tàu.");
@@ -1040,16 +1782,55 @@ namespace Depot.Application.Services
             if (string.IsNullOrWhiteSpace(request.DriverPhone))
                 throw new ArgumentException("Thiếu số điện thoại bác tài.");
 
+            // BUG-025: trước đây nhận SĐT toàn chữ ("abcxyz") và tên dài 1.000 ký tự, in thẳng lên e-EIR.
+            if (request.DriverName.Trim().Length > 150)
+                throw new ArgumentException("Họ tên bác tài tối đa 150 ký tự.");
+            var phoneDigits = new string(request.DriverPhone.Where(char.IsDigit).ToArray());
+            if (!request.DriverPhone.Trim().All(c => char.IsDigit(c) || c is ' ' or '.' or '-' or '+' or '(' or ')')
+                || phoneDigits.Length is < 9 or > 15)
+                throw new ArgumentException($"Số điện thoại bác tài '{request.DriverPhone.Trim()}' không hợp lệ (9–15 chữ số).");
+
             // Trường này KHÔNG cho gõ tay ngoài UI — frontend tự gắn Id tài khoản đang đăng nhập vào request.
             // Nếu thiếu tức là phiên đăng nhập bị mất (localStorage bị xoá, gọi thẳng API...) nên chặn ngay.
             if (request.GateInStaffId is null || request.GateInStaffId <= 0)
                 throw new ArgumentException("Thiếu nhân viên tiếp nhận (phiên đăng nhập không hợp lệ, vui lòng đăng nhập lại).");
         }
 
+        // Bảng quy đổi chữ cái → số theo đúng chuẩn ISO 6346 (bỏ qua bội số của 11: không có giá trị nào
+        // là 11, 22, 33...).
+        private static readonly Dictionary<char, int> Iso6346LetterValues = new()
+        {
+            ['A'] = 10, ['B'] = 12, ['C'] = 13, ['D'] = 14, ['E'] = 15, ['F'] = 16, ['G'] = 17, ['H'] = 18,
+            ['I'] = 19, ['J'] = 20, ['K'] = 21, ['L'] = 23, ['M'] = 24, ['N'] = 25, ['O'] = 26, ['P'] = 27,
+            ['Q'] = 28, ['R'] = 29, ['S'] = 30, ['T'] = 31, ['U'] = 32, ['V'] = 34, ['W'] = 35, ['X'] = 36,
+            ['Y'] = 37, ['Z'] = 38
+        };
+
+        /// <summary>Tính check-digit chuẩn ISO 6346 (4 chữ cái chủ sở hữu+loại, 6 số serial, trọng số 2^n
+        /// theo thứ tự, tổng mod 11 rồi mod 10) cho 10 ký tự đầu của <paramref name="containerNo"/> (đã
+        /// chuẩn hoá, đúng 11 ký tự). Trả false nếu không đúng khuôn dạng 4 chữ cái + 6 số.</summary>
+        private static bool TryGetIso6346CheckDigit(string containerNo, out int checkDigit)
+        {
+            checkDigit = 0;
+            if (containerNo.Length != 11) return false;
+            if (!containerNo.Substring(0, 4).All(char.IsLetter)) return false;
+            if (!containerNo.Substring(4, 6).All(char.IsDigit)) return false;
+
+            var sum = 0;
+            for (var i = 0; i < 10; i++)
+            {
+                var ch = containerNo[i];
+                var value = char.IsDigit(ch) ? ch - '0' : Iso6346LetterValues[ch];
+                sum += value * (1 << i);
+            }
+            checkDigit = (sum % 11) % 10;
+            return true;
+        }
+
         /// <summary>Tổng hợp KPI từ dữ liệu SQL Server cho Dashboard.</summary>
         public async Task<DepotStatisticsSummaryDto> GetDashboardStatsAsync()
         {
-            var jobs = await _db.DepotJobs.Include(j => j.Estimate).ToListAsync();
+            var jobs = await _db.DepotJobs.ToListAsync();
 
             var totalJobs = jobs.Count;
             var gateIn = jobs.Count(j => j.Status == "GATE_IN");
@@ -1058,7 +1839,7 @@ namespace Depot.Application.Services
             var repairing = jobs.Count(j => j.Status == "REPAIRING");
             var readyForOut = jobs.Count(j => j.Status == "READY_FOR_OUT");
 
-            var totalRev = jobs.Where(j => j.Estimate != null).Sum(j => j.Estimate!.GrandTotal);
+            var totalRev = await _db.Estimates.SumAsync(e => (decimal?)e.GrandTotal) ?? 0;
 
             return new DepotStatisticsSummaryDto
             {

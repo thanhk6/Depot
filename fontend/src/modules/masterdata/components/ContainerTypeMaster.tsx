@@ -32,337 +32,6 @@ export interface ContainerTypeMasterProps {
   onUpdateContainerTypes: (updated: ContainerTypeMasterItem[]) => void;
 }
 
-const PRESETS_20FT: Partial<ContainerTypeMasterItem>[] = [
-  {
-    typeCode: '20DC',
-    isoCode: '22G1',
-    vietnameseName: 'Container Khô 20 Feet Thường (20DC / 20GP)',
-    name: '20ft Dry General Purpose Container',
-    size: '20',
-    category: 'DRY',
-    isReefer: false,
-    lengthMm: 6058,
-    widthMm: 2438,
-    heightMm: 2591,
-    internalLengthMm: 5898,
-    internalWidthMm: 2352,
-    internalHeightMm: 2393,
-    doorWidthMm: 2340,
-    doorHeightMm: 2280,
-    cbm: 33.2,
-    tareWeightKg: 2230,
-    maxPayloadKg: 28250,
-    maxGrossWeightKg: 30480,
-    teuRatio: 1.0,
-    material: 'CORTEN_STEEL',
-    floorType: 'WOOD_PLYWOOD',
-    description: 'Quy cách chuẩn phổ biến nhất đóng hàng bách hóa tổng hợp, nông sản, vật liệu xây dựng.'
-  },
-  {
-    typeCode: '20HC',
-    isoCode: '25G1',
-    vietnameseName: 'Container Khô 20 Feet Cao (20HC / 20HQ)',
-    name: '20ft High Cube Dry Container (9ft 6in)',
-    size: '20',
-    category: 'DRY',
-    isReefer: false,
-    lengthMm: 6058,
-    widthMm: 2438,
-    heightMm: 2896,
-    internalLengthMm: 5898,
-    internalWidthMm: 2352,
-    internalHeightMm: 2698,
-    doorWidthMm: 2340,
-    doorHeightMm: 2585,
-    cbm: 37.4,
-    tareWeightKg: 2380,
-    maxPayloadKg: 28100,
-    maxGrossWeightKg: 30480,
-    teuRatio: 1.0,
-    material: 'CORTEN_STEEL',
-    floorType: 'WOOD_PLYWOOD',
-    description: 'Phiên bản 20ft tăng chiều cao lên 2.896m (9ft 6in), tăng dung tích chứa hàng thêm 13%.'
-  },
-  {
-    typeCode: '20RF',
-    isoCode: '22R1',
-    vietnameseName: 'Container Lạnh 20 Feet (20RF)',
-    name: '20ft Reefer Refrigerated Container',
-    size: '20',
-    category: 'REEFER',
-    isReefer: true,
-    lengthMm: 6058,
-    widthMm: 2438,
-    heightMm: 2591,
-    internalLengthMm: 5444,
-    internalWidthMm: 2294,
-    internalHeightMm: 2276,
-    doorWidthMm: 2290,
-    doorHeightMm: 2264,
-    cbm: 28.3,
-    tareWeightKg: 2950,
-    maxPayloadKg: 27530,
-    maxGrossWeightKg: 30480,
-    teuRatio: 1.0,
-    tempRangeMin: -30,
-    tempRangeMax: 30,
-    material: 'STAINLESS_STEEL',
-    floorType: 'ALUMINUM_T_FLOOR',
-    description: 'Trang bị máy nén lạnh Thermo King / Carrier, vách foam cách nhiệt, sàn chữ T luân chuyển khí lạnh.'
-  },
-  {
-    typeCode: '20HR',
-    isoCode: '25R1',
-    vietnameseName: 'Container Lạnh 20 Feet Cao (20HR / 20RH)',
-    name: '20ft High Cube Refrigerated Container',
-    size: '20',
-    category: 'REEFER',
-    isReefer: true,
-    lengthMm: 6058,
-    widthMm: 2438,
-    heightMm: 2896,
-    internalLengthMm: 5444,
-    internalWidthMm: 2294,
-    internalHeightMm: 2560,
-    doorWidthMm: 2290,
-    doorHeightMm: 2540,
-    cbm: 32.5,
-    tareWeightKg: 3100,
-    maxPayloadKg: 27380,
-    maxGrossWeightKg: 30480,
-    teuRatio: 1.0,
-    tempRangeMin: -35,
-    tempRangeMax: 30,
-    material: 'STAINLESS_STEEL',
-    floorType: 'ALUMINUM_T_FLOOR',
-    description: 'Container bảo ôn lạnh 20ft chiều cao 2.896m, bảo quản hàng đông lạnh mật độ cao, kem, thịt bò, dược phẩm.'
-  },
-  {
-    typeCode: '20OT',
-    isoCode: '22U1',
-    vietnameseName: 'Container Mở Nóc 20 Feet (20OT)',
-    name: '20ft Open Top Container (Soft Top)',
-    size: '20',
-    category: 'OPEN_TOP',
-    isReefer: false,
-    lengthMm: 6058,
-    widthMm: 2438,
-    heightMm: 2591,
-    internalLengthMm: 5898,
-    internalWidthMm: 2352,
-    internalHeightMm: 2348,
-    doorWidthMm: 2340,
-    doorHeightMm: 2280,
-    cbm: 32.0,
-    tareWeightKg: 2350,
-    maxPayloadKg: 28130,
-    maxGrossWeightKg: 30480,
-    teuRatio: 1.0,
-    material: 'CORTEN_STEEL',
-    floorType: 'WOOD_PLYWOOD',
-    description: 'Nóc hở phủ bạt Tarpaulin kéo rút, đà ngang xà nóc tháo lắp được, phục vụ cẩu tải hàng máy móc quá khổ.'
-  },
-  {
-    typeCode: '20HT',
-    isoCode: '22U6',
-    vietnameseName: 'Container Mở Nóc Cứng 20 Feet (20HT / Hard Top)',
-    name: '20ft Hard Top Open Top Container',
-    size: '20',
-    category: 'OPEN_TOP',
-    isReefer: false,
-    lengthMm: 6058,
-    widthMm: 2438,
-    heightMm: 2591,
-    internalLengthMm: 5898,
-    internalWidthMm: 2352,
-    internalHeightMm: 2348,
-    doorWidthMm: 2340,
-    doorHeightMm: 2280,
-    cbm: 32.2,
-    tareWeightKg: 2680,
-    maxPayloadKg: 27800,
-    maxGrossWeightKg: 30480,
-    teuRatio: 1.0,
-    material: 'CORTEN_STEEL',
-    floorType: 'WOOD_PLYWOOD',
-    description: 'Nắp nóc bằng tôn thép dập sóng tháo rời được bằng cẩu bốc xếp, an toàn và kín nước như cont khô.'
-  },
-  {
-    typeCode: '20FR',
-    isoCode: '22P1',
-    vietnameseName: 'Container Mặt Bằng 20 Feet (20FR)',
-    name: '20ft Flat Rack Container (Collapsible Ends)',
-    size: '20',
-    category: 'FLAT_RACK',
-    isReefer: false,
-    lengthMm: 6058,
-    widthMm: 2438,
-    heightMm: 2591,
-    internalLengthMm: 5940,
-    internalWidthMm: 2380,
-    internalHeightMm: 2233,
-    doorWidthMm: 0,
-    doorHeightMm: 0,
-    cbm: 31.0,
-    tareWeightKg: 2750,
-    maxPayloadKg: 32250,
-    maxGrossWeightKg: 35000,
-    teuRatio: 1.0,
-    material: 'CORTEN_STEEL',
-    floorType: 'WOOD_PLYWOOD',
-    description: 'Không vách bên và nóc, 2 đầu thành gập phẳng xếp chồng, sàn chịu tải cực cao cho xe cơ giới, máy xúc.'
-  },
-  {
-    typeCode: '20TK',
-    isoCode: '22T1',
-    vietnameseName: 'Container Bồn Xitec 20 Feet (20TK / ISO Tank)',
-    name: '20ft ISO Tank Container (UN T11/T14)',
-    size: '20',
-    category: 'TANK',
-    isReefer: false,
-    lengthMm: 6058,
-    widthMm: 2438,
-    heightMm: 2591,
-    internalLengthMm: 5850,
-    internalWidthMm: 2300,
-    internalHeightMm: 2300,
-    doorWidthMm: 0,
-    doorHeightMm: 0,
-    cbm: 26.0,
-    tareWeightKg: 3420,
-    maxPayloadKg: 32580,
-    maxGrossWeightKg: 36000,
-    teuRatio: 1.0,
-    material: 'STAINLESS_STEEL',
-    floorType: 'STEEL',
-    description: 'Bồn thép không gỉ 316L, có lớp cách nhiệt và ống gia nhiệt hơi nước Steam Coil, vận chuyển hóa chất lỏng, dầu nhớt.'
-  },
-  {
-    typeCode: '20VH',
-    isoCode: '22V0',
-    vietnameseName: 'Container Thông Gió 20 Feet (20VH / Coffee Cont)',
-    name: '20ft Ventilated Coffee Container',
-    size: '20',
-    category: 'VENTILATED',
-    isReefer: false,
-    lengthMm: 6058,
-    widthMm: 2438,
-    heightMm: 2591,
-    internalLengthMm: 5898,
-    internalWidthMm: 2352,
-    internalHeightMm: 2393,
-    doorWidthMm: 2340,
-    doorHeightMm: 2280,
-    cbm: 33.0,
-    tareWeightKg: 2320,
-    maxPayloadKg: 28160,
-    maxGrossWeightKg: 30480,
-    teuRatio: 1.0,
-    material: 'CORTEN_STEEL',
-    floorType: 'WOOD_PLYWOOD',
-    description: 'Có hệ thống khe thoát ẩm thông gió tự nhiên dọc xà trên và xà dưới, chống ngưng tụ mồ hôi cho hạt cà phê, ca cao.'
-  },
-  {
-    typeCode: '20BK',
-    isoCode: '22B0',
-    vietnameseName: 'Container Chở Hàng Rời 20 Feet (20BK / Bulk)',
-    name: '20ft Dry Bulk Container (Top Loading Hatch)',
-    size: '20',
-    category: 'BULK',
-    isReefer: false,
-    lengthMm: 6058,
-    widthMm: 2438,
-    heightMm: 2591,
-    internalLengthMm: 5898,
-    internalWidthMm: 2352,
-    internalHeightMm: 2393,
-    doorWidthMm: 2340,
-    doorHeightMm: 2280,
-    cbm: 32.8,
-    tareWeightKg: 2450,
-    maxPayloadKg: 28030,
-    maxGrossWeightKg: 30480,
-    teuRatio: 1.0,
-    material: 'CORTEN_STEEL',
-    floorType: 'STEEL',
-    description: 'Có cửa nạp liệu trên nóc (Manholes) và cửa xả góc dưới cửa sau, dùng vận chuyển ngũ cốc, hạt nhựa, xi măng.'
-  },
-  {
-    typeCode: '20OS',
-    isoCode: '22S1',
-    vietnameseName: 'Container Mở Vách Hông 20 Feet (20OS / Side Door)',
-    name: '20ft Full Side Access / Open Side Container',
-    size: '20',
-    category: 'SPECIAL',
-    isReefer: false,
-    lengthMm: 6058,
-    widthMm: 2438,
-    heightMm: 2591,
-    internalLengthMm: 5898,
-    internalWidthMm: 2280,
-    internalHeightMm: 2300,
-    doorWidthMm: 5700,
-    doorHeightMm: 2180,
-    cbm: 31.0,
-    tareWeightKg: 3180,
-    maxPayloadKg: 27300,
-    maxGrossWeightKg: 30480,
-    teuRatio: 1.0,
-    material: 'CORTEN_STEEL',
-    floorType: 'WOOD_PLYWOOD',
-    description: 'Toàn bộ một bên vách hông mở 4 cánh cửa dạng xếp, cho phép xe nâng bốc dỡ pallet trực tiếp từ cạnh bên.'
-  },
-  {
-    typeCode: '20DD',
-    isoCode: '22G9',
-    vietnameseName: 'Container Mở 2 Đầu Cửa 20 Feet (20DD / Tunnel)',
-    name: '20ft Double Door / Tunnel Container',
-    size: '20',
-    category: 'SPECIAL',
-    isReefer: false,
-    lengthMm: 6058,
-    widthMm: 2438,
-    heightMm: 2591,
-    internalLengthMm: 5840,
-    internalWidthMm: 2352,
-    internalHeightMm: 2393,
-    doorWidthMm: 2340,
-    doorHeightMm: 2280,
-    cbm: 32.8,
-    tareWeightKg: 2400,
-    maxPayloadKg: 28080,
-    maxGrossWeightKg: 30480,
-    teuRatio: 1.0,
-    material: 'CORTEN_STEEL',
-    floorType: 'WOOD_PLYWOOD',
-    description: 'Thiết kế 2 bộ cửa mở ở cả hai đầu container, thuận tiện bốc dỡ hàng theo nguyên tắc FIFO hoặc ngăn vách đôi.'
-  },
-  {
-    typeCode: '20IC',
-    isoCode: '22H0',
-    vietnameseName: 'Container Cách Nhiệt Bảo Ôn 20 Feet (20IC / Insulated)',
-    name: '20ft Insulated Thermal Container',
-    size: '20',
-    category: 'SPECIAL',
-    isReefer: false,
-    lengthMm: 6058,
-    widthMm: 2438,
-    heightMm: 2591,
-    internalLengthMm: 5740,
-    internalWidthMm: 2270,
-    internalHeightMm: 2270,
-    doorWidthMm: 2260,
-    doorHeightMm: 2210,
-    cbm: 29.5,
-    tareWeightKg: 2550,
-    maxPayloadKg: 27930,
-    maxGrossWeightKg: 30480,
-    teuRatio: 1.0,
-    material: 'STAINLESS_STEEL',
-    floorType: 'WOOD_PLYWOOD',
-    description: 'Vách cách nhiệt Polyurethane bảo vệ hàng hóa nhạy cảm với sốc nhiệt mà không cần máy lạnh cơ học.'
-  }
-];
 
 export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
   containerTypes,
@@ -399,21 +68,21 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
     size: '20',
     category: 'DRY',
     isReefer: false,
-    lengthMm: 6058,
-    widthMm: 2438,
-    heightMm: 2591,
-    internalLengthMm: 5898,
-    internalWidthMm: 2352,
-    internalHeightMm: 2393,
-    doorWidthMm: 2340,
-    doorHeightMm: 2280,
-    cbm: 33.2,
-    tareWeightKg: 2200,
-    maxPayloadKg: 28280,
-    maxGrossWeightKg: 30480,
+    lengthMm: 0,
+    widthMm: 0,
+    heightMm: 0,
+    internalLengthMm: 0,
+    internalWidthMm: 0,
+    internalHeightMm: 0,
+    doorWidthMm: 0,
+    doorHeightMm: 0,
+    cbm: 0,
+    tareWeightKg: 0,
+    maxPayloadKg: 0,
+    maxGrossWeightKg: 0,
     teuRatio: 1.0,
-    tempRangeMin: -30,
-    tempRangeMax: 30,
+    tempRangeMin: undefined,
+    tempRangeMax: undefined,
     material: 'CORTEN_STEEL',
     floorType: 'WOOD_PLYWOOD',
     description: '',
@@ -459,7 +128,7 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
   const handleOpenCreate = () => {
     setEditingType(null);
     setFormData({
-      id: `CT-${String(types.length + 1).padStart(2, '0')}`,
+      id: `CT-${Date.now()}`,
       typeCode: '',
       isoCode: '',
       name: '',
@@ -467,21 +136,21 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
       size: '20',
       category: 'DRY',
       isReefer: false,
-      lengthMm: 6058,
-      widthMm: 2438,
-      heightMm: 2591,
-      internalLengthMm: 5898,
-      internalWidthMm: 2352,
-      internalHeightMm: 2393,
-      doorWidthMm: 2340,
-      doorHeightMm: 2280,
-      cbm: 33.2,
-      tareWeightKg: 2200,
-      maxPayloadKg: 28280,
-      maxGrossWeightKg: 30480,
+      lengthMm: 0,
+      widthMm: 0,
+      heightMm: 0,
+      internalLengthMm: 0,
+      internalWidthMm: 0,
+      internalHeightMm: 0,
+      doorWidthMm: 0,
+      doorHeightMm: 0,
+      cbm: 0,
+      tareWeightKg: 0,
+      maxPayloadKg: 0,
+      maxGrossWeightKg: 0,
       teuRatio: 1.0,
-      tempRangeMin: -30,
-      tempRangeMax: 30,
+      tempRangeMin: undefined,
+      tempRangeMax: undefined,
       material: 'CORTEN_STEEL',
       floorType: 'WOOD_PLYWOOD',
       description: '',
@@ -498,13 +167,28 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
     setIsModalOpen(true);
   };
 
+  // Mã ISO là khóa `Code` duy nhất của catalog trên DB, mã loại là `Name` mà Gate-In dò theo — cả 2
+  // đều phải duy nhất trong danh mục (trùng ISO thì persistCatalog sẽ ghi đè lên dòng có sẵn).
+  const findDuplicate = (typeCode: string, isoCode: string, excludeId?: string) =>
+    types.find(
+      (t) =>
+        t.id !== excludeId &&
+        (t.typeCode.toUpperCase() === typeCode.toUpperCase() || t.isoCode.toUpperCase() === isoCode.toUpperCase())
+    );
+
+  const nextFreeCode = (base: string, suffix: string, taken: (code: string) => boolean) => {
+    let candidate = `${base}${suffix}`;
+    for (let n = 2; taken(candidate); n++) candidate = `${base}${suffix}${n}`;
+    return candidate;
+  };
+
   // Handle Duplicate
   const handleDuplicate = (item: ContainerTypeMasterItem) => {
     const newItem: ContainerTypeMasterItem = {
       ...item,
-      id: `CT-${Date.now().toString().slice(-4)}`,
-      typeCode: `${item.typeCode}_COPY`,
-      isoCode: `${item.isoCode}_C`,
+      id: `CT-${Date.now()}`,
+      typeCode: nextFreeCode(item.typeCode, '_COPY', (c) => types.some((t) => t.typeCode.toUpperCase() === c)),
+      isoCode: nextFreeCode(item.isoCode, '_C', (c) => types.some((t) => t.isoCode.toUpperCase() === c)),
       vietnameseName: `${item.vietnameseName} (Bản sao)`,
       sortOrder: types.length + 1
     };
@@ -535,6 +219,11 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
       alert('Vui lòng nhập đầy đủ Mã loại container, Mã ISO và Tên tiếng Việt!');
       return;
     }
+    const duplicate = findDuplicate(formData.typeCode, formData.isoCode, editingType?.id);
+    if (duplicate) {
+      alert(`Mã loại hoặc mã ISO đã được dùng bởi "${duplicate.typeCode} / ${duplicate.isoCode}". Mỗi loại container phải có mã loại và mã ISO riêng.`);
+      return;
+    }
 
     const payloadKg = (formData.maxGrossWeightKg || 0) - (formData.tareWeightKg || 0);
 
@@ -554,23 +243,23 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
         id: formData.id || `CT-${Date.now().toString().slice(-4)}`,
         typeCode: formData.typeCode.toUpperCase(),
         isoCode: formData.isoCode.toUpperCase(),
-        name: formData.name || formData.vietnameseName,
+        name: formData.name || '',
         vietnameseName: formData.vietnameseName,
         size: formData.size || '20',
         category: formData.category || 'DRY',
         isReefer: formData.category === 'REEFER' || !!formData.isReefer,
-        lengthMm: Number(formData.lengthMm) || 6058,
-        widthMm: Number(formData.widthMm) || 2438,
-        heightMm: Number(formData.heightMm) || 2591,
-        internalLengthMm: Number(formData.internalLengthMm) || 5898,
-        internalWidthMm: Number(formData.internalWidthMm) || 2352,
-        internalHeightMm: Number(formData.internalHeightMm) || 2393,
-        doorWidthMm: Number(formData.doorWidthMm) || 2340,
-        doorHeightMm: Number(formData.doorHeightMm) || 2280,
-        cbm: Number(formData.cbm) || 33.2,
-        tareWeightKg: Number(formData.tareWeightKg) || 2200,
-        maxPayloadKg: payloadKg > 0 ? payloadKg : Number(formData.maxPayloadKg) || 28280,
-        maxGrossWeightKg: Number(formData.maxGrossWeightKg) || 30480,
+        lengthMm: Number(formData.lengthMm) || 0,
+        widthMm: Number(formData.widthMm) || 0,
+        heightMm: Number(formData.heightMm) || 0,
+        internalLengthMm: Number(formData.internalLengthMm) || 0,
+        internalWidthMm: Number(formData.internalWidthMm) || 0,
+        internalHeightMm: Number(formData.internalHeightMm) || 0,
+        doorWidthMm: Number(formData.doorWidthMm) || 0,
+        doorHeightMm: Number(formData.doorHeightMm) || 0,
+        cbm: Number(formData.cbm) || 0,
+        tareWeightKg: Number(formData.tareWeightKg) || 0,
+        maxPayloadKg: payloadKg > 0 ? payloadKg : Number(formData.maxPayloadKg) || 0,
+        maxGrossWeightKg: Number(formData.maxGrossWeightKg) || 0,
         teuRatio: formData.size === '20' ? 1.0 : formData.size === '40' ? 2.0 : formData.size === '45' ? 2.25 : 0.5,
         tempRangeMin: formData.tempRangeMin,
         tempRangeMax: formData.tempRangeMax,
@@ -590,21 +279,21 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
   const getCategoryBadge = (category: ContainerCategoryType) => {
     switch (category) {
       case 'DRY':
-        return 'bg-sky-500/15 text-sky-300 border-sky-500/30';
+        return 'bg-sky-50 text-sky-700 border-sky-200';
       case 'REEFER':
-        return 'bg-teal-500/15 text-teal-300 border-teal-500/30';
+        return 'bg-teal-50 text-teal-700 border-teal-200';
       case 'OPEN_TOP':
-        return 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+        return 'bg-amber-50 text-amber-700 border-amber-200';
       case 'FLAT_RACK':
-        return 'bg-rose-500/15 text-rose-300 border-rose-500/30';
+        return 'bg-rose-50 text-rose-700 border-rose-200';
       case 'TANK':
-        return 'bg-purple-500/15 text-purple-300 border-purple-500/30';
+        return 'bg-purple-50 text-purple-700 border-purple-200';
       case 'VENTILATED':
-        return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
+        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
       case 'BULK':
-        return 'bg-orange-500/15 text-orange-300 border-orange-500/30';
+        return 'bg-orange-50 text-orange-700 border-orange-200';
       default:
-        return 'bg-slate-700 text-slate-300 border-slate-600';
+        return 'bg-slate-200 text-slate-700 border-slate-600';
     }
   };
 
@@ -672,74 +361,74 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
     <div className="space-y-5">
       {/* Top Banner & KPI Stat Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center gap-3 shadow-lg">
-          <div className="p-2.5 bg-sky-500/20 text-sky-400 rounded-xl">
+        <div className="p-4 bg-white border border-slate-200 rounded-2xl flex items-center gap-3 shadow-lg">
+          <div className="p-2.5 bg-sky-50 text-sky-600 rounded-xl">
             <Container className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-[11px] text-slate-400 block font-medium">Tổng Loại Vỏ</span>
-            <span className="text-lg font-bold text-white">{stats.total} loại</span>
+            <span className="text-[11px] text-slate-500 block font-medium">Tổng Loại Vỏ</span>
+            <span className="text-lg font-bold text-slate-900">{stats.total} loại</span>
           </div>
         </div>
 
-        <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center gap-3 shadow-lg">
-          <div className="p-2.5 bg-blue-500/20 text-blue-400 rounded-xl">
+        <div className="p-4 bg-white border border-slate-200 rounded-2xl flex items-center gap-3 shadow-lg">
+          <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
             <Box className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-[11px] text-slate-400 block font-medium">Cont Khô (Dry)</span>
-            <span className="text-lg font-bold text-blue-400">{stats.dryCount} loại</span>
+            <span className="text-[11px] text-slate-500 block font-medium">Cont Khô (Dry)</span>
+            <span className="text-lg font-bold text-blue-600">{stats.dryCount} loại</span>
           </div>
         </div>
 
-        <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center gap-3 shadow-lg">
-          <div className="p-2.5 bg-teal-500/20 text-teal-400 rounded-xl">
+        <div className="p-4 bg-white border border-slate-200 rounded-2xl flex items-center gap-3 shadow-lg">
+          <div className="p-2.5 bg-teal-50 text-teal-600 rounded-xl">
             <ThermometerSnowflake className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-[11px] text-slate-400 block font-medium">Cont Lạnh (Reefer)</span>
-            <span className="text-lg font-bold text-teal-400">{stats.reeferCount} loại</span>
+            <span className="text-[11px] text-slate-500 block font-medium">Cont Lạnh (Reefer)</span>
+            <span className="text-lg font-bold text-teal-600">{stats.reeferCount} loại</span>
           </div>
         </div>
 
-        <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center gap-3 shadow-lg">
-          <div className="p-2.5 bg-amber-500/20 text-amber-400 rounded-xl">
+        <div className="p-4 bg-white border border-slate-200 rounded-2xl flex items-center gap-3 shadow-lg">
+          <div className="p-2.5 bg-amber-50 text-amber-600 rounded-xl">
             <Layers className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-[11px] text-slate-400 block font-medium">Loại Đặc Biệt</span>
-            <span className="text-lg font-bold text-amber-400">{stats.specialCount} loại</span>
+            <span className="text-[11px] text-slate-500 block font-medium">Loại Đặc Biệt</span>
+            <span className="text-lg font-bold text-amber-600">{stats.specialCount} loại</span>
           </div>
         </div>
 
-        <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center gap-3 shadow-lg col-span-2 sm:col-span-1">
-          <div className="p-2.5 bg-emerald-500/20 text-emerald-400 rounded-xl">
+        <div className="p-4 bg-white border border-slate-200 rounded-2xl flex items-center gap-3 shadow-lg col-span-2 sm:col-span-1">
+          <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl">
             <CheckCircle2 className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-[11px] text-slate-400 block font-medium">Đang Áp Dụng</span>
-            <span className="text-lg font-bold text-emerald-400">{stats.activeCount} active</span>
+            <span className="text-[11px] text-slate-500 block font-medium">Đang Áp Dụng</span>
+            <span className="text-lg font-bold text-emerald-600">{stats.activeCount} active</span>
           </div>
         </div>
       </div>
 
       {/* Control Toolbar */}
-      <div className="p-4 bg-slate-900 border border-slate-800 rounded-3xl space-y-3 shadow-xl">
+      <div className="p-4 bg-white border border-slate-200 rounded-3xl space-y-3 shadow-xl">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           {/* Search bar */}
           <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Tìm theo mã loại (20DC, 40HC, 40HR), mã ISO (22G1, 45R1), tên quy cách..."
-              className="w-full pl-10 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-sky-500 transition"
+              className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-500 focus:outline-none focus:border-sky-500 transition"
             />
             {searchTerm && (
               <button
                 onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -750,18 +439,18 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={handleExportCSV}
-              className="px-3.5 py-2 bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow"
+              className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow"
             >
-              <Download className="w-4 h-4 text-emerald-400" />
+              <Download className="w-4 h-4 text-emerald-600" />
               <span>Xuất Excel/CSV</span>
             </button>
 
             {/* View Mode Toggle */}
-            <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl p-0.5">
+            <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl p-0.5">
               <button
                 onClick={() => setViewMode('TABLE')}
                 className={`p-1.5 rounded-lg transition ${
-                  viewMode === 'TABLE' ? 'bg-sky-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                  viewMode === 'TABLE' ? 'bg-sky-600 text-white shadow' : 'text-slate-500 hover:text-slate-900'
                 }`}
                 title="Dạng Bảng Chi Tiết"
               >
@@ -770,7 +459,7 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
               <button
                 onClick={() => setViewMode('GRID')}
                 className={`p-1.5 rounded-lg transition ${
-                  viewMode === 'GRID' ? 'bg-sky-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                  viewMode === 'GRID' ? 'bg-sky-600 text-white shadow' : 'text-slate-500 hover:text-slate-900'
                 }`}
                 title="Dạng Thẻ Blueprint"
               >
@@ -780,7 +469,7 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
 
             <button
               onClick={handleOpenCreate}
-              className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-lg shadow-sky-600/30"
+              className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-lg "
             >
               <Plus className="w-4 h-4" />
               <span>+ Thêm Loại Container</span>
@@ -789,9 +478,9 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
         </div>
 
         {/* Filters bar */}
-        <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-slate-800/80 text-xs">
+        <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-slate-200/80 text-xs">
           <span className="text-[11px] text-slate-500 font-semibold flex items-center gap-1">
-            <Filter className="w-3 h-3 text-sky-400" /> Lọc nhanh:
+            <Filter className="w-3 h-3 text-sky-600" /> Lọc nhanh:
           </span>
 
           {/* Category Filter */}
@@ -803,7 +492,7 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
                 className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
                   categoryFilter === cat
                     ? 'bg-sky-600 text-white shadow'
-                    : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+                    : 'bg-slate-50 text-slate-500 hover:text-slate-700 border border-slate-200'
                 }`}
               >
                 {cat === 'ALL'
@@ -827,7 +516,7 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
             ))}
           </div>
 
-          <div className="h-4 w-px bg-slate-800 mx-1 hidden sm:block" />
+          <div className="h-4 w-px bg-slate-100 mx-1 hidden sm:block" />
 
           {/* Size Filter */}
           <div className="flex items-center gap-1">
@@ -838,7 +527,7 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
                 className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
                   sizeFilter === sz
                     ? 'bg-indigo-600 text-white shadow'
-                    : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+                    : 'bg-slate-50 text-slate-500 hover:text-slate-700 border border-slate-200'
                 }`}
               >
                 {sz === 'ALL' ? 'Tất cả cỡ' : `${sz} Feet`}
@@ -846,7 +535,7 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
             ))}
           </div>
 
-          <div className="h-4 w-px bg-slate-800 mx-1 hidden sm:block" />
+          <div className="h-4 w-px bg-slate-100 mx-1 hidden sm:block" />
 
           {/* Status Filter */}
           <div className="flex items-center gap-1">
@@ -857,7 +546,7 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
                 className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
                   statusFilter === st
                     ? 'bg-emerald-600 text-white shadow'
-                    : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+                    : 'bg-slate-50 text-slate-500 hover:text-slate-700 border border-slate-200'
                 }`}
               >
                 {st === 'ALL' ? 'Tất cả trạng thái' : st === 'ACTIVE' ? 'Đang dùng' : 'Tạm ngưng'}
@@ -870,11 +559,11 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
       {/* Main Content Area */}
       {viewMode === 'TABLE' ? (
         /* TABLE VIEW */
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
+        <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-2xl">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
-                <tr className="border-b border-slate-800 bg-slate-950/80 text-slate-400 font-semibold uppercase tracking-wider">
+                <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider">
                   <th className="py-3.5 px-4">Mã Loại</th>
                   <th className="py-3.5 px-3">Mã ISO</th>
                   <th className="py-3.5 px-4">Tên Quy Cách / Chủng Loại</th>
@@ -888,7 +577,7 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
                   <th className="py-3.5 px-4 text-right">Thao Tác</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60 text-slate-300">
+              <tbody className="divide-y divide-slate-200/60 text-slate-700">
                 {filteredTypes.length === 0 ? (
                   <tr>
                     <td colSpan={11} className="py-12 text-center text-slate-500">
@@ -899,18 +588,18 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
                   filteredTypes.map((item) => (
                     <tr
                       key={item.id}
-                      className="hover:bg-slate-800/40 transition group cursor-pointer"
+                      className="hover:bg-slate-100 transition group cursor-pointer"
                       onClick={() => setViewingDetailType(item)}
                     >
                       {/* Type Code */}
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-2">
-                          <span className="px-2.5 py-1 bg-slate-950 text-white font-mono font-bold rounded-lg border border-slate-800 text-xs shadow-sm">
+                          <span className="px-2.5 py-1 bg-slate-50 text-slate-900 font-mono font-bold rounded-lg border border-slate-200 text-xs shadow-sm">
                             {item.typeCode}
                           </span>
                           {item.isReefer && (
                             <span title="Container Lạnh">
-                              <ThermometerSnowflake className="w-3.5 h-3.5 text-teal-400" />
+                              <ThermometerSnowflake className="w-3.5 h-3.5 text-teal-600" />
                             </span>
                           )}
                         </div>
@@ -918,7 +607,7 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
 
                       {/* ISO Code */}
                       <td className="py-3.5 px-3">
-                        <span className="font-mono font-bold text-sky-400 bg-sky-950/50 px-2 py-0.5 rounded border border-sky-800/50">
+                        <span className="font-mono font-bold text-sky-600 bg-sky-50 px-2 py-0.5 rounded border border-sky-200/50">
                           {item.isoCode}
                         </span>
                       </td>
@@ -926,8 +615,8 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
                       {/* Name */}
                       <td className="py-3.5 px-4">
                         <div>
-                          <span className="font-bold text-white block">{item.vietnameseName}</span>
-                          <span className="text-[11px] text-slate-400 block">{item.name}</span>
+                          <span className="font-bold text-slate-900 block">{item.vietnameseName}</span>
+                          <span className="text-[11px] text-slate-500 block">{item.name}</span>
                         </div>
                       </td>
 
@@ -943,7 +632,7 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
                       </td>
 
                       {/* Dimensions Ext */}
-                      <td className="py-3.5 px-4 font-mono text-[11px] text-slate-300">
+                      <td className="py-3.5 px-4 font-mono text-[11px] text-slate-700">
                         <span>
                           {item.lengthMm.toLocaleString()} x {item.widthMm.toLocaleString()} x{' '}
                           {item.heightMm.toLocaleString()}
@@ -955,24 +644,24 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
                       </td>
 
                       {/* CBM */}
-                      <td className="py-3.5 px-3 font-semibold text-white">
-                        <span className="px-2 py-0.5 bg-slate-950 rounded font-mono text-cyan-300 border border-slate-800">
+                      <td className="py-3.5 px-3 font-semibold text-slate-900">
+                        <span className="px-2 py-0.5 bg-slate-50 rounded font-mono text-cyan-700 border border-slate-200">
                           {item.cbm} m³
                         </span>
                       </td>
 
                       {/* Tare Weight */}
-                      <td className="py-3.5 px-3 font-mono text-slate-300">
+                      <td className="py-3.5 px-3 font-mono text-slate-700">
                         {item.tareWeightKg.toLocaleString()} kg
                       </td>
 
                       {/* Max Gross */}
-                      <td className="py-3.5 px-3 font-mono font-bold text-emerald-400">
+                      <td className="py-3.5 px-3 font-mono font-bold text-emerald-600">
                         {item.maxGrossWeightKg.toLocaleString()} kg
                       </td>
 
                       {/* TEU */}
-                      <td className="py-3.5 px-3 font-mono text-indigo-300 font-bold">
+                      <td className="py-3.5 px-3 font-mono text-indigo-700 font-bold">
                         {item.teuRatio} TEU
                       </td>
 
@@ -982,8 +671,8 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
                           onClick={() => handleToggleStatus(item.id)}
                           className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition flex items-center gap-1 cursor-pointer ${
                             item.status === 'ACTIVE'
-                              ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                              : 'bg-slate-800 text-slate-400 border border-slate-700'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-slate-100 text-slate-500 border border-slate-200'
                           }`}
                         >
                           {item.status === 'ACTIVE' ? (
@@ -1003,28 +692,28 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => setViewingDetailType(item)}
-                            className="p-1.5 text-slate-400 hover:text-sky-400 hover:bg-sky-950/50 rounded-lg transition"
+                            className="p-1.5 text-slate-500 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition"
                             title="Xem chi tiết Blueprint"
                           >
                             <Info className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleOpenEdit(item)}
-                            className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-blue-950/50 rounded-lg transition"
+                            className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
                             title="Chỉnh sửa thông số"
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDuplicate(item)}
-                            className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-amber-950/50 rounded-lg transition"
+                            className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition"
                             title="Tạo bản sao"
                           >
                             <Copy className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDelete(item.id)}
-                            className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-950/50 rounded-lg transition"
+                            className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
                             title="Xóa loại container"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -1045,16 +734,16 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
             <div
               key={item.id}
               onClick={() => setViewingDetailType(item)}
-              className="p-5 bg-slate-900 border border-slate-800 hover:border-sky-500/50 rounded-3xl space-y-4 shadow-xl transition cursor-pointer group flex flex-col justify-between"
+              className="p-5 bg-white border border-slate-200 hover:border-sky-200 rounded-3xl space-y-4 shadow-xl transition cursor-pointer group flex flex-col justify-between"
             >
               <div className="space-y-3">
                 {/* Header card */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="px-3 py-1 bg-slate-950 text-white font-mono font-bold text-sm rounded-xl border border-slate-800 shadow">
+                    <span className="px-3 py-1 bg-slate-50 text-slate-900 font-mono font-bold text-sm rounded-xl border border-slate-200 shadow">
                       {item.typeCode}
                     </span>
-                    <span className="px-2 py-0.5 bg-sky-950/60 text-sky-400 font-mono font-bold text-xs rounded-lg border border-sky-800/60">
+                    <span className="px-2 py-0.5 bg-sky-50 text-sky-600 font-mono font-bold text-xs rounded-lg border border-sky-200/60">
                       {item.isoCode}
                     </span>
                   </div>
@@ -1069,31 +758,31 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
                 </div>
 
                 <div>
-                  <h4 className="font-bold text-white text-sm group-hover:text-sky-300 transition">
+                  <h4 className="font-bold text-slate-900 text-sm group-hover:text-sky-700 transition">
                     {item.vietnameseName}
                   </h4>
-                  <p className="text-xs text-slate-400 line-clamp-2 mt-1">{item.description}</p>
+                  <p className="text-xs text-slate-500 line-clamp-2 mt-1">{item.description}</p>
                 </div>
 
                 {/* Specs Box */}
-                <div className="p-3 bg-slate-950/70 border border-slate-800/80 rounded-2xl grid grid-cols-2 gap-2.5 text-xs">
+                <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-2xl grid grid-cols-2 gap-2.5 text-xs">
                   <div>
                     <span className="text-[10px] text-slate-500 block">Kích thước (DxRxC mm):</span>
-                    <span className="font-mono text-slate-200 text-[11px]">
+                    <span className="font-mono text-slate-700 text-[11px]">
                       {item.lengthMm} x {item.widthMm} x {item.heightMm}
                     </span>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 block">Thể tích chứa hàng:</span>
-                    <span className="font-mono font-bold text-cyan-300">{item.cbm} CBM (m³)</span>
+                    <span className="font-mono font-bold text-cyan-700">{item.cbm} CBM (m³)</span>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 block">Trọng lượng bì (Tare):</span>
-                    <span className="font-mono text-slate-300">{item.tareWeightKg.toLocaleString()} kg</span>
+                    <span className="font-mono text-slate-700">{item.tareWeightKg.toLocaleString()} kg</span>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 block">Max Gross Weight:</span>
-                    <span className="font-mono font-bold text-emerald-400">
+                    <span className="font-mono font-bold text-emerald-600">
                       {item.maxGrossWeightKg.toLocaleString()} kg
                     </span>
                   </div>
@@ -1102,15 +791,15 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
 
               {/* Card Footer Actions */}
               <div
-                className="flex items-center justify-between pt-3 border-t border-slate-800/80"
+                className="flex items-center justify-between pt-3 border-t border-slate-200/80"
                 onClick={(e) => e.stopPropagation()}
               >
                 <button
                   onClick={() => handleToggleStatus(item.id)}
                   className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition flex items-center gap-1 cursor-pointer ${
                     item.status === 'ACTIVE'
-                      ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                      : 'bg-slate-800 text-slate-400 border border-slate-700'
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      : 'bg-slate-100 text-slate-500 border border-slate-200'
                   }`}
                 >
                   {item.status === 'ACTIVE' ? 'Đang áp dụng' : 'Tạm ngưng'}
@@ -1119,21 +808,21 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => handleOpenEdit(item)}
-                    className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-blue-950/50 rounded-lg transition"
+                    className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
                     title="Chỉnh sửa"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => handleDuplicate(item)}
-                    className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-amber-950/50 rounded-lg transition"
+                    className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition"
                     title="Sao chép"
                   >
                     <Copy className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => handleDelete(item.id)}
-                    className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-950/50 rounded-lg transition"
+                    className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
                     title="Xóa"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -1148,25 +837,25 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
       {/* MODAL: ADD / EDIT CONTAINER TYPE */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden my-8">
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden my-8">
             {/* Modal Header */}
-            <div className="p-5 bg-gradient-to-r from-slate-900 via-sky-950/40 to-slate-900 border-b border-slate-800 flex items-center justify-between">
+            <div className="p-5 bg-gradient-to-r from-sky-50 via-white to-slate-50 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-sky-600/20 text-sky-400 rounded-2xl border border-sky-500/30">
+                <div className="p-2.5 bg-sky-50 text-sky-600 rounded-2xl border border-sky-200">
                   <Container className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white">
+                  <h3 className="text-base font-bold text-slate-900">
                     {editingType ? `Chỉnh Sửa Loại Container: ${editingType.typeCode}` : 'Thêm Mới Loại Container (ISO 6346)'}
                   </h3>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-500">
                     Cấu hình kích thước kỹ thuật, thể tích chứa, tải trọng quy chuẩn và đặc tính vận hành.
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition"
+                className="p-2 text-slate-500 hover:text-slate-900 rounded-xl hover:bg-slate-100 transition"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1177,51 +866,15 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
               {/* Section 1: Basic Identifiers */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between flex-wrap gap-2">
-                  <h4 className="text-xs font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <h4 className="text-xs font-bold text-sky-600 uppercase tracking-wider flex items-center gap-1.5">
                     <Info className="w-3.5 h-3.5" />
                     <span>1. Thông Tin Nhận Diện &amp; Tiêu Chuẩn Quốc Tế</span>
                   </h4>
                 </div>
 
-                {/* Quick 20ft Preset Bar */}
-                <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-2xl space-y-2">
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-slate-400 font-semibold flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Chọn nhanh mẫu quy chuẩn <strong>20 Feet (1.0 TEU)</strong> theo Phân nhóm:</span>
-                    </span>
-                    <span className="text-[10px] text-slate-500 italic">Tự động điền kích thước, tải trọng &amp; thông số ISO</span>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {PRESETS_20FT.map((p) => (
-                      <button
-                        key={p.typeCode}
-                        type="button"
-                        onClick={() => {
-                          setFormData((prev) => ({
-                            ...prev,
-                            ...p,
-                            id: prev.id || `CT-${Date.now().toString().slice(-4)}`
-                          }));
-                        }}
-                        className={`px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold transition flex items-center gap-1 cursor-pointer border ${
-                          formData.typeCode === p.typeCode
-                            ? 'bg-sky-600 text-white border-sky-400 shadow-md shadow-sky-600/30'
-                            : 'bg-slate-900 text-slate-300 hover:text-white hover:bg-slate-800 border-slate-800'
-                        }`}
-                        title={`${p.vietnameseName} (${p.category})`}
-                      >
-                        <span>{p.typeCode}</span>
-                        <span className="text-[9px] text-slate-400">({p.category})</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                       Mã Loại Container (Type Code)*
                     </label>
                     <input
@@ -1230,12 +883,12 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
                       placeholder="VD: 20DC, 40HC, 40HR"
                       value={formData.typeCode || ''}
                       onChange={(e) => setFormData({ ...formData, typeCode: e.target.value.toUpperCase() })}
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono font-bold text-xs focus:outline-none focus:border-sky-500"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono font-bold text-xs focus:outline-none focus:border-sky-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                       Mã ISO (ISO 6346 Code)*
                     </label>
                     <input
@@ -1244,12 +897,12 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
                       placeholder="VD: 22G1, 45G1, 45R1"
                       value={formData.isoCode || ''}
                       onChange={(e) => setFormData({ ...formData, isoCode: e.target.value.toUpperCase() })}
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sky-300 font-mono font-bold text-xs focus:outline-none focus:border-sky-500"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sky-700 font-mono font-bold text-xs focus:outline-none focus:border-sky-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                       Kích Cỡ Chiều Dài (Size Feet)*
                     </label>
                     <select
@@ -1262,7 +915,7 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
                           teuRatio: newSize === '20' ? 1.0 : newSize === '40' ? 2.0 : newSize === '45' ? 2.25 : 0.5
                         });
                       }}
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold text-xs focus:outline-none focus:border-sky-500"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-bold text-xs focus:outline-none focus:border-sky-500"
                     >
                       <option value="20">20 Feet (1.0 TEU)</option>
                       <option value="40">40 Feet (2.0 TEU)</option>
@@ -1272,7 +925,7 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                       Phân Nhóm Chủng Loại (Category)*
                     </label>
                     <select
@@ -1285,7 +938,7 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
                           isReefer: cat === 'REEFER'
                         });
                       }}
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-bold text-xs focus:outline-none focus:border-sky-500"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-bold text-xs focus:outline-none focus:border-sky-500"
                     >
                       <option value="DRY">DRY - Container Khô Tiêu Chuẩn</option>
                       <option value="REEFER">REEFER - Container Bảo Ôn Lạnh</option>
@@ -1299,7 +952,7 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
                   </div>
 
                   <div className="sm:col-span-2">
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                       Tên Tiếng Việt Quy Cách*
                     </label>
                     <input
@@ -1308,12 +961,12 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
                       placeholder="VD: Container Khô 40 Feet Cao (40HC)"
                       value={formData.vietnameseName || ''}
                       onChange={(e) => setFormData({ ...formData, vietnameseName: e.target.value })}
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-sky-500"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:border-sky-500"
                     />
                   </div>
 
                   <div className="sm:col-span-2">
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                       Tên Tiếng Anh Quốc Tế
                     </label>
                     <input
@@ -1321,113 +974,113 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
                       placeholder="VD: 40ft High Cube Dry Container"
                       value={formData.name || ''}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-sky-500"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:border-sky-500"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Section 2: Dimensions */}
-              <div className="space-y-3 pt-3 border-t border-slate-800/80">
-                <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+              <div className="space-y-3 pt-3 border-t border-slate-200/80">
+                <h4 className="text-xs font-bold text-amber-600 uppercase tracking-wider flex items-center gap-1.5">
                   <Maximize2 className="w-3.5 h-3.5" />
                   <span>2. Kích Thước Kỹ Thuật (Kích Thước mm)</span>
                 </h4>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   {/* External */}
-                  <div className="p-3.5 bg-slate-950/70 border border-slate-800 rounded-2xl space-y-2">
-                    <span className="text-xs font-bold text-white block">Kích Thước Phủ Bì Ngoài (External)</span>
+                  <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                    <span className="text-xs font-bold text-slate-900 block">Kích Thước Phủ Bì Ngoài (External)</span>
                     <div>
-                      <label className="block text-[10px] text-slate-400">Chiều Dài (mm)</label>
+                      <label className="block text-[10px] text-slate-500">Chiều Dài (mm)</label>
                       <input
                         type="number"
                         value={formData.lengthMm || 0}
                         onChange={(e) => setFormData({ ...formData, lengthMm: Number(e.target.value) })}
-                        className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-white font-mono text-xs focus:outline-none"
+                        className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-mono text-xs focus:outline-none"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] text-slate-400">Chiều Rộng (mm)</label>
+                      <label className="block text-[10px] text-slate-500">Chiều Rộng (mm)</label>
                       <input
                         type="number"
                         value={formData.widthMm || 0}
                         onChange={(e) => setFormData({ ...formData, widthMm: Number(e.target.value) })}
-                        className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-white font-mono text-xs focus:outline-none"
+                        className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-mono text-xs focus:outline-none"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] text-slate-400">Chiều Cao (mm)</label>
+                      <label className="block text-[10px] text-slate-500">Chiều Cao (mm)</label>
                       <input
                         type="number"
                         value={formData.heightMm || 0}
                         onChange={(e) => setFormData({ ...formData, heightMm: Number(e.target.value) })}
-                        className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-white font-mono text-xs focus:outline-none"
+                        className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-mono text-xs focus:outline-none"
                       />
                     </div>
                   </div>
 
                   {/* Internal */}
-                  <div className="p-3.5 bg-slate-950/70 border border-slate-800 rounded-2xl space-y-2">
-                    <span className="text-xs font-bold text-white block">Kích Thước Lọt Lòng Trong (Internal)</span>
+                  <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                    <span className="text-xs font-bold text-slate-900 block">Kích Thước Lọt Lòng Trong (Internal)</span>
                     <div>
-                      <label className="block text-[10px] text-slate-400">Chiều Dài Trong (mm)</label>
+                      <label className="block text-[10px] text-slate-500">Chiều Dài Trong (mm)</label>
                       <input
                         type="number"
                         value={formData.internalLengthMm || 0}
                         onChange={(e) => setFormData({ ...formData, internalLengthMm: Number(e.target.value) })}
-                        className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-white font-mono text-xs focus:outline-none"
+                        className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-mono text-xs focus:outline-none"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] text-slate-400">Chiều Rộng Trong (mm)</label>
+                      <label className="block text-[10px] text-slate-500">Chiều Rộng Trong (mm)</label>
                       <input
                         type="number"
                         value={formData.internalWidthMm || 0}
                         onChange={(e) => setFormData({ ...formData, internalWidthMm: Number(e.target.value) })}
-                        className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-white font-mono text-xs focus:outline-none"
+                        className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-mono text-xs focus:outline-none"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] text-slate-400">Chiều Cao Trong (mm)</label>
+                      <label className="block text-[10px] text-slate-500">Chiều Cao Trong (mm)</label>
                       <input
                         type="number"
                         value={formData.internalHeightMm || 0}
                         onChange={(e) => setFormData({ ...formData, internalHeightMm: Number(e.target.value) })}
-                        className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-white font-mono text-xs focus:outline-none"
+                        className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-mono text-xs focus:outline-none"
                       />
                     </div>
                   </div>
 
                   {/* Door Opening & CBM */}
-                  <div className="p-3.5 bg-slate-950/70 border border-slate-800 rounded-2xl space-y-2">
-                    <span className="text-xs font-bold text-white block">Kích Thước Khung Cửa &amp; Thể Tích</span>
+                  <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                    <span className="text-xs font-bold text-slate-900 block">Kích Thước Khung Cửa &amp; Thể Tích</span>
                     <div>
-                      <label className="block text-[10px] text-slate-400">Rộng Mở Cửa (mm)</label>
+                      <label className="block text-[10px] text-slate-500">Rộng Mở Cửa (mm)</label>
                       <input
                         type="number"
                         value={formData.doorWidthMm || 0}
                         onChange={(e) => setFormData({ ...formData, doorWidthMm: Number(e.target.value) })}
-                        className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-white font-mono text-xs focus:outline-none"
+                        className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-mono text-xs focus:outline-none"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] text-slate-400">Cao Mở Cửa (mm)</label>
+                      <label className="block text-[10px] text-slate-500">Cao Mở Cửa (mm)</label>
                       <input
                         type="number"
                         value={formData.doorHeightMm || 0}
                         onChange={(e) => setFormData({ ...formData, doorHeightMm: Number(e.target.value) })}
-                        className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-white font-mono text-xs focus:outline-none"
+                        className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-mono text-xs focus:outline-none"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] text-cyan-300 font-bold">Thể Tích Chứa Hàng (CBM m³)</label>
+                      <label className="block text-[10px] text-cyan-700 font-bold">Thể Tích Chứa Hàng (CBM m³)</label>
                       <input
                         type="number"
                         step="0.1"
                         value={formData.cbm || 0}
                         onChange={(e) => setFormData({ ...formData, cbm: Number(e.target.value) })}
-                        className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-cyan-300 font-mono font-bold text-xs focus:outline-none"
+                        className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-cyan-700 font-mono font-bold text-xs focus:outline-none"
                       />
                     </div>
                   </div>
@@ -1435,15 +1088,15 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
               </div>
 
               {/* Section 3: Weights & Payload */}
-              <div className="space-y-3 pt-3 border-t border-slate-800/80">
-                <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+              <div className="space-y-3 pt-3 border-t border-slate-200/80">
+                <h4 className="text-xs font-bold text-emerald-600 uppercase tracking-wider flex items-center gap-1.5">
                   <Scale className="w-3.5 h-3.5" />
                   <span>3. Tải Trọng &amp; Trọng Lượng Quy Chuẩn (kg)</span>
                 </h4>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                       Trọng Lượng Bì (Tare Weight kg)*
                     </label>
                     <input
@@ -1459,12 +1112,12 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
                           maxPayloadKg: maxG - tare > 0 ? maxG - tare : formData.maxPayloadKg
                         });
                       }}
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono font-bold text-xs focus:outline-none focus:border-emerald-500"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono font-bold text-xs focus:outline-none focus:border-emerald-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                       Tổng Trọng Tải Tối Đa (Max Gross kg)*
                     </label>
                     <input
@@ -1480,40 +1133,40 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
                           maxPayloadKg: maxG - tare > 0 ? maxG - tare : formData.maxPayloadKg
                         });
                       }}
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-emerald-400 font-mono font-bold text-xs focus:outline-none focus:border-emerald-500"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-emerald-600 font-mono font-bold text-xs focus:outline-none focus:border-emerald-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                       Tải Trọng Hàng Hóa (Max Payload kg)
                     </label>
                     <input
                       type="number"
                       value={formData.maxPayloadKg || 0}
                       onChange={(e) => setFormData({ ...formData, maxPayloadKg: Number(e.target.value) })}
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-300 font-mono text-xs focus:outline-none"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-mono text-xs focus:outline-none"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Section 4: Material & Specifications */}
-              <div className="space-y-3 pt-3 border-t border-slate-800/80">
-                <h4 className="text-xs font-bold text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
+              <div className="space-y-3 pt-3 border-t border-slate-200/80">
+                <h4 className="text-xs font-bold text-purple-600 uppercase tracking-wider flex items-center gap-1.5">
                   <Shield className="w-3.5 h-3.5" />
                   <span>4. Cấu Trúc Vật Liệu &amp; Mô Tả Vận Hành</span>
                 </h4>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                       Vật Liệu Vỏ Chế Tạo (Material)
                     </label>
                     <select
                       value={formData.material || 'CORTEN_STEEL'}
                       onChange={(e) => setFormData({ ...formData, material: e.target.value as any })}
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none"
                     >
                       <option value="CORTEN_STEEL">Thép Chống Ăn Mòn Corten Steel (SPA-H)</option>
                       <option value="STAINLESS_STEEL">Thép Không Gỉ Inox 304/316L</option>
@@ -1523,13 +1176,13 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                       Loại Ván Sàn (Floor Type)
                     </label>
                     <select
                       value={formData.floorType || 'WOOD_PLYWOOD'}
                       onChange={(e) => setFormData({ ...formData, floorType: e.target.value as any })}
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none"
                     >
                       <option value="WOOD_PLYWOOD">Ván Ép Gỗ Dầu Cứng Plywood 28mm (IICL)</option>
                       <option value="BAMBOO">Ván Ép Tre Ép Khối (Bamboo Floorboard)</option>
@@ -1539,13 +1192,13 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                       Trạng Thái Áp Dụng
                     </label>
                     <select
                       value={formData.status || 'ACTIVE'}
                       onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-emerald-400 font-bold text-xs focus:outline-none"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-emerald-600 font-bold text-xs focus:outline-none"
                     >
                       <option value="ACTIVE">ACTIVE - Đang Áp Dụng Hệ Thống</option>
                       <option value="INACTIVE">INACTIVE - Tạm Ngưng Sử Dụng</option>
@@ -1553,34 +1206,34 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
                   </div>
 
                   {formData.category === 'REEFER' && (
-                    <div className="sm:col-span-3 p-3 bg-teal-950/40 border border-teal-800/60 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="sm:col-span-3 p-3 bg-teal-50 border border-teal-200/60 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-xs font-semibold text-teal-300 mb-1">
+                        <label className="block text-xs font-semibold text-teal-700 mb-1">
                           Nhiệt Độ Thấp Nhất (°C)
                         </label>
                         <input
                           type="number"
-                          value={formData.tempRangeMin || -30}
+                          value={formData.tempRangeMin ?? -30}
                           onChange={(e) => setFormData({ ...formData, tempRangeMin: Number(e.target.value) })}
-                          className="w-full px-3 py-2 bg-slate-950 border border-teal-800/80 rounded-xl text-teal-200 font-mono text-xs focus:outline-none"
+                          className="w-full px-3 py-2 bg-white border border-teal-200/80 rounded-xl text-teal-800 font-mono text-xs focus:outline-none"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-teal-300 mb-1">
+                        <label className="block text-xs font-semibold text-teal-700 mb-1">
                           Nhiệt Độ Cao Nhất (°C)
                         </label>
                         <input
                           type="number"
-                          value={formData.tempRangeMax || 30}
+                          value={formData.tempRangeMax ?? 30}
                           onChange={(e) => setFormData({ ...formData, tempRangeMax: Number(e.target.value) })}
-                          className="w-full px-3 py-2 bg-slate-950 border border-teal-800/80 rounded-xl text-teal-200 font-mono text-xs focus:outline-none"
+                          className="w-full px-3 py-2 bg-white border border-teal-200/80 rounded-xl text-teal-800 font-mono text-xs focus:outline-none"
                         />
                       </div>
                     </div>
                   )}
 
                   <div className="sm:col-span-3">
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                       Mô Tả Ứng Dụng Hàng Hóa &amp; Hướng Dẫn Vận Hành
                     </label>
                     <textarea
@@ -1588,24 +1241,24 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
                       value={formData.description || ''}
                       onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                       placeholder="Ghi chú về nhóm hàng hóa đóng phù hợp, lưu ý xếp dỡ..."
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Form Actions */}
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl transition"
+                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition"
                 >
                   Hủy Bỏ
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-sky-600/30 transition flex items-center gap-2"
+                  className="px-6 py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs rounded-xl shadow-lg  transition flex items-center gap-2"
                 >
                   <Check className="w-4 h-4" />
                   <span>{editingType ? 'Cập Nhật Loại Container' : 'Lưu Vào Master Data'}</span>
@@ -1619,17 +1272,17 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
       {/* MODAL: TECHNICAL BLUEPRINT SPEC VIEWER */}
       {viewingDetailType && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-3xl shadow-2xl overflow-hidden">
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-3xl shadow-2xl overflow-hidden">
             {/* Header */}
-            <div className="p-5 bg-gradient-to-r from-slate-900 via-sky-950/50 to-slate-900 border-b border-slate-800 flex items-center justify-between">
+            <div className="p-5 bg-gradient-to-r from-sky-50 via-white to-slate-50 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="p-3 bg-sky-600/20 text-sky-400 rounded-2xl border border-sky-500/30">
+                <div className="p-3 bg-sky-50 text-sky-600 rounded-2xl border border-sky-200">
                   <Container className="w-7 h-7" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-base font-bold text-white font-mono">{viewingDetailType.typeCode}</span>
-                    <span className="px-2 py-0.5 bg-sky-500/20 text-sky-300 font-mono text-xs font-bold rounded-lg">
+                    <span className="text-base font-bold text-slate-900 font-mono">{viewingDetailType.typeCode}</span>
+                    <span className="px-2 py-0.5 bg-sky-50 text-sky-700 font-mono text-xs font-bold rounded-lg">
                       ISO: {viewingDetailType.isoCode}
                     </span>
                     <span
@@ -1640,12 +1293,12 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
                       {viewingDetailType.category}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-400 mt-0.5">{viewingDetailType.vietnameseName}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">{viewingDetailType.vietnameseName}</p>
                 </div>
               </div>
               <button
                 onClick={() => setViewingDetailType(null)}
-                className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition"
+                className="p-2 text-slate-500 hover:text-slate-900 rounded-xl hover:bg-slate-100 transition"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1654,52 +1307,52 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
             {/* Spec Blueprint Content */}
             <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto text-xs">
               {/* Description */}
-              <p className="p-3.5 bg-slate-950 border border-slate-800 rounded-2xl text-slate-300 leading-relaxed">
+              <p className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-700 leading-relaxed">
                 {viewingDetailType.description}
               </p>
 
               {/* Dimensions Section */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-2xl space-y-2.5">
-                  <h5 className="font-bold text-sky-400 flex items-center gap-1.5">
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
+                  <h5 className="font-bold text-sky-600 flex items-center gap-1.5">
                     <Maximize2 className="w-4 h-4" /> Kích Thước Phủ Bì Ngoài (External)
                   </h5>
-                  <div className="space-y-1.5 text-slate-300">
+                  <div className="space-y-1.5 text-slate-700">
                     <div className="flex justify-between">
-                      <span className="text-slate-400">Chiều dài:</span>
-                      <span className="font-mono font-bold text-white">{viewingDetailType.lengthMm.toLocaleString()} mm</span>
+                      <span className="text-slate-500">Chiều dài:</span>
+                      <span className="font-mono font-bold text-slate-900">{viewingDetailType.lengthMm.toLocaleString()} mm</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-400">Chiều rộng:</span>
-                      <span className="font-mono font-bold text-white">{viewingDetailType.widthMm.toLocaleString()} mm</span>
+                      <span className="text-slate-500">Chiều rộng:</span>
+                      <span className="font-mono font-bold text-slate-900">{viewingDetailType.widthMm.toLocaleString()} mm</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-400">Chiều cao:</span>
-                      <span className="font-mono font-bold text-white">{viewingDetailType.heightMm.toLocaleString()} mm</span>
+                      <span className="text-slate-500">Chiều cao:</span>
+                      <span className="font-mono font-bold text-slate-900">{viewingDetailType.heightMm.toLocaleString()} mm</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-2xl space-y-2.5">
-                  <h5 className="font-bold text-amber-400 flex items-center gap-1.5">
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
+                  <h5 className="font-bold text-amber-600 flex items-center gap-1.5">
                     <Box className="w-4 h-4" /> Kích Thước Lọt Lòng Trong (Internal)
                   </h5>
-                  <div className="space-y-1.5 text-slate-300">
+                  <div className="space-y-1.5 text-slate-700">
                     <div className="flex justify-between">
-                      <span className="text-slate-400">Chiều dài trong:</span>
-                      <span className="font-mono font-bold text-white">
+                      <span className="text-slate-500">Chiều dài trong:</span>
+                      <span className="font-mono font-bold text-slate-900">
                         {viewingDetailType.internalLengthMm.toLocaleString()} mm
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-400">Chiều rộng trong:</span>
-                      <span className="font-mono font-bold text-white">
+                      <span className="text-slate-500">Chiều rộng trong:</span>
+                      <span className="font-mono font-bold text-slate-900">
                         {viewingDetailType.internalWidthMm.toLocaleString()} mm
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-400">Chiều cao trong:</span>
-                      <span className="font-mono font-bold text-white">
+                      <span className="text-slate-500">Chiều cao trong:</span>
+                      <span className="font-mono font-bold text-slate-900">
                         {viewingDetailType.internalHeightMm.toLocaleString()} mm
                       </span>
                     </div>
@@ -1708,31 +1361,31 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
               </div>
 
               {/* Weight & Capacity Table */}
-              <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-2xl space-y-3">
-                <h5 className="font-bold text-emerald-400 flex items-center gap-1.5">
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                <h5 className="font-bold text-emerald-600 flex items-center gap-1.5">
                   <Scale className="w-4 h-4" /> Tải Trọng &amp; Dung Tích Xếp Hàng
                 </h5>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl">
-                    <span className="text-[10px] text-slate-400 block">Thể Tích (CBM)</span>
-                    <span className="text-base font-bold font-mono text-cyan-300">{viewingDetailType.cbm} m³</span>
+                  <div className="p-3 bg-white border border-slate-200 rounded-xl">
+                    <span className="text-[10px] text-slate-500 block">Thể Tích (CBM)</span>
+                    <span className="text-base font-bold font-mono text-cyan-700">{viewingDetailType.cbm} m³</span>
                   </div>
-                  <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl">
-                    <span className="text-[10px] text-slate-400 block">Trọng Lượng Bì (Tare)</span>
-                    <span className="text-base font-bold font-mono text-white">
+                  <div className="p-3 bg-white border border-slate-200 rounded-xl">
+                    <span className="text-[10px] text-slate-500 block">Trọng Lượng Bì (Tare)</span>
+                    <span className="text-base font-bold font-mono text-slate-900">
                       {viewingDetailType.tareWeightKg.toLocaleString()} kg
                     </span>
                   </div>
-                  <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl">
-                    <span className="text-[10px] text-slate-400 block">Tải Trọng Hàng Max</span>
-                    <span className="text-base font-bold font-mono text-white">
+                  <div className="p-3 bg-white border border-slate-200 rounded-xl">
+                    <span className="text-[10px] text-slate-500 block">Tải Trọng Hàng Max</span>
+                    <span className="text-base font-bold font-mono text-slate-900">
                       {viewingDetailType.maxPayloadKg.toLocaleString()} kg
                     </span>
                   </div>
-                  <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl">
-                    <span className="text-[10px] text-slate-400 block">Max Gross Weight</span>
-                    <span className="text-base font-bold font-mono text-emerald-400">
+                  <div className="p-3 bg-white border border-slate-200 rounded-xl">
+                    <span className="text-[10px] text-slate-500 block">Max Gross Weight</span>
+                    <span className="text-base font-bold font-mono text-emerald-600">
                       {viewingDetailType.maxGrossWeightKg.toLocaleString()} kg
                     </span>
                   </div>
@@ -1740,32 +1393,32 @@ export const ContainerTypeMaster: React.FC<ContainerTypeMasterProps> = ({
               </div>
 
               {/* Material & Reefer info */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-slate-300">
-                <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-slate-700">
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
                   <span className="text-[10px] text-slate-500 block">Chất liệu vỏ:</span>
-                  <span className="font-semibold text-white">{viewingDetailType.material}</span>
+                  <span className="font-semibold text-slate-900">{viewingDetailType.material}</span>
                 </div>
-                <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl">
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
                   <span className="text-[10px] text-slate-500 block">Chất liệu sàn:</span>
-                  <span className="font-semibold text-white">{viewingDetailType.floorType}</span>
+                  <span className="font-semibold text-slate-900">{viewingDetailType.floorType}</span>
                 </div>
-                <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl">
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
                   <span className="text-[10px] text-slate-500 block">Quy đổi TEU:</span>
-                  <span className="font-semibold text-indigo-300 font-mono">{viewingDetailType.teuRatio} TEU</span>
+                  <span className="font-semibold text-indigo-700 font-mono">{viewingDetailType.teuRatio} TEU</span>
                 </div>
               </div>
             </div>
 
             {/* Footer */}
-            <div className="p-4 bg-slate-950 border-t border-slate-800 flex items-center justify-between">
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
               <button
                 onClick={() => {
                   setViewingDetailType(null);
                   handleOpenEdit(viewingDetailType);
                 }}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5"
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold text-xs rounded-xl transition flex items-center gap-1.5"
               >
-                <Edit2 className="w-4 h-4 text-blue-400" />
+                <Edit2 className="w-4 h-4 text-blue-600" />
                 <span>Chỉnh Sửa Loại Này</span>
               </button>
 

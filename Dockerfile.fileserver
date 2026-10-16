@@ -1,0 +1,37 @@
+# Dockerfile cho Depot.FileServer (.NET 8) — host riêng chỉ lưu/đọc/xóa file vật lý, không dùng DB.
+# Build từ thư mục gốc repo (context = "."), giống Dockerfile.backend.
+# File lưu ở Storage__RootPath (mặc định /data/storage-files) — PHẢI mount volume ra ngoài, nếu không
+# mọi ảnh sẽ mất khi container bị tạo lại (docker compose pull/up).
+
+# ===== Stage 1: Build & Publish =====
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+COPY ["SolutionDepot/3. Hosts/Depot.FileServer/Depot.FileServer.csproj", "SolutionDepot/3. Hosts/Depot.FileServer/"]
+RUN dotnet restore "SolutionDepot/3. Hosts/Depot.FileServer/Depot.FileServer.csproj"
+
+COPY ["SolutionDepot/3. Hosts/Depot.FileServer/", "SolutionDepot/3. Hosts/Depot.FileServer/"]
+RUN dotnet publish "SolutionDepot/3. Hosts/Depot.FileServer/Depot.FileServer.csproj" \
+    -c Release -o /app/publish --no-restore
+
+# ===== Stage 2: Runtime =====
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+WORKDIR /app
+
+# curl chỉ dùng cho healthcheck /api/health.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_ENVIRONMENT=Production
+ENV Storage__RootPath=/data/storage-files
+VOLUME ["/data/storage-files"]
+EXPOSE 8080
+
+COPY --from=build /app/publish .
+
+HEALTHCHECK --interval=10s --timeout=5s --retries=10 --start-period=15s \
+    CMD curl -f http://localhost:8080/api/health || exit 1
+
+ENTRYPOINT ["dotnet", "Depot.FileServer.dll"]
