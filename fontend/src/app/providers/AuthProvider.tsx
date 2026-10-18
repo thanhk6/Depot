@@ -30,7 +30,8 @@ const ROLE_ID_BY_PROFILE_ROLE: Record<string, string> = {
   REPAIR_TECH: 'ROLE_TECHNICIAN',
   QC_INSPECTOR: 'ROLE_QC',
   FORKLIFT_DRIVER: 'ROLE_FORKLIFT',
-  CLEANING_STAFF: 'ROLE_CLEANING_STAFF'
+  CLEANING_STAFF: 'ROLE_CLEANING_STAFF',
+  SUPERVISOR: 'ROLE_SUPERVISOR'
 };
 
 const readLoggedInProfile = (): { id?: string | number; fullName?: string; username?: string; email?: string; role?: string } | null => {

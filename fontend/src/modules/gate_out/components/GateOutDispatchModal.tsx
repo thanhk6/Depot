@@ -39,14 +39,34 @@ interface GateOutDispatchModalProps {
       forkliftOperator: string;
       gateLane: string;
       note?: string;
+      withoutBooking?: boolean;
+      noBookingReason?: string;
+      noBookingNote?: string;
     }
   ) => void;
+  /** Tài khoản có quyền `operation` (cấp vỏ theo booking) — giám sát thường không có. */
+  canGateOutWithBooking: boolean;
+  /** Tài khoản có quyền `gateout_nobooking` (chỉ ADMIN / SUPERVISOR). */
+  canGateOutWithoutBooking: boolean;
+  /** Kiểm tra booking với backend (chỉ đọc) — trả hợp lệ / lý do và số vỏ còn lại. */
+  onCheckBooking: (containerId: string, bookingNo: string) => Promise<{ valid: boolean; message: string }>;
 }
+
+// Lý do ra cổng không theo booking — mã khớp DepotJobService.NoBookingReasons ở backend.
+const NO_BOOKING_REASONS: { value: string; label: string }[] = [
+  { value: 'OFF_HIRE', label: 'Trả vỏ về hãng' },
+  { value: 'DEPOT_TRANSFER', label: 'Chuyển depot' },
+  { value: 'OFFSITE_REPAIR', label: 'Sửa ngoài depot' },
+  { value: 'OTHER', label: 'Khác (ghi chú)' }
+];
 
 export const GateOutDispatchModal: React.FC<GateOutDispatchModalProps> = ({
   container,
   onClose,
-  onConfirmGateOut
+  onConfirmGateOut,
+  canGateOutWithBooking,
+  canGateOutWithoutBooking,
+  onCheckBooking
 }) => {
   // Mọi ô để trống cho người dùng nhập thật — trước đây điền sẵn booking/biển số/tài xế/seal/xe nâng mẫu.
   const [bookingNo, setBookingNo] = useState('');
@@ -62,6 +82,25 @@ export const GateOutDispatchModal: React.FC<GateOutDispatchModalProps> = ({
   const [gateLane, setGateLane] = useState('LÀN 03 (CỔNG XUẤT HÀNG)');
   const [note, setNote] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  // Tài khoản không có quyền cấp theo booking (giám sát) thì chỉ còn đường không booking.
+  const [withoutBooking, setWithoutBooking] = useState(!canGateOutWithBooking && canGateOutWithoutBooking);
+  const [noBookingReason, setNoBookingReason] = useState('');
+  const [noBookingNote, setNoBookingNote] = useState('');
+  const [bookingCheck, setBookingCheck] = useState<{ valid: boolean; message: string } | null>(null);
+  const [checkingBooking, setCheckingBooking] = useState(false);
+
+  const handleCheckBooking = async () => {
+    if (!bookingNo.trim()) {
+      setBookingCheck({ valid: false, message: 'Nhập số booking trước khi kiểm tra.' });
+      return;
+    }
+    setCheckingBooking(true);
+    try {
+      setBookingCheck(await onCheckBooking(container.id, bookingNo.trim()));
+    } finally {
+      setCheckingBooking(false);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,13 +112,25 @@ export const GateOutDispatchModal: React.FC<GateOutDispatchModalProps> = ({
       setErrorMsg('Vui lòng nhập Tên tài xế nhận vỏ');
       return;
     }
-    if (!bookingNo.trim()) {
+    if (withoutBooking) {
+      if (!noBookingReason) {
+        setErrorMsg('Chọn lý do ra cổng không theo booking');
+        return;
+      }
+      if (noBookingReason === 'OTHER' && !noBookingNote.trim()) {
+        setErrorMsg('Lý do "Khác" phải ghi chú cụ thể');
+        return;
+      }
+    } else if (!bookingNo.trim()) {
       setErrorMsg('Vui lòng nhập Số Booking lệnh cấp vỏ');
       return;
     }
 
     onConfirmGateOut(container.id, {
-      bookingNo,
+      bookingNo: withoutBooking ? '' : bookingNo.trim(),
+      withoutBooking,
+      noBookingReason: withoutBooking ? noBookingReason : undefined,
+      noBookingNote: withoutBooking ? noBookingNote.trim() : undefined,
       truckPlate: truckPlate.toUpperCase(),
       chassisPlate: chassisPlate.toUpperCase(),
       driverName,
@@ -203,16 +254,72 @@ export const GateOutDispatchModal: React.FC<GateOutDispatchModalProps> = ({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="space-y-1">
-                <label className="text-slate-700 font-bold block">Số Booking / Lệnh Cấp Vỏ (*)</label>
-                <input
-                  type="text"
-                  value={bookingNo}
-                  onChange={(e) => setBookingNo(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-slate-200 text-slate-900 rounded-xl shadow-sm font-mono uppercase focus:outline-none focus:border-indigo-500 font-bold"
-                  placeholder="VD: BKG-MAE-882190"
-                  required
-                />
+              <div className="sm:col-span-3 p-3 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
+                {canGateOutWithoutBooking ? (
+                  <label className={`flex items-center gap-2 font-bold text-slate-700 ${canGateOutWithBooking ? 'cursor-pointer' : ''}`}>
+                    <input
+                      type="checkbox"
+                      checked={withoutBooking}
+                      disabled={!canGateOutWithBooking}
+                      onChange={(e) => { setWithoutBooking(e.target.checked); setBookingCheck(null); setErrorMsg(''); }}
+                    />
+                    <span>Không cần booking (trả vỏ về hãng / chuyển depot / sửa ngoài) — quyền quản lý / giám sát</span>
+                  </label>
+                ) : (
+                  <div className="text-[11px] text-slate-500">Không có booking? Gọi giám sát / quản lý cấp vỏ.</div>
+                )}
+
+                {withoutBooking ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-slate-700 font-bold block">Lý Do Ra Cổng (*)</label>
+                      <select
+                        value={noBookingReason}
+                        onChange={(e) => setNoBookingReason(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 text-slate-900 rounded-xl shadow-sm focus:outline-none"
+                      >
+                        <option value="">-- Chọn lý do --</option>
+                        {NO_BOOKING_REASONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                      </select>
+                    </div>
+                    <div className="sm:col-span-2 space-y-1">
+                      <label className="text-slate-700 font-bold block">Ghi Chú Lý Do{noBookingReason === 'OTHER' ? ' (*)' : ''}</label>
+                      <input
+                        type="text"
+                        value={noBookingNote}
+                        onChange={(e) => setNoBookingNote(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 text-slate-900 rounded-xl shadow-sm focus:outline-none focus:border-indigo-500"
+                        placeholder="VD: số lệnh trả vỏ của hãng, depot nhận..."
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <label className="text-slate-700 font-bold block">Số Booking / Lệnh Cấp Vỏ (*)</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={bookingNo}
+                        onChange={(e) => { setBookingNo(e.target.value); setBookingCheck(null); }}
+                        className="flex-1 px-3 py-2 bg-white border border-slate-200 text-slate-900 rounded-xl shadow-sm font-mono uppercase focus:outline-none focus:border-indigo-500 font-bold"
+                        placeholder="VD: BKG-MAE-882190"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleCheckBooking}
+                        disabled={checkingBooking}
+                        className="px-3 py-2 bg-white hover:bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-xl font-bold shadow-sm transition cursor-pointer disabled:opacity-50"
+                      >
+                        {checkingBooking ? 'Đang kiểm tra...' : 'Kiểm tra booking'}
+                      </button>
+                    </div>
+                    {bookingCheck && (
+                      <div className={`text-[11px] font-bold ${bookingCheck.valid ? 'text-emerald-700' : 'text-rose-700'}`}>
+                        {bookingCheck.message}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1">

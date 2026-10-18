@@ -33,6 +33,7 @@ namespace Depot.Application.Services
         Task<bool> DeactivateStorageTariffAsync(long id);
         Task<List<CustomerCompany>> GetCustomersAsync();
         Task<CustomerCompany> CreateCustomerAsync(CustomerCompanyRequest request);
+        Task<CustomerCompany> QuickCreateTruckingCompanyAsync(TruckingQuickCreateRequest request, string actor);
         Task<CustomerCompany?> UpdateCustomerAsync(long id, CustomerCompanyRequest request);
         Task<bool> DeactivateCustomerAsync(long id);
         Task<List<CustomerDriver>> GetDriversAsync(string customerCode);

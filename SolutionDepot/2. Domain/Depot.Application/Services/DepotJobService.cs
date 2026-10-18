@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Depot.Data.EF;
 using Depot.Data.Entities.Cleaning;
 using Depot.Data.Entities.Depot;
+using Depot.Data.Entities.Master;
 using Depot.Data.Entities.Finance;
 using Depot.Data.Entities.Storage;
 using Depot.Data.Entities.System;
@@ -146,12 +147,12 @@ namespace Depot.Application.Services
                     GateInDate = j.GateInDate, GateOutDate = j.GateOutDate,
                     GateOutTruckPlate = j.GateOutTruckPlate, GateOutDriverName = j.GateOutDriverName,
                     GateOutTrailerPlate = j.GateOutTrailerPlate, GateOutSealNo = j.GateOutSealNo,
-                    GateInEirNo = j.GateInEirNo, GateOutEirNo = j.GateOutEirNo,
+                    GateInEirNo = j.GateInEirNo, GateOutEirNo = j.GateOutEirNo, GateOutBookingNo = j.GateOutBookingNo,
                     GateInTruckPlate = j.GateInTruckPlate, GateInTrailerPlate = j.GateInTrailerPlate,
                     GateInDriverName = j.GateInDriverName, GateInDriverPhone = j.GateInDriverPhone,
                     GateInSealNo = j.GateInSealNo, GateInBookingNo = j.GateInBookingNo,
                     GateInDriverLicense = j.GateInDriverLicense, GateInCustomsSealNo = j.GateInCustomsSealNo,
-                    GateInTruckingCompany = j.GateInTruckingCompany, GateInRemarks = j.GateInRemarks,
+                    GateInTruckingCompany = j.GateInTruckingCompany, GateInTruckingName = j.GateInTruckingName, GateInRemarks = j.GateInRemarks,
                     GateInStaffId = j.GateInStaffId, GateInStaffName = j.GateInStaffName,
                     SurveyClaimedByStaffId = j.SurveyClaimedByStaffId, SurveyClaimedByName = j.SurveyClaimedByName,
                     SurveyClaimedAt = j.SurveyClaimedAt,
@@ -303,6 +304,15 @@ namespace Depot.Application.Services
                         throw new ArgumentException("Container còn lệnh sửa chữa chưa qua QC đạt — không thể chuyển sang Sẵn sàng xuất.");
                 }
 
+                // Chuyển thẳng sang REPAIRING trước đây bỏ qua được bước hãng tàu duyệt báo giá (hồ sơ chưa có
+                // báo giá vẫn vào màn Sửa chữa). Chỉ cho khi báo giá đã APPROVED (vd. đưa hồ sơ chờ QC về sửa tiếp).
+                if (request.Status == "REPAIRING")
+                {
+                    var estimateStatus = await _db.Estimates.Where(e => e.DepotJobId == job.Id).Select(e => e.Status).FirstOrDefaultAsync();
+                    if (estimateStatus != "APPROVED")
+                        throw new ArgumentException("Báo giá chưa được hãng tàu duyệt — không thể chuyển sang Đang sửa chữa.");
+                }
+
                 var fromStatus = job.Status;
                 job.Status = request.Status;
                 _db.AuditLogs.Add(CreateAudit(job.JobNo, job.Id, "STATUS_UPDATED", string.IsNullOrWhiteSpace(actor) ? "Container UI" : actor,
@@ -310,6 +320,37 @@ namespace Depot.Application.Services
                 await _db.SaveChangesAsync();
                 return true;
             }
+
+        /// <summary>Mã nhà xe vãng lai (không có trong danh mục khách hàng) — tên lưu riêng ở GateInTruckingName.</summary>
+        public const string WalkInTruckingCode = "VANG_LAI";
+
+        /// <summary>
+        /// Chuẩn hoá đơn vị vận tải lúc Gate-In: VANG_LAI bắt buộc tên; mã khác phải là khách hàng ACTIVE và tên lấy
+        /// từ danh mục (không tin tên client gửi); trống chỉ được khi không bắt buộc (màn Giám định / cổng khách hàng).
+        /// </summary>
+        private async Task<(string? Code, string? Name)> ResolveGateInTruckingAsync(CreateDepotJobRequest request)
+        {
+            var code = request.TruckingCompany?.Trim().ToUpperInvariant();
+            if (string.IsNullOrEmpty(code))
+            {
+                if (request.RequireTrucking)
+                    throw new ArgumentException("Chưa chọn đơn vị vận tải / nhà xe.");
+                return (null, null);
+            }
+            if (code == WalkInTruckingCode)
+            {
+                var name = System.Text.RegularExpressions.Regex.Replace(request.TruckingName ?? string.Empty, @"\s+", " ").Trim();
+                if (name.Length == 0)
+                    throw new ArgumentException("Chưa nhập tên nhà xe vãng lai.");
+                if (name.Length > 200)
+                    throw new ArgumentException("Tên nhà xe vãng lai tối đa 200 ký tự.");
+                return (WalkInTruckingCode, name);
+            }
+            var customer = await _db.CustomerCompanies.AsNoTracking().FirstOrDefaultAsync(c => c.Code == code && c.Status == "ACTIVE");
+            if (customer == null)
+                throw new ArgumentException($"Nhà xe {code} không tồn tại hoặc đã ngưng hoạt động.");
+            return (customer.Code, customer.Name);
+        }
 
         /// <summary>Gate-In tạo Job + audit + EIR nhập; container đang hoạt động không được trùng.</summary>
         public async Task<DepotJob> CreateGateInJobAsync(CreateDepotJobRequest request)
@@ -348,6 +389,8 @@ namespace Depot.Application.Services
                 throw new ArgumentException("Không xác định được nhân viên tiếp nhận từ phiên đăng nhập. Vui lòng đăng nhập lại.");
             }
 
+            var (truckingCode, truckingName) = await ResolveGateInTruckingAsync(request);
+
             var jobNo = $"JOB-{DateTime.UtcNow:yyyy}-{new Random().Next(1000, 9999)}";
             var newJob = new DepotJob
             {
@@ -373,7 +416,8 @@ namespace Depot.Application.Services
                 GateInDriverLicense = string.IsNullOrWhiteSpace(request.DriverLicense) ? null : request.DriverLicense.Trim(),
                 GateInCustomsSealNo = string.IsNullOrWhiteSpace(request.CustomsSealNo) ? null : request.CustomsSealNo.Trim(),
                 GateInBookingNo = string.IsNullOrWhiteSpace(request.BookingNo) ? null : request.BookingNo.Trim(),
-                GateInTruckingCompany = string.IsNullOrWhiteSpace(request.TruckingCompany) ? null : request.TruckingCompany.Trim(),
+                GateInTruckingCompany = truckingCode,
+                GateInTruckingName = truckingName,
                 GateInRemarks = string.IsNullOrWhiteSpace(request.Remarks) ? null : request.Remarks.Trim(),
                 GateInStaffId = staff.Id,
                 GateInStaffName = staff.FullName,
@@ -946,6 +990,10 @@ namespace Depot.Application.Services
             if (job == null || estimate == null || estimate.Status != "PENDING_APPROVAL" || job.Status != "ESTIMATING") return false;
             if (estimate.ConfirmedAt == null)
                 throw new EstimateNotAllowedException($"Báo giá {estimate.EstimateNo} chưa được xác nhận — người báo giá phải bấm \"Xác nhận báo giá\" trước khi ghi nhận hãng tàu duyệt.");
+            // GrandTotal do server tính khi lưu báo giá; hãng tàu không duyệt nhiều hơn số depot yêu cầu
+            // (trước đây ghi nhận được 999.999.999 cho báo giá 151.200).
+            if (request.ApprovedAmount is { } amount && amount > estimate.GrandTotal)
+                throw new EstimateNotAllowedException($"Số tiền hãng tàu duyệt ({amount:N0}) lớn hơn tổng báo giá ({estimate.GrandTotal:N0} {estimate.Currency}).");
 
             estimate.Status = "APPROVED";
             estimate.ApprovedAt = request.ApprovedAt?.ToUniversalTime() ?? DateTime.UtcNow;
@@ -986,17 +1034,31 @@ namespace Depot.Application.Services
         /// thay vì chuyển thẳng sang sửa chữa như nhánh Approved.
         /// </summary>
         /// <summary>Reject lưu lý do audit và đưa estimate về ESTIMATING để chỉnh sửa lại.</summary>
-        public async Task<bool> RejectEstimateAsync(long jobId, RejectEstimateRequest request)
+        public async Task<bool> RejectEstimateAsync(long jobId, RejectEstimateRequest request, string recordedBy)
         {
             var job = await _db.DepotJobs.FirstOrDefaultAsync(j => j.Id == jobId);
             var estimate = job == null ? null : await _db.Estimates.FirstOrDefaultAsync(e => e.DepotJobId == jobId);
             if (job == null || estimate == null || estimate.Status != "PENDING_APPROVAL" || string.IsNullOrWhiteSpace(request.Reason)) return false;
+            // Cùng điều kiện với ghi nhận duyệt — trước đây từ chối được cả báo giá người báo giá chưa xác nhận.
+            if (estimate.ConfirmedAt == null)
+                throw new EstimateNotAllowedException($"Báo giá {estimate.EstimateNo} chưa được xác nhận — người báo giá phải bấm \"Xác nhận báo giá\" trước khi ghi nhận hãng tàu từ chối.");
+
+            // Giống luồng duyệt: ApprovedBy = nhân viên depot ghi nhận (tài khoản đăng nhập); người / mã từ chối
+            // phía hãng tàu lưu riêng ở CarrierApproverName. Trước đây ApprovedBy lấy thẳng chuỗi client gửi.
+            var carrierSide = request.RejectedBy?.Trim();
+            if (string.IsNullOrEmpty(carrierSide) || string.Equals(carrierSide, "Hãng tàu", StringComparison.OrdinalIgnoreCase))
+                carrierSide = null;
+            if (carrierSide != null && carrierSide.Length > 200) carrierSide = carrierSide[..200];
 
             estimate.Status = "REJECTED";
-            estimate.ApprovedBy = string.IsNullOrWhiteSpace(request.RejectedBy) ? "Hãng tàu" : request.RejectedBy;
+            estimate.ApprovedBy = string.IsNullOrWhiteSpace(recordedBy) ? "Depot" : recordedBy;
+            estimate.CarrierApproverName = carrierSide;
             estimate.ApprovedAt = DateTime.UtcNow;
             job.Status = "ESTIMATING";
-            _db.AuditLogs.Add(CreateAudit(job.JobNo, jobId, "ESTIMATE_REJECTED", estimate.ApprovedBy, request.Reason.Trim()));
+            var details = carrierSide == null
+                ? request.Reason.Trim()
+                : $"{request.Reason.Trim()} (phía hãng tàu: {carrierSide})";
+            _db.AuditLogs.Add(CreateAudit(job.JobNo, jobId, "ESTIMATE_REJECTED", estimate.ApprovedBy, details));
             await _db.SaveChangesAsync();
             return true;
         }
@@ -1571,7 +1633,19 @@ namespace Depot.Application.Services
                 Details = $"Bắt đầu sửa chữa container bởi kỹ thuật viên {technicianName}"
             });
 
-            await _db.SaveChangesAsync();
+            try
+            {
+                await _db.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                // 2 yêu cầu bắt đầu đồng thời cùng qua kiểm tra AnyAsync ở trên; yêu cầu thứ 2 vướng unique
+                // IX_RepairOrders_JobNo — trước đây thành HTTP 500. Kiểm tra lại: đã có lệnh sửa thì báo 409.
+                _db.ChangeTracker.Clear();
+                if (await _db.RepairOrders.AnyAsync(r => r.DepotJobId == jobId))
+                    throw new InvalidOperationException("Lệnh sửa chữa của container này đã được bắt đầu.");
+                throw;
+            }
             return true;
         }
 
@@ -1608,23 +1682,79 @@ namespace Depot.Application.Services
             var repairOrder = job == null ? null : await _db.RepairOrders.FirstOrDefaultAsync(r => r.DepotJobId == jobId);
             if (job == null || repairOrder == null || job.Status != "REPAIRING") return false;
 
+            // Ảnh trước / sau sửa đã được lưu thật từng tấm lúc chụp (bảng DepotFiles, TableName="RepairOrder") —
+            // đếm theo DB thay vì tin `request.Photos`. Mỗi hạng mục (= 1 dòng báo giá đã duyệt, theo thứ tự Id như
+            // frontend dựng danh sách) phải có ≥ 1 ảnh trước sửa và ≥ 1 ảnh sau sửa mới được chuyển QC.
+            var photoNames = await _db.Set<DepotFile>()
+                .Where(f => f.TableName == RepairAfterPhotoTable && f.IdTable == repairOrder.Id && !f.IsDeleted)
+                .Select(f => f.Name)
+                .ToListAsync();
+            var photos = photoNames.Select(ParseRepairPhoto).Where(p => p != null).Select(p => p!.Value).ToList();
+            var beforeCount = photos.Count(p => p.Kind == RepairPhotoKindBefore);
+            var afterCount = photos.Count(p => p.Kind == RepairPhotoKindAfter);
+
+            var approvedEstimateId = await _db.Estimates
+                .Where(e => e.DepotJobId == jobId && e.Status == "APPROVED")
+                .Select(e => (long?)e.Id)
+                .FirstOrDefaultAsync();
+            var itemCount = approvedEstimateId == null ? 0 : await _db.Set<EstimateItem>().CountAsync(i => i.EstimateId == approvedEstimateId.Value);
+            var missing = new List<string>();
+            if (itemCount > 0)
+            {
+                for (var n = 1; n <= itemCount; n++)
+                {
+                    var hasBefore = photos.Any(p => p.ItemNo == n && p.Kind == RepairPhotoKindBefore);
+                    var hasAfter = photos.Any(p => p.ItemNo == n && p.Kind == RepairPhotoKindAfter);
+                    if (!hasBefore && !hasAfter) missing.Add($"hạng mục #{n} thiếu ảnh trước sửa và ảnh sau sửa");
+                    else if (!hasBefore) missing.Add($"hạng mục #{n} thiếu ảnh trước sửa");
+                    else if (!hasAfter) missing.Add($"hạng mục #{n} thiếu ảnh sau sửa");
+                }
+            }
+            else
+            {
+                // Hồ sơ cũ không có báo giá đã duyệt: không xác định được hạng mục, yêu cầu tối thiểu cho cả lệnh.
+                if (beforeCount == 0) missing.Add("lệnh sửa chưa có ảnh trước sửa");
+                if (afterCount == 0) missing.Add("lệnh sửa chưa có ảnh sau sửa");
+            }
+            if (missing.Count > 0)
+                throw new RepairPhotosMissingException($"Chưa đủ ảnh để chuyển QC: {string.Join("; ", missing)}.");
+
             repairOrder.StartedAt ??= DateTime.UtcNow;
             repairOrder.CompletedAt = DateTime.UtcNow;
             repairOrder.QcStatus = "PENDING";
-            // Ảnh sau sửa đã được lưu thật từng tấm lúc chụp (bảng DepotFiles, TableName="RepairOrder") —
-            // đếm theo DB thay vì tin `request.Photos` (trước đây frontend gửi base64 lên đây rồi bị bỏ đi,
-            // chỉ ghi lại con số).
-            var afterPhotoCount = await _db.Set<DepotFile>()
-                .CountAsync(f => f.TableName == RepairAfterPhotoTable && f.IdTable == repairOrder.Id && !f.IsDeleted);
-            repairOrder.QcNotes = afterPhotoCount == 0 ? "Hoàn thành không kèm ảnh." : $"Đã đính kèm {afterPhotoCount} ảnh sau sửa.";
+            repairOrder.QcNotes = $"Đã đính kèm {beforeCount} ảnh trước sửa, {afterCount} ảnh sau sửa.";
             job.Status = "QC_PENDING";
-            _db.AuditLogs.Add(CreateAudit(job.JobNo, jobId, "REPAIR_COMPLETED", repairOrder.TechnicianName, "Hoàn tất thi công, chuyển QC."));
+            _db.AuditLogs.Add(CreateAudit(job.JobNo, jobId, "REPAIR_COMPLETED", repairOrder.TechnicianName,
+                $"Hoàn tất thi công, chuyển QC ({beforeCount} ảnh trước sửa, {afterCount} ảnh sau sửa)."));
             await _db.SaveChangesAsync();
             return true;
         }
 
-        /// <summary>TableName trong DepotFiles cho ảnh sau sửa — IdTable = RepairOrder.Id.</summary>
+        /// <summary>TableName trong DepotFiles cho ảnh lệnh sửa (trước + sau sửa) — IdTable = RepairOrder.Id.</summary>
         public const string RepairAfterPhotoTable = "RepairOrder";
+        public const string RepairPhotoKindBefore = "BEFORE";
+        public const string RepairPhotoKindAfter = "AFTER";
+
+        /// <summary>Tiền tố tên file ảnh lệnh sửa: sau sửa "ITEM-{n}__" (giữ như dữ liệu cũ), trước sửa "BEFORE-ITEM-{n}__".</summary>
+        public static string RepairPhotoPrefix(string kind, int itemNo) =>
+            kind == RepairPhotoKindBefore ? $"BEFORE-ITEM-{itemNo}__" : $"ITEM-{itemNo}__";
+
+        private static readonly System.Text.RegularExpressions.Regex RepairPhotoNameRegex =
+            new(@"^(BEFORE-)?ITEM-(\d+)__", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        /// <summary>Đọc loại ảnh + số hạng mục từ tên file; null nếu không đúng khuôn.</summary>
+        public static (string Kind, int ItemNo)? ParseRepairPhoto(string? fileName)
+        {
+            var m = RepairPhotoNameRegex.Match(fileName ?? string.Empty);
+            if (!m.Success) return null;
+            return (m.Groups[1].Success ? RepairPhotoKindBefore : RepairPhotoKindAfter, int.Parse(m.Groups[2].Value));
+        }
+
+        /// <summary>Lỗi nghiệp vụ khi hoàn tất lệnh sửa mà còn hạng mục thiếu ảnh trước / sau sửa (controller trả 400 kèm lý do).</summary>
+        public sealed class RepairPhotosMissingException : Exception
+        {
+            public RepairPhotosMissingException(string message) : base(message) { }
+        }
 
         public async Task<long?> GetRepairOrderIdAsync(long jobId, bool requireRepairing)
         {
@@ -1634,10 +1764,8 @@ namespace Depot.Application.Services
         }
 
         /// <summary>QC đạt chuyển READY_FOR_OUT, QC trượt chuyển ngược REPAIRING để sửa lại.</summary>
-        public async Task<bool> CompleteQcInspectionAsync(QcInspectionRequest qcReq)
+        public async Task<bool> CompleteQcInspectionAsync(long jobId, QcInspectionRequest qcReq, string inspector)
         {
-            if (!long.TryParse(qcReq.JobId, out var jobId)) return false;
-
             var job = await _db.DepotJobs.FirstOrDefaultAsync(j => j.Id == jobId);
             var repairOrder = job == null ? null : await _db.RepairOrders.FirstOrDefaultAsync(r => r.DepotJobId == jobId);
             if (job == null || repairOrder == null || job.Status != "QC_PENDING") return false;
@@ -1645,7 +1773,8 @@ namespace Depot.Application.Services
             repairOrder.CompletedAt = DateTime.UtcNow;
             repairOrder.QcStatus = qcReq.Passed ? "PASSED" : "FAILED";
             repairOrder.QcNotes = qcReq.Comments;
-            repairOrder.InspectorName = qcReq.InspectorName;
+            // QC viên = tài khoản đăng nhập (controller truyền vào); InspectorName client gửi bị bỏ qua.
+            repairOrder.InspectorName = inspector;
 
             // QC đạt trước đây luôn cho READY_FOR_OUT ngay — nhưng container vừa sửa chữa vừa có lệnh vệ
             // sinh song song (tự sinh từ SubmitSurveyAsync khi surveyor chọn dịch vụ vệ sinh cho container
@@ -1660,7 +1789,7 @@ namespace Depot.Application.Services
                 DepotJobId = jobId,
                 JobNo = job.JobNo,
                 Action = qcReq.Passed ? "QC_PASSED" : "QC_FAILED",
-                User = qcReq.InspectorName,
+                User = inspector,
                 Timestamp = DateTime.UtcNow,
                 Details = $"Kết quả kiểm định QC: {(qcReq.Passed ? "ĐẠT (PASSED)" : "KHÔNG ĐẠT (FAILED)")}. Ghi chú: {qcReq.Comments}"
             });
@@ -1702,28 +1831,283 @@ namespace Depot.Application.Services
             return true;
         }
 
-        /// <summary>Gate-Out chỉ nhận container READY_FOR_OUT, sinh EIR xuất và giải phóng vị trí bãi.</summary>
-        public async Task<bool> GateOutAsync(long jobId, GateOutRequest request)
-        {
-            var job = await _db.DepotJobs.FirstOrDefaultAsync(j => j.Id == jobId);
-            if (job == null || job.Status != "READY_FOR_OUT" || string.IsNullOrWhiteSpace(request.TruckPlate) || string.IsNullOrWhiteSpace(request.DriverName)) return false;
+        /// <summary>Loại lỗi nghiệp vụ Gate-Out — controller đổi sang mã HTTP tương ứng.</summary>
+        public enum GateOutErrorKind { Validation, NotFound, Conflict, Forbidden }
 
-            // Trước đây không hề kiểm tra đã thanh toán chưa — container còn nợ phí lưu bãi/nâng hạ
-            // (ServiceOrder phát sinh từ Khai Thác Gate-In) vẫn Gate-Out được bình thường miễn Status đúng
-            // READY_FOR_OUT. Chỉ chặn khi THẬT SỰ có phiếu dịch vụ phát sinh phí (GrandTotal > 0) và chưa
-            // thanh toán — container AV không phát sinh dịch vụ gì (không có ServiceOrder nào) vẫn được
-            // Gate-Out bình thường như thiết kế cũ, không đổi hành vi cho trường hợp đó.
+        /// <summary>Gate-Out bị từ chối kèm thông báo tiếng Việt cụ thể (thay cho bool chung chung trước đây).</summary>
+        public sealed class GateOutNotAllowedException : Exception
+        {
+            public GateOutErrorKind Kind { get; }
+            public GateOutNotAllowedException(string message, GateOutErrorKind kind = GateOutErrorKind.Validation) : base(message) { Kind = kind; }
+        }
+
+        /// <summary>Cấu hình "Số giờ hiệu lực booking" lưu thành 1 mục danh mục (giống PAYMENT_ACCOUNT), không có bảng setting riêng.</summary>
+        public const string GateOutSettingCatalog = "GATE_OUT_SETTING";
+        public const string BookingValidityHoursCode = "BOOKING_VALIDITY_HOURS";
+        public const int DefaultBookingValidityHours = 24;
+        public const int MaxBookingValidityHours = 8760;
+
+        /// <summary>Lý do ra cổng không theo booking (chỉ ADMIN / SUPERVISOR).</summary>
+        public static readonly IReadOnlyDictionary<string, string> NoBookingReasons = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["OFF_HIRE"] = "Trả vỏ về hãng",
+            ["DEPOT_TRANSFER"] = "Chuyển depot",
+            ["OFFSITE_REPAIR"] = "Sửa ngoài depot",
+            ["OTHER"] = "Khác"
+        };
+
+        private static readonly TimeZoneInfo VietnamTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh");
+
+        private static DateTime VietnamDate(DateTime utc) =>
+            TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), VietnamTimeZone).Date;
+
+        private static DateTime VietnamMidnightToUtc(DateTime vietnamDate) =>
+            TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(vietnamDate.Date, DateTimeKind.Unspecified), VietnamTimeZone);
+
+        /// <summary>Hạn cuối booking = 00:00 ngày ValidUntil (giờ Việt Nam) + số giờ hiệu lực cấu hình.
+        /// ValidUntil giữ nguyên giờ phút như dữ liệu cũ — chỉ lấy NGÀY để so.</summary>
+        public static DateTime BookingDeadlineUtc(DateTime validUntilUtc, int validityHours) =>
+            VietnamMidnightToUtc(VietnamDate(validUntilUtc)).AddHours(validityHours);
+
+        /// <summary>Mốc nhỏ nhất của ValidUntil để booking còn hạn tại <paramref name="nowUtc"/>:
+        /// ValidUntil &gt;= mốc ⇔ BookingDeadlineUtc(ValidUntil) &gt; now. Dùng được trong UPDATE ... WHERE (không cần hàm múi giờ ở DB).</summary>
+        public static DateTime BookingMinValidUntilUtc(DateTime nowUtc, int validityHours) =>
+            VietnamMidnightToUtc(VietnamDate(nowUtc.AddHours(-validityHours)).AddDays(1));
+
+        /// <summary>Đọc "hours" từ JsonData của mục cấu hình; ngoài 1–8760 coi như không hợp lệ.</summary>
+        public static bool TryReadBookingValidityHours(string? json, out int hours)
+        {
+            hours = 0;
+            if (string.IsNullOrWhiteSpace(json)) return false;
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                if (doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object
+                    && doc.RootElement.TryGetProperty("hours", out var p)
+                    && p.ValueKind == System.Text.Json.JsonValueKind.Number
+                    && p.TryGetInt32(out var h) && h >= 1 && h <= MaxBookingValidityHours)
+                {
+                    hours = h;
+                    return true;
+                }
+            }
+            catch (System.Text.Json.JsonException) { }
+            return false;
+        }
+
+        /// <summary>Số giờ hiệu lực booking đang áp dụng — chưa cấu hình / cấu hình lỗi thì 24 giờ (hết ngày ValidUntil).</summary>
+        public async Task<int> GetBookingValidityHoursAsync()
+        {
+            var json = await _db.MasterCatalogItems.AsNoTracking()
+                .Where(x => x.CatalogType == GateOutSettingCatalog && x.Code == BookingValidityHoursCode && x.IsActive && !x.IsDeleted)
+                .OrderByDescending(x => x.Id)
+                .Select(x => x.JsonData)
+                .FirstOrDefaultAsync();
+            return TryReadBookingValidityHours(json, out var hours) ? hours : DefaultBookingValidityHours;
+        }
+
+        /// <summary>Nhóm loại (DRY, REEFER…) của mã container lấy từ JsonData.category trong DM Loại Container — không đoán theo ký tự trong mã.</summary>
+        private async Task<string?> GetContainerCategoryAsync(string isoSize)
+        {
+            var code = isoSize.Trim().ToUpperInvariant();
+            var jsons = await _db.MasterCatalogItems.AsNoTracking()
+                .Where(x => x.CatalogType == "CONTAINER_TYPE" && !x.IsDeleted && x.Name.ToUpper() == code)
+                .OrderBy(x => x.Id)
+                .Select(x => x.JsonData)
+                .ToListAsync();
+            foreach (var json in jsons)
+            {
+                try
+                {
+                    using var doc = System.Text.Json.JsonDocument.Parse(json);
+                    if (doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object
+                        && doc.RootElement.TryGetProperty("category", out var c)
+                        && c.ValueKind == System.Text.Json.JsonValueKind.String
+                        && !string.IsNullOrWhiteSpace(c.GetString()))
+                        return c.GetString()!.Trim().ToUpperInvariant();
+                }
+                catch (System.Text.Json.JsonException) { }
+            }
+            return null;
+        }
+
+        private sealed record GateOutBookingMatch(CustomerBooking Booking, string ShippingLineCode, string Category);
+
+        /// <summary>Kiểm tra booking cho 1 hồ sơ theo đúng thứ tự: có số → tồn tại → ACTIVE → còn hạn → đúng hãng →
+        /// đúng kích cỡ → đúng nhóm loại → còn số lượng. Dùng chung cho Gate-Out và API kiểm tra (chỉ đọc).</summary>
+        private async Task<GateOutBookingMatch> EvaluateGateOutBookingAsync(DepotJob job, string? bookingNo, DateTime nowUtc, int validityHours)
+        {
+            var no = bookingNo?.Trim().ToUpperInvariant();
+            if (string.IsNullOrEmpty(no))
+                throw new GateOutNotAllowedException("Chưa nhập số Booking cấp vỏ.");
+
+            var booking = await _db.CustomerBookings.AsNoTracking().FirstOrDefaultAsync(b => b.BookingNo.ToUpper() == no);
+            if (booking == null)
+                throw new GateOutNotAllowedException($"Không tìm thấy booking {no}.", GateOutErrorKind.NotFound);
+            if (!string.Equals(booking.Status, "ACTIVE", StringComparison.OrdinalIgnoreCase))
+                throw new GateOutNotAllowedException($"Booking {booking.BookingNo} không còn hoạt động (trạng thái {booking.Status}).");
+            if (booking.ValidUntil < BookingMinValidUntilUtc(nowUtc, validityHours))
+                throw new GateOutNotAllowedException($"Booking {booking.BookingNo} đã hết hạn ngày {VietnamDate(booking.ValidUntil):dd/MM/yyyy}.");
+
+            var lineCodes = await _db.ShippingLines.AsNoTracking()
+                .Where(s => s.Id == booking.ShippingLineId || s.Id == job.ShippingLineId)
+                .ToDictionaryAsync(s => s.Id, s => s.Code);
+            var bookingLine = lineCodes.GetValueOrDefault(booking.ShippingLineId, booking.ShippingLineId.ToString());
+            if (booking.ShippingLineId != job.ShippingLineId)
+            {
+                var jobLine = lineCodes.GetValueOrDefault(job.ShippingLineId, job.ShippingLineId.ToString());
+                throw new GateOutNotAllowedException($"Booking {booking.BookingNo} thuộc hãng tàu {bookingLine}, container {job.ContainerNo} thuộc hãng tàu {jobLine}.");
+            }
+
+            var bookingSize = (booking.ContainerSize ?? string.Empty).Trim().ToUpperInvariant();
+            var jobSize = (job.IsoSize ?? string.Empty).Trim().ToUpperInvariant();
+            if (bookingSize != jobSize)
+                throw new GateOutNotAllowedException($"Booking {booking.BookingNo} yêu cầu container {bookingSize}, container {job.ContainerNo} là {jobSize}.");
+
+            var bookingType = (booking.ContainerType ?? string.Empty).Trim().ToUpperInvariant();
+            var category = await GetContainerCategoryAsync(jobSize)
+                ?? throw new GateOutNotAllowedException($"Loại container {jobSize} chưa khai báo nhóm loại trong DM Loại Container — không đối chiếu được với loại {bookingType} của booking {booking.BookingNo}.");
+            if (bookingType != category)
+                throw new GateOutNotAllowedException($"Booking {booking.BookingNo} yêu cầu loại {bookingType}, container {job.ContainerNo} thuộc loại {category}.");
+
+            if (booking.UsedCount >= booking.ContainerCount)
+                throw new GateOutNotAllowedException($"Booking {booking.BookingNo} đã cấp đủ {booking.UsedCount}/{booking.ContainerCount} vỏ.");
+
+            return new GateOutBookingMatch(booking, bookingLine, category);
+        }
+
+        /// <summary>Kiểm tra trước 1 booking cho 1 hồ sơ — chỉ đọc, không đổi booking hay hồ sơ.</summary>
+        public async Task<GateOutBookingCheckResult> CheckGateOutBookingAsync(long jobId, string? bookingNo)
+        {
+            var job = await _db.DepotJobs.AsNoTracking().FirstOrDefaultAsync(j => j.Id == jobId)
+                ?? throw new GateOutNotAllowedException("Không tìm thấy hồ sơ container.", GateOutErrorKind.NotFound);
+            var hours = await GetBookingValidityHoursAsync();
+            try
+            {
+                var m = await EvaluateGateOutBookingAsync(job, bookingNo, DateTime.UtcNow, hours);
+                var b = m.Booking;
+                return new GateOutBookingCheckResult
+                {
+                    Valid = true,
+                    Message = $"Booking {b.BookingNo} hợp lệ — còn {b.ContainerCount - b.UsedCount}/{b.ContainerCount} vỏ.",
+                    BookingNo = b.BookingNo,
+                    ShippingLineCode = m.ShippingLineCode,
+                    ContainerSize = b.ContainerSize,
+                    ContainerType = b.ContainerType,
+                    ValidUntilDate = VietnamDate(b.ValidUntil).ToString("dd/MM/yyyy"),
+                    ContainerCount = b.ContainerCount,
+                    UsedCount = b.UsedCount,
+                    Remaining = b.ContainerCount - b.UsedCount
+                };
+            }
+            catch (GateOutNotAllowedException ex)
+            {
+                return new GateOutBookingCheckResult { Valid = false, Message = ex.Message, BookingNo = bookingNo?.Trim().ToUpperInvariant() };
+            }
+        }
+
+        /// <summary>
+        /// Cấp vỏ / Gate-Out. Mặc định bắt buộc booking hợp lệ (EvaluateGateOutBookingAsync); "không cần booking" phải có lý do
+        /// (quyền gateout_nobooking kiểm ở controller). Ghi trong 1 transaction bằng UPDATE có điều kiện: hồ sơ chỉ đổi khi còn
+        /// READY_FOR_OUT (chống gửi lặp), booking chỉ tăng khi UsedCount &lt; ContainerCount (chống cấp vượt khi nhiều xe cùng lấy).
+        /// </summary>
+        public async Task GateOutAsync(long jobId, GateOutRequest request, string actor)
+        {
+            request ??= new GateOutRequest();
+            var nowUtc = DateTime.UtcNow;
+            var by = Truncate(string.IsNullOrWhiteSpace(actor) ? "Gate-Out" : actor.Trim(), 200)!;
+
+            var job = await _db.DepotJobs.AsNoTracking().FirstOrDefaultAsync(j => j.Id == jobId)
+                ?? throw new GateOutNotAllowedException("Không tìm thấy hồ sơ container.", GateOutErrorKind.NotFound);
+            if (job.Status == "GATE_OUT")
+                throw new GateOutNotAllowedException($"Container {job.ContainerNo} đã Gate-Out (EIR {job.GateOutEirNo}).", GateOutErrorKind.Conflict);
+            if (job.Status != "READY_FOR_OUT")
+                throw new GateOutNotAllowedException($"Container {job.ContainerNo} chưa sẵn sàng xuất (trạng thái hiện tại {job.Status}).");
+            if (string.IsNullOrWhiteSpace(request.TruckPlate) || string.IsNullOrWhiteSpace(request.DriverName))
+                throw new GateOutNotAllowedException("Thiếu biển số xe đầu kéo hoặc tên tài xế.");
+
+            // Container còn nợ phí (ServiceOrder có phí, chưa thu) không được ra cổng — AV không có phiếu nào vẫn ra bình thường.
             var hasUnpaidServiceOrder = await _db.ServiceOrders.AnyAsync(so =>
                 so.DepotJobId == job.Id && so.Status != "CANCELLED" && so.GrandTotal > 0 && so.PaymentStatus != "PAID");
-            if (hasUnpaidServiceOrder) return false;
+            if (hasUnpaidServiceOrder)
+                throw new GateOutNotAllowedException($"Container {job.ContainerNo} còn phiếu dịch vụ chưa thanh toán — thu tiền ở màn Thanh Toán trước khi Gate-Out.");
 
-            job.Status = "GATE_OUT";
-            job.GateOutDate = DateTime.UtcNow;
-            job.GateOutTruckPlate = request.TruckPlate.Trim().ToUpperInvariant();
-            job.GateOutDriverName = request.DriverName.Trim();
-            job.GateOutTrailerPlate = request.TrailerPlate;
-            job.GateOutSealNo = request.SealNo;
-            job.GateOutEirNo = $"EIR-OUT-{DateTime.UtcNow:yyyyMMdd}-{Random.Shared.Next(100000, 999999)}";
+            GateOutBookingMatch? match = null;
+            var validityHours = 0;
+            string? reasonLabel = null;
+            var note = request.NoBookingNote?.Trim();
+            if (request.WithoutBooking)
+            {
+                var reason = request.NoBookingReason?.Trim();
+                if (string.IsNullOrEmpty(reason) || !NoBookingReasons.TryGetValue(reason, out reasonLabel))
+                    throw new GateOutNotAllowedException("Phải chọn lý do ra cổng không theo booking (Trả vỏ về hãng / Chuyển depot / Sửa ngoài depot / Khác).");
+                if (string.Equals(reason, "OTHER", StringComparison.OrdinalIgnoreCase) && string.IsNullOrEmpty(note))
+                    throw new GateOutNotAllowedException("Lý do \"Khác\" phải ghi chú cụ thể.");
+            }
+            else
+            {
+                validityHours = await GetBookingValidityHoursAsync();
+                match = await EvaluateGateOutBookingAsync(job, request.BookingNo, nowUtc, validityHours);
+            }
+
+            var truckPlate = request.TruckPlate.Trim().ToUpperInvariant();
+            var driverName = request.DriverName.Trim();
+            var trailerPlate = request.TrailerPlate;
+            var sealNo = request.SealNo;
+            var eirNo = $"EIR-OUT-{nowUtc:yyyyMMdd}-{Random.Shared.Next(100000, 999999)}";
+            var bookingNo = match?.Booking.BookingNo;
+
+            await using var tx = await _db.Database.BeginTransactionAsync();
+
+            var updatedJobs = await _db.DepotJobs
+                .Where(j => j.Id == jobId && j.Status == "READY_FOR_OUT")
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(j => j.Status, "GATE_OUT")
+                    .SetProperty(j => j.GateOutDate, nowUtc)
+                    .SetProperty(j => j.GateOutTruckPlate, truckPlate)
+                    .SetProperty(j => j.GateOutDriverName, driverName)
+                    .SetProperty(j => j.GateOutTrailerPlate, trailerPlate)
+                    .SetProperty(j => j.GateOutSealNo, sealNo)
+                    .SetProperty(j => j.GateOutEirNo, eirNo)
+                    .SetProperty(j => j.GateOutBookingNo, bookingNo)
+                    .SetProperty(j => j.LastModifiedBy, by)
+                    .SetProperty(j => j.LastModifiedAt, nowUtc));
+            if (updatedJobs == 0)
+            {
+                await tx.RollbackAsync();
+                throw new GateOutNotAllowedException($"Container {job.ContainerNo} vừa được Gate-Out hoặc đổi trạng thái bởi thao tác khác — tải lại để xem.", GateOutErrorKind.Conflict);
+            }
+
+            string details;
+            if (match != null)
+            {
+                var bookingId = match.Booking.Id;
+                var minValidUntil = BookingMinValidUntilUtc(nowUtc, validityHours);
+                var took = await _db.CustomerBookings
+                    .Where(b => b.Id == bookingId && b.Status == "ACTIVE" && b.UsedCount < b.ContainerCount && b.ValidUntil >= minValidUntil)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(b => b.UsedCount, b => b.UsedCount + 1)
+                        .SetProperty(b => b.LastModifiedBy, by)
+                        .SetProperty(b => b.LastModifiedAt, nowUtc));
+                var fresh = await _db.CustomerBookings.AsNoTracking().FirstAsync(b => b.Id == bookingId);
+                if (took == 0)
+                {
+                    await tx.RollbackAsync();
+                    var reasonText = fresh.UsedCount >= fresh.ContainerCount
+                        ? $"Booking {fresh.BookingNo} đã cấp đủ {fresh.UsedCount}/{fresh.ContainerCount} vỏ."
+                        : !string.Equals(fresh.Status, "ACTIVE", StringComparison.OrdinalIgnoreCase)
+                            ? $"Booking {fresh.BookingNo} không còn hoạt động (trạng thái {fresh.Status})."
+                            : $"Booking {fresh.BookingNo} đã hết hạn ngày {VietnamDate(fresh.ValidUntil):dd/MM/yyyy}.";
+                    throw new GateOutNotAllowedException(reasonText, GateOutErrorKind.Conflict);
+                }
+                details = $"Cấp vỏ theo booking {fresh.BookingNo} cho xe {truckPlate}, tài xế {driverName}, EIR {eirNo}. " +
+                          $"Booking đã cấp {fresh.UsedCount}/{fresh.ContainerCount}, còn {fresh.ContainerCount - fresh.UsedCount} vỏ.";
+            }
+            else
+            {
+                details = $"Cấp vỏ KHÔNG theo booking — lý do: {reasonLabel}{(string.IsNullOrEmpty(note) ? string.Empty : $" ({note})")}. " +
+                          $"Xe {truckPlate}, tài xế {driverName}, EIR {eirNo}.";
+            }
 
             var position = await _db.YardPositions.FirstOrDefaultAsync(p => p.IsOccupied && p.OccupiedContainerNo == job.ContainerNo);
             if (position != null)
@@ -1731,9 +2115,9 @@ namespace Depot.Application.Services
                 position.IsOccupied = false;
                 position.OccupiedContainerNo = null;
             }
-            _db.AuditLogs.Add(CreateAudit(job.JobNo, jobId, "GATE_OUT", "", $"Cấp vỏ cho xe {job.GateOutTruckPlate}, tài xế {request.DriverName}, EIR {job.GateOutEirNo}."));
+            _db.AuditLogs.Add(CreateAudit(job.JobNo, jobId, "GATE_OUT", "", Truncate(details, 1000)!));
             await _db.SaveChangesAsync();
-            return true;
+            await tx.CommitAsync();
         }
 
         private static JobAuditLog CreateAudit(string jobNo, long jobId, string action, string user, string details) => new()

@@ -29,6 +29,8 @@ export const CompleteItemModal: React.FC<CompleteItemModalProps> = ({
 }) => {
   const afterPhotos = item.photos.filter((p) => p.type === 'AFTER');
   const hasAfterPhoto = afterPhotos.length > 0;
+  // Ảnh trước sửa là điều kiện bắt buộc trước ảnh sau sửa (ảnh giám định không tính).
+  const hasBeforePhoto = item.photos.some((p) => p.type === 'BEFORE');
 
   const [technician, setTechnician] = useState(item.technician || leadTechnician || '');
   const [actualHours, setActualHours] = useState<number>(item.actualHours || 0);
@@ -75,6 +77,10 @@ export const CompleteItemModal: React.FC<CompleteItemModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!hasBeforePhoto) {
+      alert('Bắt buộc phải chụp ít nhất 01 ảnh trước khi sửa (BEFORE photo) mới được phép hoàn thành hạng mục!');
+      return;
+    }
     if (!hasAfterPhoto) {
       alert('Bắt buộc phải chụp hoặc đính kèm ít nhất 01 ảnh sau khi sửa (AFTER photo) mới được phép hoàn thành hạng mục!');
       return;
@@ -122,6 +128,17 @@ export const CompleteItemModal: React.FC<CompleteItemModalProps> = ({
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6 flex-1 bg-white">
           {/* Photo validation notice */}
+          {!hasBeforePhoto && (
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-2.5">
+              <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <h4 className="text-xs font-bold text-amber-800">Chưa Có Ảnh Trước Sửa (Bắt Buộc)</h4>
+                <p className="text-[11px] text-amber-700 leading-relaxed">
+                  Đóng cửa sổ này, bấm "Chụp Ảnh Trước Sửa" ở thẻ hạng mục để chụp hiện trạng hư hỏng, rồi mới chụp ảnh sau sửa và hoàn thành.
+                </p>
+              </div>
+            </div>
+          )}
           {!hasAfterPhoto ? (
             <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-start justify-between gap-3">
               <div className="flex items-start gap-2.5">
@@ -321,7 +338,7 @@ export const CompleteItemModal: React.FC<CompleteItemModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={!hasAfterPhoto}
+              disabled={!hasAfterPhoto || !hasBeforePhoto}
               className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl shadow-lg  transition flex items-center gap-2 cursor-pointer"
             >
               <CheckCircle2 className="w-4 h-4" />

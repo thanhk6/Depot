@@ -27,6 +27,27 @@ export const customerApi = {
     const response = await apiClient.post<ApiResponse<unknown>>(API_ENDPOINTS.CUSTOMERS.BASE, request);
     return response.data;
   },
+  /**
+   * Thêm nhanh nhà xe tại cổng Gate-In (quyền cổng). Trùng tên / MST → backend trả 409 kèm nhà xe đã có:
+   * trả `duplicate = true` + nhà xe đó để màn hình chọn luôn thay vì báo lỗi.
+   */
+  quickCreateTrucking: async (request: { name: string; phone?: string; taxCode?: string }): Promise<{
+    ok: boolean;
+    duplicate: boolean;
+    message: string;
+    customer?: { code: string; name: string };
+  }> => {
+    try {
+      const response = await apiClient.post<ApiResponse<{ code: string; name: string }>>(`${API_ENDPOINTS.CUSTOMERS.BASE}/trucking-quick`, request);
+      return { ok: true, duplicate: false, message: response.data.message, customer: response.data.data };
+    } catch (error: any) {
+      const body = error?.response?.data;
+      if (error?.response?.status === 409 && body?.data?.code) {
+        return { ok: false, duplicate: true, message: body.message, customer: body.data };
+      }
+      return { ok: false, duplicate: false, message: body?.message || 'Không thêm được nhà xe.' };
+    }
+  },
   update: async (id: string, request: unknown) => {
     const response = await apiClient.put<ApiResponse<unknown>>(`${API_ENDPOINTS.CUSTOMERS.BASE}/${id}`, request);
     return response.data;

@@ -34,11 +34,16 @@ Container **không hư hỏng** (giám định không ghi lỗi nào) đi tắt:
 **Các bước**
 1. Nhập số container. Hệ thống kiểm tra đúng chuẩn ISO 6346 (4 chữ + 7 số, số kiểm tra cuối).
 2. Chọn loại container (danh mục *DM Loại Container*), hãng tàu (danh mục *Hãng Tàu*), nhập tare / max payload.
-3. Nhập thông tin xe: biển số, tài xế, số điện thoại, seal, booking… Nhân viên tiếp nhận lấy theo tài khoản đăng nhập.
-4. Lưu.
+3. **Đơn Vị Vận Tải / Nhà Xe (bắt buộc):** chọn 1 trong 3 radio — chỉ hiện ô của radio đang chọn, đổi radio thì bỏ lựa chọn cũ.
+   - **Chọn nhà xe có sẵn** (mặc định) → gõ mã / tên, chọn trong gợi ý (chỉ hiện khách hàng đang hoạt động).
+   - **Thêm nhà xe mới**: nhập tên (SĐT, MST tuỳ chọn) → hệ thống tạo nhà xe mã **NX-xxxx** (loại TRUCKING, ghi chú "tạo tại cổng") và tự quay về *Chọn nhà xe có sẵn* với nhà xe đó. Tên hoặc MST trùng nhà xe đã có thì **không tạo**, tự chọn nhà xe cũ.
+   - **Khách vãng lai** → gõ tên nhà xe / chủ xe (không thêm vào danh mục).
+4. Nhập thông tin xe: biển số, tài xế, số điện thoại, seal, booking… Nhân viên tiếp nhận lấy theo tài khoản đăng nhập.
+5. Lưu.
 
 **Hệ thống tự làm**
 - Tạo hồ sơ container (Job) và số e-EIR, ghi nhật ký *Tiếp nhận cổng*.
+- Lưu cả **mã và tên nhà xe** trên hồ sơ (tên lấy theo danh mục; vãng lai lưu tên đã gõ). Kế toán bổ sung hạn mức công nợ cho nhà xe tạo tại cổng ở màn *Khách hàng*.
 - Container **chưa có vị trí bãi** (đang ở khu hạ tạm / giám định).
 - Chặn nhận trùng container đang có hồ sơ trong bãi.
 - Lưu thành công thì **xoá trắng form** (hãng tàu, loại container về mục đầu tiên của danh mục) và **tự chuyển sang màn *2. Giám Định*** — thông báo ghi số container + số e-EIR. Tài khoản không có quyền Giám Định thì ở lại màn Gate-In và thấy phiếu e-EIR.
@@ -125,8 +130,9 @@ Lệnh xe nâng khác: *Bãi → Xưởng sửa chữa* khi bắt đầu sửa, 
 **Các bước**
 1. Chọn phiếu chờ thanh toán.
 2. Chọn hình thức:
-   - **Tiền mặt:** nhập số tiền khách đưa (bỏ trống = đưa đủ) → hệ thống tính tiền trả lại → **Xác nhận đã thu tiền mặt**.
-   - **Chuyển khoản VietQR:** hiện mã QR tài khoản công ty (lấy từ danh mục tài khoản nhận tiền), số tiền, nội dung = **tên công ty khách + số container** → nhân viên kiểm tra tiền về, tick xác nhận → lưu.
+   - **Tiền mặt:** nhập số tiền khách đưa (bỏ trống = đưa đủ) → hệ thống tính tiền trả lại → kế toán **tích "Đã nhận đủ tiền mặt"** → **Xác nhận đã thu tiền mặt**.
+   - **Chuyển khoản:** luôn hiện số tiền và nội dung chuyển khoản = **tên công ty khách + số container**; mã QR VietQR chỉ hiện khi danh mục đã khai báo tài khoản nhận tiền (chưa khai báo thì ẩn, không báo lỗi) → kế toán tự kiểm tra tiền về tài khoản, **tích xác nhận** → lưu.
+   - Chưa kết nối API ngân hàng: mọi khoản thu đều do kế toán tự xác nhận; chưa tích thì nút gạch nợ bị khoá; đổi hình thức hoặc chọn sang container khác thì phải tích lại (ô tiền tài xế đưa cũng được xoá).
 3. In phiếu thu.
 
 **Hệ thống tự làm:** phiếu = *Đã thanh toán*, ghi **nhật ký thanh toán riêng** (tab *Nhật ký thanh toán*, gồm cả giao dịch bị từ chối) và nhật ký container *Thu tiền*. Container có hư hỏng chuyển sang màn **Báo giá**.
@@ -165,10 +171,10 @@ Lệnh xe nâng khác: *Bãi → Xưởng sửa chữa* khi bắt đầu sửa, 
 
 ## 8. Ghi nhận hãng tàu duyệt (nhập tay)
 
-- **Người thực hiện:** Nhân viên báo giá.
+- **Người thực hiện:** vai trò có quyền *Ghi nhận duyệt*: Admin, Đại diện hãng tàu (Carrier), Thu ngân / Kế toán (Cashier), Giám sát / Trưởng ca (Supervisor). **Người lập báo giá không ghi nhận duyệt được** (tách người lập với người ghi nhận).
 - **Màn hình:** *Phê Duyệt Hãng Tàu*.
 
-**Điều kiện:** báo giá **đã xác nhận** (chưa xác nhận thì hệ thống chặn).
+**Điều kiện:** báo giá **đã xác nhận** — áp dụng cho cả *Duyệt* lẫn *Không duyệt* (chưa xác nhận thì hệ thống chặn).
 
 Hãng tàu trả lời qua email / cổng AEMS / điện thoại / văn bản → nhân viên ghi nhận lại trên hệ thống.
 
@@ -181,12 +187,14 @@ Hãng tàu trả lời qua email / cổng AEMS / điện thoại / văn bản �
 | Thời điểm hãng tàu duyệt | mặc định lúc nhập, sửa theo email / AEMS |
 | Nhận duyệt qua | Email / Cổng AEMS / Điện thoại / Văn bản |
 | Mã duyệt | nếu hãng tàu cấp |
-| Số tiền hãng tàu duyệt | mặc định = tổng báo giá, sửa nếu hãng tàu duyệt khác |
+| Số tiền hãng tàu duyệt | mặc định = tổng báo giá, sửa nếu hãng tàu duyệt thấp hơn — **không được lớn hơn tổng báo giá** |
 | Ghi chú | hướng dẫn của hãng tàu |
 
 → Báo giá *Đã duyệt*, container chuyển **Sửa chữa**. Người ghi nhận lưu tự động.
 
-**Từ chối** — bấm *Không duyệt*, **bắt buộc nhập lý do** → báo giá *Từ chối*, nhân viên báo giá sửa lại (bước 7) rồi xác nhận lại.
+**Từ chối** — bấm *Không duyệt*, **bắt buộc nhập lý do** → báo giá *Từ chối*, nhân viên báo giá sửa lại (bước 7) rồi xác nhận lại. Người ghi nhận từ chối là tài khoản đang đăng nhập; mã / người từ chối phía hãng tàu (nếu nhập) lưu riêng và ghi kèm lý do trong nhật ký.
+
+> Không có đường tắt: đổi trạng thái thủ công sang *Sửa chữa* bị chặn khi báo giá chưa được ghi nhận duyệt.
 
 ---
 
@@ -199,11 +207,11 @@ Hãng tàu trả lời qua email / cổng AEMS / điện thoại / văn bản �
 
 **Các bước**
 1. Lệnh sửa chữa ở trạng thái **Chờ sửa**. Hạng mục = **đúng các dòng báo giá đã duyệt** (Damage / Repair code, Rep. loc, số PCS).
-2. Nhận lệnh / **Bắt đầu sửa** → *Đang sửa*.
-3. Làm từng hạng mục, chụp ảnh **sau sửa**, ghi vật tư đã dùng.
-4. **Hoàn tất sửa chữa** → chuyển QC.
+2. Nhận lệnh / **Bắt đầu sửa** → *Đang sửa*. Kỹ thuật viên của lệnh sửa là **tài khoản bấm Bắt đầu**; mỗi hồ sơ chỉ có 1 lệnh sửa (2 người bấm cùng lúc thì người sau được báo lệnh đã bắt đầu).
+3. Mỗi hạng mục: **chụp ảnh trước sửa** (hiện trạng hư hỏng, ≥ 1 ảnh) → sửa → **chụp ảnh sau sửa** (≥ 1 ảnh) → ghi giờ công, kết quả, vật tư → hoàn thành hạng mục. Chưa có ảnh trước sửa thì nút chụp ảnh sau và nút hoàn thành bị khoá; ảnh giám định chỉ để đối chiếu, không thay ảnh trước sửa.
+4. **Hoàn tất sửa chữa** → chuyển QC. Hệ thống **từ chối** nếu còn hạng mục thiếu ảnh trước sửa hoặc ảnh sau sửa và báo rõ hạng mục nào thiếu.
 
-**Hệ thống tự làm:** ghi nhật ký *Bắt đầu sửa chữa*, *Hoàn tất sửa chữa*.
+**Hệ thống tự làm:** lưu ảnh lên máy chủ ngay khi chụp; ghi nhật ký *Bắt đầu sửa chữa*, *Hoàn tất sửa chữa* (kèm số ảnh trước / sau sửa).
 
 ---
 
@@ -216,7 +224,7 @@ Hãng tàu trả lời qua email / cổng AEMS / điện thoại / văn bản �
 1. Tab *Chờ QC*: chọn container → **Tiến hành nghiệm thu**.
 2. Kiểm tra, chụp ảnh, ghi nhận xét → **Đạt** hoặc **Không đạt**.
    - **Không đạt:** container quay lại *Sửa chữa* (bước 9).
-   - **Đạt:** cột *Người QC & thời gian* hiện người nghiệm thu thật; in **chứng chỉ QC**.
+   - **Đạt:** cột *Người QC & thời gian* hiện người nghiệm thu thật (tài khoản đang đăng nhập, không nhập tay được); in **chứng chỉ QC**.
 3. Báo hãng tàu sửa xong: nút *Báo hãng tàu sửa xong* (API) chỉ hiện khi hãng tàu có kết nối API; hiện tại dùng **EDI / Email** hoặc báo ngoài hệ thống.
 
 **Hệ thống tự làm:** QC đạt → container *Sẵn sàng xuất* (hoặc quay lại vệ sinh nếu còn lệnh vệ sinh chưa xong); tạo lệnh xe nâng *Xưởng sửa chữa → Bãi*.
@@ -225,17 +233,21 @@ Hãng tàu trả lời qua email / cổng AEMS / điện thoại / văn bản �
 
 ## 11. Xuất cổng (Gate-Out)
 
-- **Người thực hiện:** Khai thác cổng.
+- **Người thực hiện:** Khai thác cổng (cấp vỏ theo booking); Quản lý / Giám sát (cấp vỏ **không theo booking**).
 - **Màn hình:** nhóm *Cổng Xuất & Cấp Vỏ* (*Vỏ chờ cấp*, *Tiếp nhận làn cổng xuất*, *Nhật ký xuất & phiếu e-EIR*).
 
 **Điều kiện (hệ thống chặn nếu thiếu)**
 - Container ở trạng thái **Sẵn sàng xuất**.
 - **Không còn phiếu dịch vụ chưa thanh toán**.
 - Nhập đủ **biển số xe** và **tên tài xế**.
+- **Booking hợp lệ** (bắt buộc, trừ khi Quản lý / Giám sát chọn *Không cần booking*): booking có trong hệ thống, đang hoạt động, còn hạn, **đúng hãng tàu**, **đúng kích cỡ** (vd 40HC) và **đúng loại** (DRY / REEFER… theo DM Loại Container) của container, và **còn vỏ chưa cấp**. Sai điều nào hệ thống báo rõ điều đó.
+- **Hạn booking:** còn dùng được đến **00:00 ngày hết hạn ghi trên booking (giờ Việt Nam) + số giờ hiệu lực** ở *Cấu Hình Cấp Vỏ* (mặc định 24 giờ = hết ngày hết hạn). Hết hạn thì báo *"Booking … đã hết hạn ngày dd/MM/yyyy"*.
 
-**Các bước:** chọn vỏ chờ cấp → nhập xe, tài xế, seal → xác nhận xuất → in e-EIR xuất.
+**Các bước:** chọn vỏ chờ cấp → nhập số booking, bấm **Kiểm tra booking** (xem hợp lệ / còn bao nhiêu vỏ) → nhập xe, tài xế, seal → xác nhận xuất → in e-EIR xuất.
 
-**Hệ thống tự làm:** hồ sơ *Đã ra cổng*, giải phóng vị trí bãi, ghi nhật ký *Xuất cổng*.
+**Không có booking** (trả vỏ về hãng, chuyển depot, sửa ngoài depot…): nhân viên cổng **gọi Giám sát / Quản lý**. Người này mở hộp cấp vỏ, tích *Không cần booking*, chọn lý do (*Khác* thì bắt buộc ghi chú) rồi xác nhận.
+
+**Hệ thống tự làm:** hồ sơ *Đã ra cổng* kèm số booking, booking **tăng số vỏ đã cấp 1** (không bao giờ cấp vượt số lượng, kể cả nhiều xe cùng lấy), giải phóng vị trí bãi, ghi nhật ký *Xuất cổng* (booking và số vỏ còn lại, hoặc lý do không theo booking và người duyệt).
 
 ---
 
@@ -246,10 +258,12 @@ Hãng tàu trả lời qua email / cổng AEMS / điện thoại / văn bản �
 | Admin | Tất cả |
 | Giám định (Surveyor) | Giám định, Container & bãi |
 | Khai thác cổng (Gate Operator) | Gate-In, Khai thác, Thanh toán, Gate-Out |
-| Thu ngân (Cashier) | Thanh toán, Công nợ, Kho, Danh mục, Báo cáo |
-| Báo giá (Estimator) | Báo giá (gồm danh mục báo giá), Phê duyệt, Giám định |
+| Thu ngân (Cashier) | Thanh toán, Công nợ, Kho, Danh mục, Báo cáo, Phê duyệt hãng tàu |
+| Báo giá (Estimator) | Báo giá (gồm danh mục báo giá), Giám định — không vào Phê duyệt |
 | Kỹ thuật viên (Technician) | Sửa chữa, Container & bãi |
-| QC | QC, Sửa chữa, Giám định |
+| QC | QC (chụp / xem ảnh lệnh sửa), Giám định — không bắt đầu / hoàn tất lệnh sửa |
+| Đại diện hãng tàu (Carrier) | Phê duyệt hãng tàu, Container — không lập / sửa báo giá |
+| Giám sát / Trưởng ca (Supervisor) | Tổng quan, Container, Phê duyệt hãng tàu |
 | Xe nâng (Forklift) | Lệnh xe nâng, Container & bãi |
 | Tổ vệ sinh (Cleaning) | Vệ sinh, Container & bãi |
 
@@ -266,6 +280,7 @@ Tài khoản nhân viên do **Admin** tạo ở *Phân Quyền RBAC & Users*. H�
 | Tài khoản nhận tiền (VietQR) | Thanh toán |
 | **DM Mã hư hỏng (Damage), Mã sửa chữa (Repair), Vị trí sửa chữa (Rep. loc), Đơn giá giờ công theo hãng tàu, TPI · Cause · Mode · Shop Code** (menu BÁO GIÁ) | Báo giá |
 | Sơ đồ bãi (Block / Bay / Row / Tier) | Xe nâng, Sơ đồ bãi |
+| **Booking hãng tàu** (màn Khách hàng: số booking, hãng tàu, kích cỡ, loại, số lượng, hạn) và **Cấu Hình Cấp Vỏ** (số giờ hiệu lực booking, mặc định 24) | Gate-Out |
 
 ## Phụ lục C — Trạng thái hồ sơ container
 

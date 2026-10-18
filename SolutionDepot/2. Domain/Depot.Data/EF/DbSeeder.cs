@@ -65,7 +65,7 @@ namespace Depot.Data.EF
         }
 
         /// <summary>
-        /// 10 RoleCode chuẩn khớp đúng <c>fontend/src/constants/permissions.ts</c> (ROLES) — nguồn sự
+        /// 11 RoleCode chuẩn khớp đúng <c>fontend/src/constants/permissions.ts</c> (ROLES) — nguồn sự
         /// thật duy nhất cho vai trò hiển thị trên UI (màn System #53, ma trận phân quyền, AuthProvider).
         /// Trước đây bảng Roles seed 11 mã riêng của backend (DEPOT_MANAGER, OPERATOR, ACCOUNTANT,
         /// REPAIR_TECH, QC_INSPECTOR, FORKLIFT_DRIVER, SHIPPING_LINE, CLEANING_STAFF) lệch hoàn toàn với
@@ -85,7 +85,9 @@ namespace Depot.Data.EF
                 new Role { RoleCode = "TECHNICIAN", RoleName = "Tho Sua Chua", Description = "Nhan lenh sua chua Work Order, xuat kho vat tu va cap nhat tien do sua chua" },
                 new Role { RoleCode = "QC_ENG", RoleName = "Ky Su QC", Description = "Nghiem thu kiem tra kin sang/nuoc, do min moi han, chuyen trang thai vo sang AV" },
                 new Role { RoleCode = "FORKLIFT", RoleName = "Tai Xe Xe Nang", Description = "Man hinh tablet dieu bai: nhan vi tri Gate-In, di chuyen va ha bai Block A/B/C" },
-                new Role { RoleCode = "CLEANING", RoleName = "To Ve Sinh Bai", Description = "Nhan danh sach vo can lam (CL), xit rua ap luc/hoa chat va ban giao sang Khai Thac (AV)" }
+                new Role { RoleCode = "CLEANING", RoleName = "To Ve Sinh Bai", Description = "Nhan danh sach vo can lam (CL), xit rua ap luc/hoa chat va ban giao sang Khai Thac (AV)" },
+                // Ghi nhận hãng tàu duyệt / từ chối báo giá (quyền Approval) — tách khỏi người lập báo giá.
+                new Role { RoleCode = "SUPERVISOR", RoleName = "Giam Sat / Truong Ca", Description = "Ghi nhan hang tau duyet / tu choi bao gia, theo doi ho so container" }
             };
 
             // Đổi tên tại chỗ cho RoleCode cũ đã có sẵn trong DB (giữ nguyên Id để không phá FK

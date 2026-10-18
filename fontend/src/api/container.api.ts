@@ -18,6 +18,10 @@ export interface CreateGateInRequest {
   customsSealNo?: string;
   bookingNo?: string;
   truckingCompany?: string;
+  /** Tên nhà xe — chỉ dùng khi truckingCompany = VANG_LAI (nhà xe có mã lấy tên từ danh mục ở backend). */
+  truckingName?: string;
+  /** Màn Gate-In gửi true: backend bắt buộc có nhà xe. */
+  requireTrucking?: boolean;
   remarks?: string;
   /** Users.Id của nhân viên đang đăng nhập — lấy tự động từ phiên đăng nhập, không cho nhập tay. */
   gateInStaffId?: number;

@@ -2,7 +2,9 @@
 // (`RolePermissions` trong Depot.Application — trả về cho frontend qua `allowedTabs` lúc đăng nhập).
 // Backend chặn API theo đúng các nhóm này (HTTP 403); ở đây chỉ để ẩn menu/màn không có quyền, tránh
 // người dùng bấm vào rồi gặp lỗi. Thêm mục menu mới thì phải thêm vào map, nếu không mục đó sẽ bị ẩn.
-export const MENU_PERMISSION: Record<string, string> = {
+// Giá trị là 1 nhóm hoặc danh sách nhóm — có MỘT trong các nhóm là thấy menu (vd Gate-Out: nhân viên cổng
+// có `operation`, giám sát chỉ có `gateout_nobooking` mà không được thêm Gate-In / phiếu dịch vụ).
+export const MENU_PERMISSION: Record<string, string | string[]> = {
   dashboard: 'dashboard',
   workflow: 'jobs',
   gate: 'operation',
@@ -12,7 +14,7 @@ export const MENU_PERMISSION: Record<string, string> = {
   operation: 'operation',
   payment: 'payment',
   estimate: 'estimate',
-  approval: 'estimate',
+  approval: 'approval', // ghi nhận hãng tàu duyệt / từ chối — quyền riêng, người lập báo giá không có
   shipping_api: 'estimate',
   est_damage_codes: 'estimate',
   est_repair_codes: 'estimate',
@@ -25,10 +27,10 @@ export const MENU_PERMISSION: Record<string, string> = {
   yard_map: 'yard',
   yard_blocks: 'yard',
   forklift: 'forklift',
-  gate_out: 'operation',
-  gate_out_ready: 'operation',
-  gate_out_lane: 'operation',
-  gate_out_history: 'operation',
+  gate_out: ['operation', 'gateout_nobooking'],
+  gate_out_ready: ['operation', 'gateout_nobooking'],
+  gate_out_lane: ['operation', 'gateout_nobooking'],
+  gate_out_history: ['operation', 'gateout_nobooking'],
   billing: 'billing',
   warehouse: 'inventory',
   master_data: 'masterdata',
@@ -46,6 +48,7 @@ export const MENU_PERMISSION: Record<string, string> = {
   customer_list: 'masterdata',
   customer_classifications: 'masterdata',
   shipping_lines: 'masterdata',
+  gate_out_settings: 'masterdata', // số giờ hiệu lực booking (GATE_OUT_SETTING)
   notifications: 'notifications',
   notifications_send: 'notifications',
   notifications_employees: 'notifications',
@@ -70,6 +73,7 @@ export const canAccessMenu = (allowedTabs: string[] | undefined, menuId: string)
   const tabs = allowedTabs || [];
   // Phiên ADMIN lưu từ trước khi thêm nhóm billing/cleaning/notifications vẫn phải thấy đủ menu.
   if (tabs.includes('permissions')) return true;
-  const group = MENU_PERMISSION[menuId];
-  return !!group && tabs.includes(group);
+  const groups = MENU_PERMISSION[menuId];
+  if (!groups) return false;
+  return (Array.isArray(groups) ? groups : [groups]).some((g) => tabs.includes(g));
 };

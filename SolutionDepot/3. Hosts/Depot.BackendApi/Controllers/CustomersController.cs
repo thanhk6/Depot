@@ -18,6 +18,29 @@ public sealed class CustomersController : ControllerBase
         return Ok(new ResponseSingleContentModel<object> { StatusCode = 200, Message = "Lấy danh sách khách hàng thành công", Data = await service.GetCustomersAsync() });
     }
 
+    /// <summary>
+    /// Thêm nhanh nhà xe ngay tại cổng Gate-In — cùng quyền với Gate-In (Operation / Survey), không cần quyền danh mục.
+    /// Trùng tên / MST với khách hàng đang hoạt động thì 409 kèm nhà xe đã có để màn hình chọn luôn.
+    /// </summary>
+    [RequirePermission(RolePermissions.Operation, RolePermissions.Survey)]
+    [HttpPost("trucking-quick")]
+    public async Task<IActionResult> QuickCreateTrucking([FromBody] TruckingQuickCreateRequest request)
+    {
+        try
+        {
+            var customer = await service.QuickCreateTruckingCompanyAsync(request, User.GetFullName() ?? User.GetUsername() ?? string.Empty);
+            return Ok(new ResponseSingleContentModel<object> { StatusCode = 200, Message = $"Đã thêm nhà xe {customer.Code} - {customer.Name}", Data = new { customer.Code, customer.Name, customer.TaxCode, customer.Phone, customer.Status } });
+        }
+        catch (MasterDataService.DuplicateTruckingCompanyException ex)
+        {
+            return Conflict(new ResponseSingleContentModel<object> { StatusCode = 409, Message = ex.Message, Data = new { ex.Existing.Code, ex.Existing.Name, ex.Existing.TaxCode, ex.Existing.Phone, ex.Existing.Status } });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = ex.Message, Data = null });
+        }
+    }
+
     [RequirePermission(RolePermissions.MasterData)]
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CustomerCompanyRequest request)

@@ -13,6 +13,9 @@ coverage/
 .claude/settings.local.json
 .claude/*.lock
 
+# Ảnh / file người dùng tải lên (Depot.FileServer — Storage:RootPath) — dữ liệu thật, không đưa lên Git
+**/storage-files/
+
 # Build results
 [Bb]in/
 [Oo]bj/

@@ -2,42 +2,28 @@ import { authApi } from '../api';
 import { tokenService } from './token.service';
 import { sessionService } from './session.service';
 import { User } from '../types/auth';
+import { SYSTEM_ROLES, SystemRole } from '../constants/roles';
 
+// Mã cũ (trước khi DbSeeder đổi bộ RoleCode) → mã thật. Chỉ để đọc phiên đăng nhập cũ còn trong localStorage.
+const LEGACY_ROLE_CODES: Record<string, SystemRole> = {
+  OPERATOR: 'GATE_OP',
+  GATE_IN: 'GATE_OP',
+  ACCOUNTANT: 'CASHIER',
+  REPAIR_TECH: 'TECHNICIAN',
+  QC_INSPECTOR: 'QC_ENG',
+  CLEANING_STAFF: 'CLEANING',
+  FORKLIFT_DRIVER: 'FORKLIFT',
+  SHIPPING_LINE: 'CARRIER',
+  DEPOT_MANAGER: 'ADMIN'
+};
+
+// Giữ nguyên RoleCode thật backend trả về. Trước đây quy theo bộ mã cũ: TECHNICIAN thành REPAIR_TECH, còn QC_ENG /
+// GATE_OP / CARRIER / CLEANING / FORKLIFT rơi về DEPOT_MANAGER → LoginScreen quy tiếp về "Khai Thác Cổng".
+// Mã lạ → UNKNOWN (nhãn "—"), KHÔNG mượn vai trò khác hay quy thành quản lý.
 const normalizeRole = (roleName?: string): User['role'] => {
-  const value = (roleName || 'OPERATOR').toUpperCase();
-
-  switch (value) {
-    case 'ADMIN':
-      return 'ADMIN';
-    case 'OPERATOR':
-    case 'GATE_IN':
-      return 'DEPOT_MANAGER' as User['role'];
-    case 'DEPOT_MANAGER':
-      return 'DEPOT_MANAGER';
-    case 'SURVEYOR':
-      return 'SURVEYOR';
-    case 'ACCOUNTANT':
-    case 'CASHIER':
-      return 'CASHIER' as User['role'];
-    case 'ESTIMATOR':
-      return 'ESTIMATOR';
-    case 'TECHNICIAN':
-    case 'REPAIR_TECH':
-      return 'REPAIR_TECH';
-    case 'QC_INSPECTOR':
-      return 'QC_INSPECTOR';
-    case 'YARD_OPERATOR':
-    case 'CLEANING_STAFF':
-      return 'YARD_OPERATOR' as User['role'];
-    case 'FORKLIFT_DRIVER':
-      return 'FORKLIFT_DRIVER';
-    case 'GATE_OUT':
-      return 'GATE_OUT' as User['role'];
-    case 'SHIPPING_LINE':
-      return 'SHIPPING_LINE';
-    default:
-      return 'DEPOT_MANAGER';
-  }
+  const value = (roleName || '').trim().toUpperCase();
+  if (value in SYSTEM_ROLES) return value as SystemRole;
+  return LEGACY_ROLE_CODES[value] || 'UNKNOWN';
 };
 
 const normalizeUser = (payload: any): User => {

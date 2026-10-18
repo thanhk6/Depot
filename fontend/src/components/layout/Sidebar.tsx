@@ -445,6 +445,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           label: 'Hãng Tàu (Maersk Line)',
           icon: <Building2 className="w-4 h-4 text-sky-400" />,
           badge: 'Độc Quyền'
+        },
+        {
+          id: 'gate_out_settings',
+          label: 'Cấu Hình Cấp Vỏ (Gate-Out)',
+          icon: <Settings className="w-4 h-4 text-indigo-400" />
         }
       ]
     },

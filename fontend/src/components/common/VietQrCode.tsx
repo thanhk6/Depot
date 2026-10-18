@@ -42,10 +42,12 @@ interface VietQrCodeProps {
   /** Nội dung chuyển khoản (số phiếu dịch vụ / số container). */
   addInfo?: string;
   compact?: boolean;
+  /** Chưa khai báo tài khoản nhận tiền thì không hiện gì (màn Thanh Toán) thay vì thông báo chưa cấu hình. */
+  hideWhenNotConfigured?: boolean;
 }
 
 /** Mã QR chuyển khoản VietQR (có sẵn số tiền + nội dung) cho tài khoản nhận tiền của công ty. */
-export const VietQrCode: React.FC<VietQrCodeProps> = ({ amount, addInfo, compact }) => {
+export const VietQrCode: React.FC<VietQrCodeProps> = ({ amount, addInfo, compact, hideWhenNotConfigured = false }) => {
   const [account, setAccount] = useState<PaymentAccount | null | undefined>(undefined);
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
 
@@ -64,9 +66,10 @@ export const VietQrCode: React.FC<VietQrCodeProps> = ({ amount, addInfo, compact
   }, [account, amount, addInfo, compact]);
 
   if (account === undefined) {
+    if (hideWhenNotConfigured) return null;
     return <div className="text-xs text-slate-500 text-center p-4">Đang tải tài khoản nhận tiền...</div>;
   }
-  if (account === null) return <VietQrNotConfigured compact={compact} />;
+  if (account === null) return hideWhenNotConfigured ? null : <VietQrNotConfigured compact={compact} />;
 
   const content = addInfo ? normalizeTransferContent(addInfo) : '';
   return (

@@ -34,6 +34,7 @@ export const API_ENDPOINTS = {
     REPAIR_COMPLETE: (id: string) => `/DepotJobs/${id}/repair/complete`,
     REPAIR_PHOTOS: (id: string) => `/DepotJobs/${id}/repair/photos`,
     GATE_OUT: (id: string) => `/DepotJobs/${id}/gate-out`,
+    GATE_OUT_BOOKING_CHECK: (id: string, bookingNo: string) => `/DepotJobs/${id}/gate-out/booking-check?bookingNo=${encodeURIComponent(bookingNo)}`,
     PAYMENT: (id: string) => `/depot/jobs/${id}/payment`,
   },
   SERVICE_ORDERS: {

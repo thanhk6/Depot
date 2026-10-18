@@ -36,7 +36,8 @@ import {
 import { GateOutContainerRecord } from '../types/gateOut';
 import { GateOutDispatchModal } from '../components/GateOutDispatchModal';
 import { GateOutEirModal } from '../components/GateOutEirModal';
-import { apiClient, containerApi } from '../../../api';
+import { apiClient, containerApi, API_ENDPOINTS } from '../../../api';
+import { getApiErrorMessage } from '../../../utils/apiError';
 import { useDepot } from '../../../context/DepotContext';
 import { useContainerTypeOptions } from '../../masterdata/utils/containerTypeCatalog';
 
@@ -209,6 +210,9 @@ export const GateOutPage: React.FC<GateOutPageProps> = ({
       forkliftOperator: string;
       gateLane: string;
       note?: string;
+      withoutBooking?: boolean;
+      noBookingReason?: string;
+      noBookingNote?: string;
     }
   ) => {
     const targetCont = readyContainers.find((c) => c.id === containerId);
@@ -219,11 +223,17 @@ export const GateOutPage: React.FC<GateOutPageProps> = ({
       if (response?.statusCode !== 200 || !response.data?.id) {
         throw new Error(response?.message || 'Không tìm thấy Job trong SQL Server.');
       }
-      const gateOut = await apiClient.post<any>(`/DepotJobs/${response.data.id}/gate-out`, {
+      // Backend tự tra + kiểm tra booking (tồn tại, còn hạn, đúng hãng / kích cỡ / loại, còn số lượng);
+      // "không cần booking" chỉ ADMIN / SUPERVISOR và bắt buộc lý do.
+      const gateOut = await apiClient.post<any>(API_ENDPOINTS.DEPOT_JOBS.GATE_OUT(String(response.data.id)), {
         truckPlate: dispatchData.truckPlate,
         driverName: dispatchData.driverName,
         trailerPlate: dispatchData.chassisPlate,
-        sealNo: dispatchData.sealNo
+        sealNo: dispatchData.sealNo,
+        bookingNo: dispatchData.withoutBooking ? null : dispatchData.bookingNo.trim(),
+        withoutBooking: !!dispatchData.withoutBooking,
+        noBookingReason: dispatchData.withoutBooking ? dispatchData.noBookingReason : null,
+        noBookingNote: dispatchData.withoutBooking ? dispatchData.noBookingNote : null
       });
       if (gateOut.data?.statusCode !== 200) {
         throw new Error(gateOut.data?.message || 'Backend không thể Gate-Out container.');
@@ -268,10 +278,31 @@ export const GateOutPage: React.FC<GateOutPageProps> = ({
 
     setTimeout(() => setToastMessage(null), 8000);
     } catch (error) {
-      setToastMessage(error instanceof Error ? error.message : 'Không thể kết nối Backend SQL Server.');
-      setTimeout(() => setToastMessage(null), 5000);
+      // Lỗi 4xx (booking hết hạn, sai hãng, đã cấp đủ...) — hiện đúng thông báo backend, không phải "Request failed".
+      setToastMessage(getApiErrorMessage(error, 'Không thể Gate-Out container.'));
+      setTimeout(() => setToastMessage(null), 8000);
     }
   };
+
+  // Kiểm tra booking với backend trước khi cấp vỏ (chỉ đọc, không đổi số đã cấp).
+  const handleCheckBooking = async (containerId: string, bookingNo: string): Promise<{ valid: boolean; message: string }> => {
+    const targetCont = readyContainers.find((c) => c.id === containerId);
+    if (!targetCont) return { valid: false, message: 'Không tìm thấy container.' };
+    try {
+      const job: any = await containerApi.getById(targetCont.containerNo);
+      if (!job?.data?.id) return { valid: false, message: job?.message || 'Không tìm thấy hồ sơ container.' };
+      const res = await apiClient.get<any>(API_ENDPOINTS.DEPOT_JOBS.GATE_OUT_BOOKING_CHECK(String(job.data.id), bookingNo));
+      const r = res.data?.data;
+      return { valid: !!r?.valid, message: r?.message || res.data?.message || '' };
+    } catch (error) {
+      return { valid: false, message: getApiErrorMessage(error, 'Không kiểm tra được booking.') };
+    }
+  };
+
+  const allowedTabs = loggedInUserProfile?.allowedTabs || [];
+  const isAdminSession = allowedTabs.includes('permissions');
+  const canGateOutWithBooking = isAdminSession || allowedTabs.includes('operation');
+  const canGateOutWithoutBooking = isAdminSession || allowedTabs.includes('gateout_nobooking');
 
   // Quick dispatch from gate lane
   const handleQuickLaneDispatch = (e: React.FormEvent) => {
@@ -1216,6 +1247,9 @@ export const GateOutPage: React.FC<GateOutPageProps> = ({
           container={selectedForDispatch}
           onClose={() => setSelectedForDispatch(null)}
           onConfirmGateOut={handleConfirmGateOut}
+          canGateOutWithBooking={canGateOutWithBooking}
+          canGateOutWithoutBooking={canGateOutWithoutBooking}
+          onCheckBooking={handleCheckBooking}
         />
       )}
 

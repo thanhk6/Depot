@@ -39,6 +39,8 @@ namespace Depot.Data.Entities.Depot
         public string? GateInEirNo { get; set; }
         /// <summary>Số e-EIR khi Gate-Out.</summary>
         public string? GateOutEirNo { get; set; }
+        /// <summary>Số booking hãng tàu dùng để cấp vỏ lúc Gate-Out (trống nếu ra cổng không theo booking).</summary>
+        public string? GateOutBookingNo { get; set; }
 
         /// <summary>Biển số xe đầu kéo giao container vào lúc Gate-In.</summary>
         public string? GateInTruckPlate { get; set; }
@@ -59,6 +61,8 @@ namespace Depot.Data.Entities.Depot
         public string? GateInBookingNo { get; set; }
         /// <summary>Đơn vị vận tải giao container lúc Gate-In.</summary>
         public string? GateInTruckingCompany { get; set; }
+        /// <summary>Tên đơn vị vận tải lúc Gate-In (snapshot từ danh mục khách hàng, hoặc tên nhà xe vãng lai khi mã = VANG_LAI).</summary>
+        public string? GateInTruckingName { get; set; }
         /// <summary>Ghi chú tiếp nhận tại cổng lúc Gate-In.</summary>
         public string? GateInRemarks { get; set; }
         /// <summary>Khóa ngoại trỏ tới Users.Id — nhân viên đang đăng nhập thực hiện Gate-In, hệ thống tự lấy, không cho chọn tay.</summary>

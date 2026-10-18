@@ -116,6 +116,14 @@ namespace Depot.ViewModels
         public int SortOrder { get; set; }
     }
 
+    /// <summary>Thêm nhanh nhà xe tại cổng Gate-In (quyền cổng) — chỉ tên bắt buộc, mã tự sinh NX-xxxx.</summary>
+    public class TruckingQuickCreateRequest
+    {
+        public string Name { get; set; } = string.Empty;
+        public string? Phone { get; set; }
+        public string? TaxCode { get; set; }
+    }
+
     public class CustomerCompanyRequest
     {
         public string Code { get; set; } = string.Empty;

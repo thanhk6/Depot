@@ -17,7 +17,12 @@ namespace Depot.ViewModels
         public string? TrailerPlate { get; set; }
         public string? SealNo { get; set; }
         public string? BookingNo { get; set; }
+        /// <summary>Mã khách hàng (nhà xe) đang hoạt động, hoặc VANG_LAI kèm TruckingName.</summary>
         public string? TruckingCompany { get; set; }
+        /// <summary>Tên nhà xe — chỉ dùng khi TruckingCompany = VANG_LAI (nhà xe có mã lấy tên từ danh mục).</summary>
+        public string? TruckingName { get; set; }
+        /// <summary>Màn Gate-In gửi true: bắt buộc có nhà xe. Màn Giám định / cổng khách hàng không gửi.</summary>
+        public bool RequireTrucking { get; set; }
         public string? Remarks { get; set; }
         /// <summary>Users.Id của nhân viên đang đăng nhập thực hiện Gate-In — frontend tự lấy từ phiên đăng nhập, không cho nhập tay.</summary>
         public long? GateInStaffId { get; set; }
@@ -191,6 +196,7 @@ namespace Depot.ViewModels
     {
         public string JobId { get; set; } = string.Empty;
         public bool Passed { get; set; }
+        /// <summary>Bỏ qua — QC viên lấy theo tài khoản đăng nhập.</summary>
         public string InspectorName { get; set; } = string.Empty;
         public string Comments { get; set; } = string.Empty;
     }
@@ -396,6 +402,30 @@ namespace Depot.ViewModels
         public string DriverName { get; set; } = string.Empty;
         public string? TrailerPlate { get; set; }
         public string? SealNo { get; set; }
+        /// <summary>Số booking hãng tàu cấp vỏ — bắt buộc trừ khi WithoutBooking (backend tự tra và kiểm tra).</summary>
+        public string? BookingNo { get; set; }
+        /// <summary>Ra cổng không theo booking — chỉ ADMIN / SUPERVISOR (quyền gateout_nobooking).</summary>
+        public bool WithoutBooking { get; set; }
+        /// <summary>Lý do ra cổng không booking: OFF_HIRE, DEPOT_TRANSFER, OFFSITE_REPAIR, OTHER.</summary>
+        public string? NoBookingReason { get; set; }
+        /// <summary>Ghi chú lý do — bắt buộc khi NoBookingReason = OTHER.</summary>
+        public string? NoBookingNote { get; set; }
+    }
+
+    /// <summary>Kết quả kiểm tra 1 booking với 1 hồ sơ trước khi Gate-Out (chỉ đọc, không đổi dữ liệu).</summary>
+    public class GateOutBookingCheckResult
+    {
+        public bool Valid { get; set; }
+        public string Message { get; set; } = string.Empty;
+        public string? BookingNo { get; set; }
+        public string? ShippingLineCode { get; set; }
+        public string? ContainerSize { get; set; }
+        public string? ContainerType { get; set; }
+        /// <summary>Ngày hết hạn ghi trên booking (theo giờ Việt Nam, dd/MM/yyyy).</summary>
+        public string? ValidUntilDate { get; set; }
+        public int? ContainerCount { get; set; }
+        public int? UsedCount { get; set; }
+        public int? Remaining { get; set; }
     }
 
     /// <summary>Lệnh duyệt của hãng tàu do nhân viên depot nhập tay.</summary>
@@ -414,12 +444,15 @@ namespace Depot.ViewModels
     public class RejectEstimateRequest
     {
         public string Reason { get; set; } = string.Empty;
+        /// <summary>Người / mã từ chối phía hãng tàu (lưu CarrierApproverName); người ghi nhận lấy theo tài khoản đăng nhập.</summary>
         public string RejectedBy { get; set; } = "Hãng tàu";
     }
 
     public class StartRepairRequest
     {
+        /// <summary>Bỏ qua — backend lấy kỹ thuật viên theo tài khoản đăng nhập.</summary>
         public string TechnicianId { get; set; } = string.Empty;
+        /// <summary>Bỏ qua — backend lấy kỹ thuật viên theo tài khoản đăng nhập.</summary>
         public string TechnicianName { get; set; } = string.Empty;
     }
 
@@ -535,6 +568,7 @@ namespace Depot.ViewModels
         public string? GateOutSealNo { get; set; }
         public string? GateInEirNo { get; set; }
         public string? GateOutEirNo { get; set; }
+        public string? GateOutBookingNo { get; set; }
         public string? GateInTruckPlate { get; set; }
         public string? GateInTrailerPlate { get; set; }
         public string? GateInDriverName { get; set; }
@@ -544,6 +578,7 @@ namespace Depot.ViewModels
         public string? GateInCustomsSealNo { get; set; }
         public string? GateInBookingNo { get; set; }
         public string? GateInTruckingCompany { get; set; }
+        public string? GateInTruckingName { get; set; }
         public string? GateInRemarks { get; set; }
         public long? GateInStaffId { get; set; }
         public string? GateInStaffName { get; set; }

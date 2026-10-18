@@ -222,6 +222,19 @@ export const ROLES: RoleDefinition[] = [
     ]
   },
   {
+    id: 'ROLE_SUPERVISOR',
+    name: 'Giám Sát / Trưởng Ca (Supervisor)',
+    code: 'SUPERVISOR',
+    description: 'Ghi nhận hãng tàu duyệt / từ chối báo giá theo email / AEMS, theo dõi hồ sơ container — không lập báo giá',
+    badgeBg: 'bg-indigo-950/80 text-indigo-300 border-indigo-800/60',
+    permissions: [
+      PERMISSIONS.CONTAINER_VIEW,
+      PERMISSIONS.APPROVAL_VIEW,
+      PERMISSIONS.APPROVAL_APPROVE,
+      PERMISSIONS.APPROVAL_REJECT
+    ]
+  },
+  {
     id: 'ROLE_CLEANING_STAFF',
     name: 'Tổ Vệ Sinh Bãi (Cleaning Staff)',
     code: 'CLEANING',

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Camera, Upload, Trash2, CheckCircle2, Image as ImageIcon, User, Clock, AlertTriangle, Loader2 } from 'lucide-react';
 import { WorkOrderRepairItem, RepairPhoto } from '../types/repair';
 import { repairApi, depotFileApi } from '../../../api';
+import { RepairPhotoKind } from '../../../api/repair.api';
 
 interface CaptureAfterPhotoModalProps {
   item: WorkOrderRepairItem;
@@ -10,9 +11,31 @@ interface CaptureAfterPhotoModalProps {
   containerNo: string;
   workOrderNo: string;
   technicianName: string;
+  /** Loại ảnh đang chụp — mặc định ảnh sau sửa (giữ hành vi cũ). */
+  kind?: RepairPhotoKind;
   onSavePhotos: (photos: RepairPhoto[]) => void;
   onClose: () => void;
 }
+
+// Nhãn hiển thị theo loại ảnh trước sửa / sau sửa.
+const KIND_TEXT: Record<RepairPhotoKind, { title: string; short: string; defaultNote: string; captureHint: string; emptyHint: string; requiredHint: string }> = {
+  BEFORE: {
+    title: 'Chụp & Lưu Ảnh Trước Sửa (Pre-Repair Photos)',
+    short: 'ảnh trước sửa',
+    defaultNote: 'Hiện trạng hư hỏng trước khi thi công',
+    captureHint: '1. Chụp Hiện Trạng Hư Hỏng Trước Khi Sửa',
+    emptyHint: 'Chưa có ảnh nào. Chụp hiện trạng hư hỏng của hạng mục trước khi bắt tay vào sửa.',
+    requiredHint: 'Bắt buộc có ít nhất 1 ảnh trước sửa mới được chụp ảnh sau sửa'
+  },
+  AFTER: {
+    title: 'Chụp & Lưu Ảnh Sau Sửa (Post-Repair Photos)',
+    short: 'ảnh sau sửa',
+    defaultNote: 'Hoàn tất hàn đắp nắn phẳng & phun sơn lót bảo vệ chuẩn IICL-6',
+    captureHint: '1. Thao Tác Chụp & Tải Ảnh Nghiệm Thu Thực Tế',
+    emptyHint: 'Chưa có ảnh nào được chụp hoặc chọn. Vui lòng chụp ảnh kết quả thi công phía trên.',
+    requiredHint: 'Bắt buộc có ít nhất 1 ảnh để hoàn thành hạng mục'
+  }
+};
 
 // Ảnh đã lưu thật trên backend có id dạng "FILE-{DepotFiles.Id}".
 const toServerFileId = (photoId: string) => (photoId.startsWith('FILE-') ? Number(photoId.slice(5)) : null);
@@ -23,13 +46,15 @@ export const CaptureAfterPhotoModal: React.FC<CaptureAfterPhotoModalProps> = ({
   containerNo,
   workOrderNo,
   technicianName,
+  kind = 'AFTER',
   onSavePhotos,
   onClose
 }) => {
-  const existingAfterPhotos = item.photos.filter((p) => p.type === 'AFTER');
+  const text = KIND_TEXT[kind];
+  const existingAfterPhotos = item.photos.filter((p) => p.type === kind);
   const [photosList, setPhotosList] = useState<RepairPhoto[]>(existingAfterPhotos);
   const [photoNote, setPhotoNote] = useState(
-    item.executionNotes || 'Hoàn tất hàn đắp nắn phẳng & phun sơn lót bảo vệ chuẩn IICL-6'
+    kind === 'AFTER' ? item.executionNotes || text.defaultNote : text.defaultNote
   );
   const [photographer, setPhotographer] = useState(technicianName || '');
   const [previewZoomUrl, setPreviewZoomUrl] = useState<string | null>(null);
@@ -49,7 +74,7 @@ export const CaptureAfterPhotoModal: React.FC<CaptureAfterPhotoModalProps> = ({
     const errors: string[] = [];
     for (const file of files) {
       try {
-        const response: any = await repairApi.uploadAfterPhoto(jobId, item.itemNo, file);
+        const response: any = await repairApi.uploadRepairPhoto(jobId, item.itemNo, file, kind);
         const saved = response?.data;
         if (response?.statusCode !== 200 || !saved) throw new Error(response?.data || response?.message || 'Upload thất bại.');
         const newPhoto: RepairPhoto = {
@@ -57,11 +82,11 @@ export const CaptureAfterPhotoModal: React.FC<CaptureAfterPhotoModalProps> = ({
           containerNo,
           workOrderNo,
           repairItemId: item.id,
-          type: 'AFTER',
+          type: kind,
           url: saved.url,
           photographer,
           timestamp: new Date(saved.createdAt).toLocaleString('vi-VN'),
-          description: photoNote || `Ảnh chụp nghiệm thu hoàn thành hạng mục #${item.itemNo}`
+          description: photoNote || `Ảnh ${kind === 'BEFORE' ? 'trước' : 'sau'} sửa hạng mục #${item.itemNo}`
         };
         setPhotosList((prev) => [...prev, newPhoto]);
       } catch (error: any) {
@@ -109,7 +134,7 @@ export const CaptureAfterPhotoModal: React.FC<CaptureAfterPhotoModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-slate-900">Chụp & Lưu Ảnh Sau Sửa (Post-Repair Photos)</h3>
+                <h3 className="text-base font-bold text-slate-900">{text.title}</h3>
                 <span className="px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-mono rounded">
                   Hạng mục #{item.itemNo}
                 </span>
@@ -148,7 +173,7 @@ export const CaptureAfterPhotoModal: React.FC<CaptureAfterPhotoModalProps> = ({
               <div className="flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
                 <span className="text-amber-800">
-                  Hạng mục này đã có {existingAfterPhotos.length} ảnh sau sửa. Nếu nghiệm thu không đạt hoặc ảnh mờ, bạn có thể chụp lại ảnh mới.
+                  Hạng mục này đã có {existingAfterPhotos.length} {text.short}. Nếu ảnh mờ hoặc chụp sai, bạn có thể chụp lại ảnh mới.
                 </span>
               </div>
               <button
@@ -165,7 +190,7 @@ export const CaptureAfterPhotoModal: React.FC<CaptureAfterPhotoModalProps> = ({
           {/* Capture / Upload Trigger Area */}
           <div className="space-y-3">
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-              1. Thao Tác Chụp & Tải Ảnh Nghiệm Thu Thực Tế
+              {text.captureHint}
             </label>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -217,11 +242,11 @@ export const CaptureAfterPhotoModal: React.FC<CaptureAfterPhotoModalProps> = ({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
-                <span>2. Danh Sách Ảnh Sau Sửa Đã Gắn (#{photosList.length})</span>
+                <span>2. Danh Sách {text.short} Đã Gắn (#{photosList.length})</span>
                 {photosList.length === 0 && (
                   <span className="text-[11px] text-rose-600 font-normal flex items-center gap-1">
                     <AlertTriangle className="w-3.5 h-3.5" />
-                    Bắt buộc có ít nhất 1 ảnh để hoàn thành hạng mục
+                    {text.requiredHint}
                   </span>
                 )}
               </label>
@@ -229,7 +254,7 @@ export const CaptureAfterPhotoModal: React.FC<CaptureAfterPhotoModalProps> = ({
 
             {photosList.length === 0 ? (
               <div className="p-6 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-center text-slate-500 text-xs">
-                Chưa có ảnh nào được chụp hoặc chọn. Vui lòng chụp ảnh kết quả thi công phía trên.
+                {text.emptyHint}
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -239,7 +264,7 @@ export const CaptureAfterPhotoModal: React.FC<CaptureAfterPhotoModalProps> = ({
                     className="p-2.5 bg-slate-50 border border-emerald-200 rounded-2xl space-y-2 relative group"
                   >
                     <div className="relative rounded-xl overflow-hidden aspect-video bg-black">
-                      <img src={photo.url} alt="Ảnh sau sửa" className="w-full h-full object-cover" />
+                      <img src={photo.url} alt={text.short} className="w-full h-full object-cover" />
                       <button
                         type="button"
                         onClick={() => setPreviewZoomUrl(photo.url)}
@@ -293,7 +318,7 @@ export const CaptureAfterPhotoModal: React.FC<CaptureAfterPhotoModalProps> = ({
             <div className="space-y-1.5">
               <label className="text-slate-500 font-semibold flex items-center gap-1">
                 <Clock className="w-3.5 h-3.5 text-slate-500" />
-                <span>Mô Tả Kết Quả Thi Công Ghi Vào Ảnh</span>
+                <span>{kind === 'BEFORE' ? 'Mô Tả Hiện Trạng Ghi Vào Ảnh' : 'Mô Tả Kết Quả Thi Công Ghi Vào Ảnh'}</span>
               </label>
               <input
                 type="text"
@@ -309,7 +334,7 @@ export const CaptureAfterPhotoModal: React.FC<CaptureAfterPhotoModalProps> = ({
         <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between flex-wrap gap-2">
           <span className="text-xs text-slate-500 font-mono">
             {photosList.length > 0
-              ? `Đã sẵn sàng lưu ${photosList.length} ảnh sau sửa`
+              ? `Đã sẵn sàng lưu ${photosList.length} ${text.short}`
               : 'Yêu cầu tải ít nhất 1 ảnh'}
           </span>
 

@@ -436,6 +436,14 @@ namespace Depot.Data.Migrations
                     b.Property<string>("GateInTruckingCompany")
                         .HasColumnType("text");
 
+                    b.Property<string>("GateInTruckingName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("GateOutBookingNo")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<DateTime?>("GateOutDate")
                         .HasColumnType("timestamp with time zone");
 

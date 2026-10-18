@@ -159,6 +159,7 @@ namespace Depot.Application.Services
                 throw new ArgumentException("CatalogType, Code và Name là bắt buộc.");
             var catalogType = request.CatalogType.Trim().ToUpperInvariant();
             var code = request.Code.Trim().ToUpperInvariant();
+            ValidateGateOutSetting(catalogType, code, request.JsonData);
             // So sánh trùng phải dùng đúng giá trị đã chuẩn hoá (Trim+Upper) — trước đây so trực tiếp
             // request.Code thô nên Code khác hoa/thường hoặc dư khoảng trắng lọt qua bước tiền-kiểm này,
             // rơi xuống bắt lỗi bằng unique index DB (trả message Postgres thô, không thân thiện).
@@ -191,6 +192,7 @@ namespace Depot.Application.Services
             var item = await _db.MasterCatalogItems.FirstOrDefaultAsync(x => x.Id == id);
             if (item == null) return null;
             var code = request.Code.Trim().ToUpperInvariant();
+            ValidateGateOutSetting(item.CatalogType, code, request.JsonData);
             // Kiểm tra trùng Code TRƯỚC khi gán — trước đây gán thẳng rồi để unique index DB bắt lỗi,
             // nhưng controller không try/catch nên exception bay thẳng ra ngoài thành lỗi 500 thô thay vì
             // 400 theo đúng envelope {statusCode,message,data} của app.
@@ -209,6 +211,17 @@ namespace Depot.Application.Services
             item.IsActive = request.IsActive; item.SortOrder = request.SortOrder;
             await _db.SaveChangesAsync();
             return item;
+        }
+
+        /// <summary>Cấu hình cấp vỏ (GATE_OUT_SETTING) chỉ có đúng 1 mã BOOKING_VALIDITY_HOURS (unique theo CatalogType+Code)
+        /// và "hours" phải là số nguyên 1–8760 — giá trị sai trước đây sẽ âm thầm rơi về mặc định 24 giờ.</summary>
+        private static void ValidateGateOutSetting(string catalogType, string code, string? jsonData)
+        {
+            if (!string.Equals(catalogType, DepotJobService.GateOutSettingCatalog, StringComparison.OrdinalIgnoreCase)) return;
+            if (code != DepotJobService.BookingValidityHoursCode)
+                throw new ArgumentException($"Cấu hình cấp vỏ chỉ có mã {DepotJobService.BookingValidityHoursCode}.");
+            if (!DepotJobService.TryReadBookingValidityHours(jsonData, out _))
+                throw new ArgumentException($"Số giờ hiệu lực booking phải là số nguyên từ 1 đến {DepotJobService.MaxBookingValidityHours} giờ.");
         }
 
         public async Task<bool> DeactivateCatalogItemAsync(long id)
@@ -447,6 +460,65 @@ namespace Depot.Application.Services
         public async Task<List<CustomerCompany>> GetCustomersAsync()
         {
             return await _db.CustomerCompanies.Where(x => x.Status != "DELETED").OrderBy(x => x.Code).ToListAsync();
+        }
+
+        /// <summary>Nhà xe đã có (trùng tên chuẩn hoá hoặc MST) — trả về để màn Gate-In chọn luôn thay vì tạo trùng.</summary>
+        public sealed class DuplicateTruckingCompanyException : Exception
+        {
+            public CustomerCompany Existing { get; }
+            public DuplicateTruckingCompanyException(string message, CustomerCompany existing) : base(message) { Existing = existing; }
+        }
+
+        private static string NormalizeCompanyName(string? name) =>
+            System.Text.RegularExpressions.Regex.Replace(name ?? string.Empty, @"\s+", " ").Trim();
+
+        /// <summary>
+        /// Thêm nhanh nhà xe tại cổng: tên bắt buộc, chống trùng tên (không phân biệt hoa thường, gộp khoảng trắng) / MST với
+        /// khách hàng ACTIVE, mã tự sinh NX-0001 tăng dần (trùng unique Code khi 2 người thêm cùng lúc thì sinh lại, tối đa 3 lần).
+        /// </summary>
+        public async Task<CustomerCompany> QuickCreateTruckingCompanyAsync(TruckingQuickCreateRequest request, string actor)
+        {
+            var name = NormalizeCompanyName(request?.Name);
+            if (name.Length == 0) throw new ArgumentException("Chưa nhập tên nhà xe.");
+            if (name.Length > 200) throw new ArgumentException("Tên nhà xe tối đa 200 ký tự.");
+            var taxCode = string.IsNullOrWhiteSpace(request!.TaxCode) ? null : new string(request.TaxCode.Where(c => !char.IsWhiteSpace(c)).ToArray());
+            var phone = string.IsNullOrWhiteSpace(request.Phone) ? null : request.Phone.Trim();
+
+            var active = await _db.CustomerCompanies.AsNoTracking().Where(x => x.Status == "ACTIVE").ToListAsync();
+            var key = name.ToLowerInvariant();
+            var sameName = active.FirstOrDefault(x => NormalizeCompanyName(x.Name).ToLowerInvariant() == key);
+            if (sameName != null)
+                throw new DuplicateTruckingCompanyException($"Đã có nhà xe {sameName.Code} - {sameName.Name}, chọn nhà xe này thay vì tạo mới.", sameName);
+            if (taxCode != null)
+            {
+                var sameTax = active.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x.TaxCode)
+                    && new string(x.TaxCode.Where(c => !char.IsWhiteSpace(c)).ToArray()) == taxCode);
+                if (sameTax != null)
+                    throw new DuplicateTruckingCompanyException($"Mã số thuế {taxCode} trùng với nhà xe {sameTax.Code} - {sameTax.Name}.", sameTax);
+            }
+
+            var note = $"Tạo tại cổng Gate-In bởi {(string.IsNullOrWhiteSpace(actor) ? "nhân viên cổng" : actor.Trim())} lúc {DateTime.UtcNow.AddHours(7):dd/MM/yyyy HH:mm}";
+            for (var attempt = 1; ; attempt++)
+            {
+                var codes = await _db.CustomerCompanies.AsNoTracking().Where(x => x.Code.StartsWith("NX-")).Select(x => x.Code).ToListAsync();
+                var next = codes.Select(c => int.TryParse(c[3..], out var n) ? n : 0).DefaultIfEmpty(0).Max() + 1;
+                var customer = new CustomerCompany
+                {
+                    Code = $"NX-{next:D4}", Name = name, Phone = phone, TaxCode = taxCode,
+                    CustomerType = "TRUCKING", Status = "ACTIVE", CreditLimit = 0, PaymentTermDays = 0, Notes = note
+                };
+                _db.CustomerCompanies.Add(customer);
+                try
+                {
+                    await _db.SaveChangesAsync();
+                    return customer;
+                }
+                catch (DbUpdateException) when (attempt < 3)
+                {
+                    // 2 yêu cầu cùng lúc sinh cùng số NX → unique Code chặn; bỏ entity hỏng rồi sinh số mới.
+                    _db.Entry(customer).State = EntityState.Detached;
+                }
+            }
         }
 
         public async Task<CustomerCompany> CreateCustomerAsync(CustomerCompanyRequest request)

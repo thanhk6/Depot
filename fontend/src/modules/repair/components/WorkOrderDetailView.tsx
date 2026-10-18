@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { WorkOrderRecord, WorkOrderRepairItem, RepairPhoto, MaterialUsage, AdditionalDamageReport } from '../types/repair';
 import { RepairItemCard } from './RepairItemCard';
+import { RepairPhotoKind } from '../../../api/repair.api';
 import { CaptureAfterPhotoModal } from './CaptureAfterPhotoModal';
 import { CompleteItemModal } from './CompleteItemModal';
 import { ReportAdditionalModal } from './ReportAdditionalModal';
@@ -26,7 +27,8 @@ interface WorkOrderDetailViewProps {
   workOrder: WorkOrderRecord;
   onBack: () => void;
   onUpdateWorkOrder: (updated: WorkOrderRecord) => void;
-  onCompleteWorkOrder: (workOrderId: string, containerId: string) => void;
+  /** Gọi backend hoàn tất lệnh sửa; trả về null nếu thành công, hoặc thông điệp lỗi (vd thiếu ảnh) để hiện lên màn. */
+  onCompleteWorkOrder: (workOrderId: string, containerId: string) => Promise<string | null>;
   onStartWorkOrder?: (workOrder: WorkOrderRecord) => void;
   onNavigateTab: (tabId: string) => void;
 }
@@ -41,6 +43,13 @@ export const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({
 }) => {
   // Modal states
   const [activePhotoModalItem, setActivePhotoModalItem] = useState<WorkOrderRepairItem | null>(null);
+  const [activePhotoKind, setActivePhotoKind] = useState<RepairPhotoKind>('AFTER');
+  const openCapture = (target: WorkOrderRepairItem, kind: RepairPhotoKind) => {
+    setActivePhotoKind(kind);
+    setActivePhotoModalItem(target);
+  };
+  const [finishError, setFinishError] = useState<string | null>(null);
+  const [isFinishing, setIsFinishing] = useState(false);
   const [activeCompleteModalItem, setActiveCompleteModalItem] = useState<WorkOrderRepairItem | null>(null);
   const [activeCompareModalItem, setActiveCompareModalItem] = useState<WorkOrderRepairItem | null>(null);
   const [isReportAdditionalOpen, setIsReportAdditionalOpen] = useState(false);
@@ -51,11 +60,12 @@ export const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({
   const completedItems = workOrder.items.filter((i) => i.status === 'COMPLETED').length;
   const inProgressItems = workOrder.items.filter((i) => i.status === 'IN_PROGRESS').length;
   const allItemsCompleted = totalItems > 0 && completedItems === totalItems;
-  const allAfterPhotosPresent = workOrder.items.every(
-    (i) => i.photos.some((p) => p.type === 'AFTER')
+  // Mỗi hạng mục phải có cả ảnh trước sửa và ảnh sau sửa (backend cũng chặn ở bước hoàn tất).
+  const allPhotosPresent = workOrder.items.every(
+    (i) => i.photos.some((p) => p.type === 'BEFORE') && i.photos.some((p) => p.type === 'AFTER')
   );
 
-  const canFinishWorkOrder = allItemsCompleted && allAfterPhotosPresent;
+  const canFinishWorkOrder = allItemsCompleted && allPhotosPresent;
 
   // Handle start individual item
   const handleStartRepairItem = (itemId: string) => {
@@ -89,11 +99,11 @@ export const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({
 
     const updatedItems = workOrder.items.map((item) => {
       if (item.id === activePhotoModalItem.id) {
-        // Keep before photos and add/replace after photos
-        const nonAfterPhotos = item.photos.filter((p) => p.type !== 'AFTER');
+        // Giữ ảnh loại khác, thay toàn bộ ảnh của loại vừa chụp (trước sửa hoặc sau sửa)
+        const otherPhotos = item.photos.filter((p) => p.type !== activePhotoKind);
         return {
           ...item,
-          photos: [...nonAfterPhotos, ...photos]
+          photos: [...otherPhotos, ...photos]
         };
       }
       return item;
@@ -156,15 +166,19 @@ export const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({
   // Handle final finish work order -> triggers QC_PENDING
   const [isFinishedSuccessOpen, setIsFinishedSuccessOpen] = useState(false);
 
-  const handleExecuteFinishWorkOrder = () => {
+  // Chỉ chuyển QC khi backend chấp nhận — trước đây đổi trạng thái + báo thành công ngay, lỗi backend bị nuốt.
+  const handleExecuteFinishWorkOrder = async () => {
+    if (isFinishing) return;
+    setIsFinishing(true);
+    setFinishError(null);
+    const error = await onCompleteWorkOrder(workOrder.id, workOrder.containerId);
+    setIsFinishing(false);
+    if (error) {
+      setFinishError(error);
+      return;
+    }
     const now = new Date().toISOString().replace('T', ' ').substring(0, 16);
-    const updatedWO: WorkOrderRecord = {
-      ...workOrder,
-      status: 'QC_PENDING',
-      completedAt: now
-    };
-    onUpdateWorkOrder(updatedWO);
-    onCompleteWorkOrder(workOrder.id, workOrder.containerId);
+    onUpdateWorkOrder({ ...workOrder, status: 'QC_PENDING', completedAt: now });
     setIsConfirmFinishWOModalOpen(false);
     setIsFinishedSuccessOpen(true);
   };
@@ -376,7 +390,7 @@ export const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({
               workOrderNo={workOrder.workOrderNo}
               containerNo={workOrder.containerNo}
               onStartRepairItem={handleStartRepairItem}
-              onOpenCapturePhotos={(targetItem) => setActivePhotoModalItem(targetItem)}
+              onOpenCapturePhotos={(targetItem, kind) => openCapture(targetItem, kind)}
               onOpenCompleteModal={(targetItem) => setActiveCompleteModalItem(targetItem)}
               onOpenCompareModal={(targetItem) => setActiveCompareModalItem(targetItem)}
             />
@@ -389,7 +403,7 @@ export const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({
         <div className="space-y-1">
           <div className="text-xs font-bold text-slate-900 flex items-center gap-2">
             <span>ĐIỀU KIỆN HOÀN TẤT WORK ORDER:</span>
-            {allItemsCompleted && allAfterPhotosPresent ? (
+            {allItemsCompleted && allPhotosPresent ? (
               <span className="text-emerald-600 flex items-center gap-1 font-mono">
                 <CheckCircle2 className="w-4 h-4" />
                 Đủ điều kiện chuyển QC
@@ -397,7 +411,7 @@ export const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({
             ) : (
               <span className="text-amber-600 flex items-center gap-1 font-mono">
                 <AlertTriangle className="w-4 h-4" />
-                Còn {totalItems - completedItems} hạng mục chưa hoàn thành hoặc thiếu ảnh sau sửa
+                Còn {totalItems - completedItems} hạng mục chưa hoàn thành hoặc thiếu ảnh trước / sau sửa
               </span>
             )}
           </div>
@@ -436,6 +450,7 @@ export const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({
           containerNo={workOrder.containerNo}
           workOrderNo={workOrder.workOrderNo}
           technicianName={workOrder.leadTechnician}
+          kind={activePhotoKind}
           onSavePhotos={handleSavePhotos}
           onClose={() => setActivePhotoModalItem(null)}
         />
@@ -448,7 +463,7 @@ export const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({
           containerNo={workOrder.containerNo}
           workOrderNo={workOrder.workOrderNo}
           leadTechnician={workOrder.leadTechnician}
-          onOpenCapturePhotos={() => setActivePhotoModalItem(activeCompleteModalItem)}
+          onOpenCapturePhotos={() => openCapture(activeCompleteModalItem, 'AFTER')}
           onConfirmComplete={handleConfirmCompleteItem}
           onClose={() => setActiveCompleteModalItem(null)}
         />
@@ -495,7 +510,7 @@ export const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({
               </h4>
               <ul className="space-y-1.5 list-disc pl-4 text-slate-500">
                 <li className="text-emerald-600 font-semibold">Tất cả {totalItems} hạng mục sửa chữa đã Completed.</li>
-                <li className="text-emerald-600 font-semibold">Hình ảnh nghiệm thu sau sửa (AFTER) đã đầy đủ.</li>
+                <li className="text-emerald-600 font-semibold">Mỗi hạng mục đã có ảnh trước sửa (BEFORE) và ảnh sau sửa (AFTER).</li>
                 <li>Ghi nhận thời gian hoàn thành: <strong>{new Date().toLocaleString('vi-VN')}</strong></li>
                 <li>Thợ nghiệm thu: <strong>{workOrder.leadTechnician}</strong></li>
                 <li>Chuyển trạng thái Work Order = <strong>QC_PENDING</strong>.</li>
@@ -506,16 +521,24 @@ export const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({
               </p>
             </div>
 
+            {finishError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl flex items-start gap-2 text-xs text-rose-700">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{finishError}</span>
+              </div>
+            )}
+
             <div className="flex items-center justify-end gap-3 pt-2">
               <button
-                onClick={() => setIsConfirmFinishWOModalOpen(false)}
+                onClick={() => { setIsConfirmFinishWOModalOpen(false); setFinishError(null); }}
                 className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-white text-xs font-bold rounded-xl transition cursor-pointer"
               >
                 Kiểm Tra Lại
               </button>
               <button
-                onClick={handleExecuteFinishWorkOrder}
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg  transition flex items-center gap-2 cursor-pointer"
+                onClick={() => void handleExecuteFinishWorkOrder()}
+                disabled={isFinishing}
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-lg  transition flex items-center gap-2 cursor-pointer"
               >
                 <CheckCircle2 className="w-4 h-4" />
                 <span>XÁC NHẬN CHUYỂN SANG BƯỚC QC</span>

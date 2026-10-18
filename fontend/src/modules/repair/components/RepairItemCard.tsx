@@ -12,16 +12,18 @@ import {
   AlertCircle,
   ChevronDown,
   ChevronUp,
-  Eye
+  Eye,
+  Lock
 } from 'lucide-react';
 import { WorkOrderRepairItem, RepairPhoto } from '../types/repair';
+import { RepairPhotoKind } from '../../../api/repair.api';
 
 interface RepairItemCardProps {
   item: WorkOrderRepairItem;
   workOrderNo: string;
   containerNo: string;
   onStartRepairItem: (itemId: string) => void;
-  onOpenCapturePhotos: (item: WorkOrderRepairItem) => void;
+  onOpenCapturePhotos: (item: WorkOrderRepairItem, kind: RepairPhotoKind) => void;
   onOpenCompleteModal: (item: WorkOrderRepairItem) => void;
   onOpenCompareModal: (item: WorkOrderRepairItem) => void;
 }
@@ -40,6 +42,11 @@ export const RepairItemCard: React.FC<RepairItemCardProps> = ({
 
   const beforePhotos = item.photos.filter((p) => p.type === 'BEFORE');
   const afterPhotos = item.photos.filter((p) => p.type === 'AFTER');
+  // Ảnh hư hỏng lúc giám định chỉ để đối chiếu — không tính là ảnh trước sửa.
+  const surveyPhotos = item.photos.filter((p) => p.type === 'ADDITIONAL');
+  // Ảnh trước sửa chỉ chụp được khi lệnh sửa đã bắt đầu (backend cần RepairOrder để gắn ảnh).
+  const canCaptureBefore = item.status !== 'PENDING';
+  const hasBefore = beforePhotos.length > 0;
 
   const statusConfig = {
     PENDING: {
@@ -164,9 +171,11 @@ export const RepairItemCard: React.FC<RepairItemCardProps> = ({
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-bold text-amber-600 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                    <span>ẢNH TRƯỚC SỬA (BEFORE)</span>
+                    <span>ẢNH TRƯỚC SỬA (BEFORE) ({beforePhotos.length})</span>
                   </span>
-                  <span className="text-[10px] text-slate-500 font-mono">Giám định e-EIR</span>
+                  <span className="text-[10px] text-slate-500 font-mono">
+                    {hasBefore ? 'Đã chụp hiện trạng' : 'Bắt buộc chụp'}
+                  </span>
                 </div>
 
                 {beforePhotos.length > 0 ? (
@@ -184,10 +193,28 @@ export const RepairItemCard: React.FC<RepairItemCardProps> = ({
                       <span>Xem ảnh lớn</span>
                     </div>
                   </div>
-                ) : (
-                  <div className="h-28 rounded-xl bg-white border border-dashed border-slate-200 flex items-center justify-center text-slate-500 text-xs">
-                    Chưa có ảnh trước sửa
+                ) : canCaptureBefore ? (
+                  <div
+                    onClick={() => onOpenCapturePhotos(item, 'BEFORE')}
+                    className="h-28 rounded-xl bg-amber-50 border-2 border-dashed border-amber-200 hover:border-amber-500 flex flex-col items-center justify-center p-3 text-center cursor-pointer transition group"
+                  >
+                    <Camera className="w-6 h-6 text-amber-600 group-hover:scale-110 transition mb-1" />
+                    <span className="text-xs font-bold text-amber-700">+ Bấm chụp ảnh trước sửa</span>
+                    <span className="text-[10px] text-slate-500">Chụp hiện trạng hư hỏng trước khi thi công</span>
                   </div>
+                ) : (
+                  <div className="h-28 rounded-xl bg-white border border-dashed border-slate-200 flex items-center justify-center p-3 text-center text-slate-500 text-xs">
+                    Bấm "Bắt đầu sửa hạng mục này" rồi chụp ảnh trước sửa
+                  </div>
+                )}
+                {surveyPhotos.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPhotoPreview(surveyPhotos[0].url)}
+                    className="text-[10px] text-slate-500 hover:text-slate-800 underline cursor-pointer"
+                  >
+                    Xem ảnh giám định để đối chiếu ({surveyPhotos.length})
+                  </button>
                 )}
               </div>
 
@@ -218,9 +245,14 @@ export const RepairItemCard: React.FC<RepairItemCardProps> = ({
                       <span>Xem ảnh lớn ({afterPhotos.length} ảnh)</span>
                     </div>
                   </div>
+                ) : !hasBefore ? (
+                  <div className="h-28 rounded-xl bg-white border border-dashed border-slate-200 flex flex-col items-center justify-center p-3 text-center text-slate-500 text-xs">
+                    <Lock className="w-5 h-5 text-slate-400 mb-1" />
+                    <span>Chụp ảnh trước sửa trước, rồi mới chụp ảnh sau sửa</span>
+                  </div>
                 ) : (
                   <div
-                    onClick={() => onOpenCapturePhotos(item)}
+                    onClick={() => onOpenCapturePhotos(item, 'AFTER')}
                     className="h-28 rounded-xl bg-emerald-50 hover:bg-emerald-50 border-2 border-dashed border-emerald-200 hover:border-emerald-500 flex flex-col items-center justify-center p-3 text-center cursor-pointer transition group"
                   >
                     <Camera className="w-6 h-6 text-emerald-600 group-hover:scale-110 transition mb-1" />
@@ -283,11 +315,29 @@ export const RepairItemCard: React.FC<RepairItemCardProps> = ({
                 </button>
               )}
 
-              {/* Capture / Add More After Photos */}
+              {/* Capture / Add More Before Photos */}
+              {canCaptureBefore && (
+                <button
+                  type="button"
+                  onClick={() => onOpenCapturePhotos(item, 'BEFORE')}
+                  className={`px-3.5 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition cursor-pointer ${
+                    hasBefore
+                      ? 'bg-slate-100 hover:bg-slate-200 text-amber-700 border-amber-200'
+                      : 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200 shadow'
+                  }`}
+                >
+                  <Camera className="w-3.5 h-3.5 text-amber-600" />
+                  <span>{hasBefore ? `Thêm Ảnh Trước Sửa (${beforePhotos.length})` : 'Chụp Ảnh Trước Sửa'}</span>
+                </button>
+              )}
+
+              {/* Capture / Add More After Photos — khoá khi chưa có ảnh trước sửa */}
               <button
                 type="button"
-                onClick={() => onOpenCapturePhotos(item)}
-                className={`px-3.5 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition cursor-pointer ${
+                onClick={() => onOpenCapturePhotos(item, 'AFTER')}
+                disabled={!hasBefore}
+                title={hasBefore ? undefined : 'Chụp ảnh trước sửa trước'}
+                className={`px-3.5 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
                   afterPhotos.length > 0
                     ? 'bg-slate-100 hover:bg-slate-200 text-emerald-700 border-emerald-200'
                     : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200 shadow'
@@ -314,7 +364,9 @@ export const RepairItemCard: React.FC<RepairItemCardProps> = ({
                 <button
                   type="button"
                   onClick={() => onOpenCompleteModal(item)}
-                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl shadow-md  flex items-center gap-1.5 transition cursor-pointer"
+                  disabled={!hasBefore}
+                  title={hasBefore ? undefined : 'Chụp ảnh trước sửa trước'}
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-black rounded-xl shadow-md  flex items-center gap-1.5 transition cursor-pointer"
                 >
                   <CheckCircle2 className="w-4 h-4" />
                   <span>GHI NHẬN KẾT QUẢ & HOÀN THÀNH</span>

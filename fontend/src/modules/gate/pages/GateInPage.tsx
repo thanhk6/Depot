@@ -4,6 +4,7 @@ import { containerApi, masterDataApi, customerApi } from '../../../api';
 import { validateContainerNumber } from '../../survey/utils/containerValidator';
 import { useDepot } from '../../../context/DepotContext';
 import { GateTariffReference } from '../components/GateTariffReference';
+import { TruckingCompanyPicker, WALK_IN_TRUCKING_CODE } from '../components/TruckingCompanyPicker';
 import {
   LogIn,
   Truck,
@@ -79,6 +80,7 @@ const EMPTY_GATE_IN_FORM = {
   type: '',
   shippingLine: '',
   truckingCompany: '',
+  truckingName: '',
   licensePlate: '',
   trailerPlate: '',
   driverName: '',
@@ -105,7 +107,7 @@ export const GateInPage: React.FC<GateInPageProps> = ({
   const [truckingOptions, setTruckingOptions] = useState<Array<{ code: string; name: string }>>([]);
   useEffect(() => {
     customerApi.getAll()
-      .then((response: any) => setTruckingOptions((response?.data || []).filter((c: any) => c && c.code).map((c: any) => ({ code: String(c.code), name: String(c.name || c.code) }))))
+      .then((response: any) => setTruckingOptions((response?.data || []).filter((c: any) => c && c.code && String(c.status || 'ACTIVE').toUpperCase() === 'ACTIVE').map((c: any) => ({ code: String(c.code), name: String(c.name || c.code) }))))
       .catch(() => setTruckingOptions([]));
   }, []);
   const [containerTypeOptions, setContainerTypeOptions] = useState<ContainerTypeOption[]>([]);
@@ -151,7 +153,10 @@ export const GateInPage: React.FC<GateInPageProps> = ({
 
   // Xoá trắng form sau Gate-In thành công — hãng tàu và loại container quay về mục đầu tiên của danh mục
   // (giống lúc mới mở màn), các ô xe / tài xế / seal / ghi chú để trống cho container kế tiếp.
+  // Tăng mỗi lần xoá trắng form → ô nhà xe về radio mặc định "Chọn nhà xe có sẵn".
+  const [truckingResetKey, setTruckingResetKey] = useState(0);
   const resetGateInForm = () => {
+    setTruckingResetKey((k) => k + 1);
     const firstType = containerTypeOptions[0];
     setFormData({
       ...EMPTY_GATE_IN_FORM,
@@ -342,6 +347,15 @@ export const GateInPage: React.FC<GateInPageProps> = ({
       return;
     }
 
+    if (!formData.truckingCompany || (formData.truckingCompany === WALK_IN_TRUCKING_CODE && !formData.truckingName.trim())) {
+      const detailMessage = formData.truckingCompany
+        ? 'Nhập tên nhà xe vãng lai.'
+        : 'Chưa chọn Đơn Vị Vận Tải / Nhà Xe (chọn có sẵn, thêm mới hoặc Khác - vãng lai).';
+      setGateInError(detailMessage);
+      showToast(detailMessage, 'error', 'Gate-In thiếu dữ liệu');
+      return;
+    }
+
     if (!loggedInUserProfile) {
       const detailMessage = 'Không xác định được nhân viên tiếp nhận. Vui lòng đăng nhập lại.';
       setGateInError(detailMessage);
@@ -367,6 +381,9 @@ export const GateInPage: React.FC<GateInPageProps> = ({
         sealNo: formData.sealNo || undefined,
         bookingNo: formData.bookingNo || undefined,
         truckingCompany: formData.truckingCompany || undefined,
+        truckingName: formData.truckingName || undefined,
+        // Màn Gate-In bắt buộc nhà xe (backend chặn nếu thiếu) — màn Giám định / cổng khách hàng không gửi cờ này.
+        requireTrucking: true,
         remarks: formData.remarks || undefined,
         // Nhân viên tiếp nhận lấy tự động theo tài khoản đang đăng nhập (Users.Id thật), không cho chọn tay.
         gateInStaffId: loggedInUserProfile ? Number(loggedInUserProfile.id) : undefined
@@ -394,7 +411,7 @@ export const GateInPage: React.FC<GateInPageProps> = ({
       trailerPlate: formData.trailerPlate,
       driverName: formData.driverName,
       driverPhone: formData.driverPhone,
-      truckingCompany: formData.truckingCompany,
+      truckingCompany: formData.truckingName || formData.truckingCompany,
       sealNo: formData.sealNo,
       bookingNo: formData.bookingNo,
       remarks: formData.remarks,
@@ -415,7 +432,7 @@ export const GateInPage: React.FC<GateInPageProps> = ({
       licensePlate: formData.licensePlate,
       driverName: formData.driverName,
       driverPhone: formData.driverPhone,
-      truckingName: formData.truckingCompany,
+      truckingName: formData.truckingName || formData.truckingCompany,
       arrivalTime: 'Vừa xong',
       status: 'WAITING_FORKLIFT',
       eirNo: newEir.eirNo,
@@ -793,18 +810,14 @@ export const GateInPage: React.FC<GateInPageProps> = ({
                     <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                       Đơn Vị Vận Tải / Nhà Xe*
                     </label>
-                    <select
-                      value={formData.truckingCompany}
-                      onChange={(e) => setFormData({ ...formData, truckingCompany: e.target.value })}
-                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 text-xs text-slate-900 rounded-xl font-bold focus:border-sky-500 focus:outline-none min-h-[42px] shadow-sm"
-                    >
-                      <option value="">{truckingOptions.length === 0 ? '— Chưa có khách hàng/nhà xe —' : '— Chọn đơn vị vận tải —'}</option>
-                      {truckingOptions.map((cust) => (
-                        <option key={cust.code} value={cust.code}>
-                          [{cust.code}] {cust.name}
-                        </option>
-                      ))}
-                    </select>
+                    <TruckingCompanyPicker
+                      options={truckingOptions}
+                      code={formData.truckingCompany}
+                      name={formData.truckingName}
+                      onChange={(code, name) => setFormData((prev) => ({ ...prev, truckingCompany: code, truckingName: name }))}
+                      resetKey={truckingResetKey}
+                      onCreated={(option) => setTruckingOptions((prev) => [...prev, option].sort((a, b) => a.code.localeCompare(b.code)))}
+                    />
                   </div>
 
                   {/* Plates Grid with Stylized Vietnamese Plate Badges */}

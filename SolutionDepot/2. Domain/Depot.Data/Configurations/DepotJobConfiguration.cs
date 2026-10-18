@@ -24,6 +24,9 @@ namespace Depot.Data.Configurations
             builder.Property(x => x.ForkliftClaimedByOperatorId).HasMaxLength(30);
             builder.Property(x => x.ForkliftClaimedByOperatorName).HasMaxLength(150);
             builder.Property(x => x.ForkliftAssignedVehicleCode).HasMaxLength(30);
+            // Số booking cấp vỏ lúc Gate-Out — cùng độ dài với CustomerBooking.BookingNo.
+            builder.Property(x => x.GateOutBookingNo).HasMaxLength(50);
+            builder.Property(x => x.GateInTruckingName).HasMaxLength(200);
             builder.HasIndex(x => x.JobNo).IsUnique();
             builder.HasIndex(x => x.ContainerNo);
             // 1 số container chỉ có tối đa 1 hồ sơ đang trong bãi. Kiểm tra AnyAsync trong CreateGateInJobAsync

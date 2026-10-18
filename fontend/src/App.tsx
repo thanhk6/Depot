@@ -32,6 +32,7 @@ import { RepairPage } from './modules/repair/pages/RepairPage';
 import { QCPage } from './modules/qc/pages/QCPage';
 import { ShippingApiPage } from './modules/shipping_api/pages/ShippingApiPage';
 import { GateOutPage } from './modules/gate_out/pages/GateOutPage';
+import { GateOutSettingsPage } from './modules/gate_out/pages/GateOutSettingsPage';
 import { WarehousePage } from './modules/warehouse/pages/WarehousePage';
 import { BillingPage } from './modules/billing/pages/BillingPage';
 import { ReportPage } from './modules/report/pages/ReportPage';
@@ -542,6 +543,8 @@ function AppContent({ onLogout }: AppContentProps) {
       case 'standards':
       case 'shipping_lines':
         return <MasterDataPage initialTab={activeTab === 'master_data' ? 'container_types' : activeTab} />;
+      case 'gate_out_settings':
+        return <GateOutSettingsPage />;
       case 'system':
         return <SystemPage />;
       default:

@@ -117,6 +117,22 @@ export const USER_ACCOUNT_PROFILES: UserAccountProfile[] = [
     roleDescription: 'Menu riêng Hãng Tàu: Tra cứu container sở hữu, xem ảnh chụp hư hỏng IICL & Thực hiện Phê Duyệt / Từ Chối Báo Giá'
   },
   {
+    id: 'USR-SUP',
+    role: 'SUPERVISOR',
+    username: '',
+    passwordHash: '',
+    fullName: '',
+    jobTitle: 'Giám Sát / Trưởng Ca',
+    department: 'Ban Điều Hành Depot',
+    email: '',
+    avatarBg: 'bg-indigo-600',
+    avatarText: '',
+    badgeBg: 'bg-indigo-950/80 text-indigo-300 border-indigo-800/60',
+    badgeText: 'Giám Sát / Trưởng Ca (Supervisor)',
+    allowedTabs: ['dashboard', 'jobs', 'approval'],
+    roleDescription: 'Ghi nhận hãng tàu duyệt / từ chối báo giá theo email / AEMS, theo dõi hồ sơ container — không lập báo giá'
+  },
+  {
     id: 'USR-007',
     role: 'REPAIR_TECH',
     username: '',

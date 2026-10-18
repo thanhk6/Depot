@@ -24,9 +24,9 @@ interface LoginScreenProps {
 // `RoleType` (kiểu role mà DepotContext/menu Sidebar đang dùng) là 2 enum khác nhau có sẵn từ trước
 // trong codebase — không phải lỗi mới, chỉ cần map qua lại để hiển thị đúng menu/màu sắc theo vai trò
 // thật của tài khoản vừa đăng nhập.
-// Khoá là đúng 10 RoleCode backend trả về (DbSeeder.SeedRolesAsync). Trước đây dùng mã cũ (GATE_IN, REPAIR_TECH,
-// QC_INSPECTOR...) nên GATE_OP/TECHNICIAN/QC_ENG/FORKLIFT/CLEANING/CARRIER đều rơi về mặc định DEPOT_MANAGER —
-// nhãn vai trò hiện "Admin" và chức danh "Giám Đốc" cho mọi người. Vai trò lạ không được quy về quản lý.
+// Khoá là đúng 11 RoleCode backend trả về (DbSeeder.SeedRolesAsync) — authService.normalizeRole giữ nguyên các mã này
+// (trước đây nó quy theo bộ mã cũ nên QC_ENG/TECHNICIAN/CARRIER... rơi về đây thành "Khai Thác Cổng").
+// Mã lạ → UNKNOWN (nhãn "—"), không mượn nhãn vai trò khác.
 const mapSystemRoleToRoleType = (role: string): RoleType => {
   switch ((role || '').toUpperCase()) {
     case 'ADMIN': return 'DEPOT_MANAGER';
@@ -39,8 +39,20 @@ const mapSystemRoleToRoleType = (role: string): RoleType => {
     case 'FORKLIFT': return 'FORKLIFT_DRIVER';
     case 'CASHIER': return 'ACCOUNTANT';
     case 'CARRIER': return 'SHIPPING_LINE';
-    default: return 'OPERATOR';
+    case 'SUPERVISOR': return 'SUPERVISOR';
+    default: return 'UNKNOWN';
   }
+};
+
+// Hồ sơ hiển thị trung tính cho vai trò lạ — không lấy getProfileByRole (rơi về hồ sơ quản lý).
+const UNKNOWN_ROLE_DISPLAY = {
+  jobTitle: '',
+  department: '',
+  avatarBg: 'bg-slate-500',
+  badgeBg: 'bg-slate-100 text-slate-600 border-slate-300',
+  badgeText: '—',
+  allowedTabs: [] as string[],
+  roleDescription: ''
 };
 
 // Lấy chữ viết tắt hiển thị trên avatar từ họ tên thật (vd "Nguyễn Văn Hùng" → "NH") — chỉ dùng khi
@@ -74,7 +86,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       const roleType = mapSystemRoleToRoleType(user.role);
       // 2 field jobTitle/department không có trong bảng SystemUser thật — suy ra hiển thị theo vai trò
       // (cosmetic only), KHÔNG dùng để ghi đè bất kỳ field định danh thật nào (họ tên, email, quyền menu).
-      const roleDisplay = getProfileByRole(roleType);
+      const roleDisplay = roleType === 'UNKNOWN' ? UNKNOWN_ROLE_DISPLAY : getProfileByRole(roleType);
 
       const profile: UserAccountProfile = {
         id: user.id,

@@ -462,8 +462,8 @@ namespace Depot.BackendApi.Controllers
             }
         }
 
-        /// <summary>Hãng tàu duyệt báo giá.</summary>
-        [RequirePermission(RolePermissions.Estimate)]
+        /// <summary>Hãng tàu duyệt báo giá (quyền Approval riêng — người lập báo giá không tự ghi nhận duyệt).</summary>
+        [RequirePermission(RolePermissions.Approval)]
         [HttpPost("{id}/approve-estimate")]
         public async Task<IActionResult> ApproveEstimate(long id, [FromBody] ApproveEstimateRequest? request)
         {
@@ -504,24 +504,44 @@ namespace Depot.BackendApi.Controllers
         }
 
         /// <summary>Hãng tàu từ chối báo giá và bắt buộc ghi lý do.</summary>
-        [RequirePermission(RolePermissions.Estimate)]
+        [RequirePermission(RolePermissions.Approval)]
         [HttpPost("{id}/reject-estimate")]
         public async Task<IActionResult> RejectEstimate(long id, [FromBody] RejectEstimateRequest request)
         {
-            var success = await _depotService.RejectEstimateAsync(id, request);
-            return success
-                ? Ok(new ResponseSingleContentModel<string> { StatusCode = 200, Message = "Đã từ chối báo giá", Data = "ESTIMATING" })
-                : BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = "Không thể từ chối báo giá", Data = "Báo giá không ở trạng thái chờ duyệt hoặc thiếu lý do" });
+            try
+            {
+                var success = await _depotService.RejectEstimateAsync(id, request, User.GetFullName() ?? User.GetUsername() ?? string.Empty);
+                return success
+                    ? Ok(new ResponseSingleContentModel<string> { StatusCode = 200, Message = "Đã từ chối báo giá", Data = "ESTIMATING" })
+                    : BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = "Không thể từ chối báo giá", Data = "Báo giá không ở trạng thái chờ duyệt hoặc thiếu lý do" });
+            }
+            catch (DepotJobService.EstimateNotAllowedException ex)
+            {
+                return BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = ex.Message, Data = null });
+            }
         }
 
         /// <summary>Ghi kết quả nghiệm thu QC.</summary>
         [RequirePermission(RolePermissions.Qc)]
         [HttpPost("{id}/qc-complete")]
-        public async Task<IActionResult> CompleteQc([FromBody] QcInspectionRequest qcReq)
+        public async Task<IActionResult> CompleteQc(long id, [FromBody] QcInspectionRequest qcReq)
         {
+            // Hồ sơ được ghi QC là {id} trên đường dẫn — trước đây lấy jobId trong body nên gọi đường dẫn
+            // hồ sơ X lại đánh QC hồ sơ Y. Body ghi mã khác đường dẫn thì từ chối, không ghi gì.
+            if (!string.IsNullOrWhiteSpace(qcReq.JobId) && qcReq.JobId.Trim() != id.ToString())
+            {
+                return BadRequest(new ResponseSingleContentModel<string>
+                {
+                    StatusCode = 400,
+                    Message = "Cập nhật QC thất bại",
+                    Data = "Mã hồ sơ trong yêu cầu không khớp đường dẫn"
+                });
+            }
+
             try
             {
-                var success = await _depotService.CompleteQcInspectionAsync(qcReq);
+                var inspector = User.GetFullName() ?? User.GetUsername() ?? string.Empty;
+                var success = await _depotService.CompleteQcInspectionAsync(id, qcReq, inspector);
                 if (!success)
                 {
                     return BadRequest(new ResponseSingleContentModel<string>
@@ -566,7 +586,11 @@ namespace Depot.BackendApi.Controllers
         {
             try
             {
-                var success = await _depotService.StartRepairAsync(id, request.TechnicianId, request.TechnicianName);
+                // Kỹ thuật viên = tài khoản đang đăng nhập; TechnicianId / TechnicianName trong body bị bỏ qua
+                // (trước đây client gửi tên gì lưu tên đó vào lệnh sửa).
+                var technicianName = User.GetFullName() ?? User.GetUsername() ?? string.Empty;
+                var technicianId = User.GetUserId()?.ToString() ?? User.GetUsername() ?? string.Empty;
+                var success = await _depotService.StartRepairAsync(id, technicianId, technicianName);
                 return success
                     ? Ok(new ResponseSingleContentModel<string> { StatusCode = 200, Message = "Đã bắt đầu Work Order", Data = "REPAIRING" })
                     : BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = "Không thể bắt đầu Work Order", Data = "Estimate chưa được duyệt hoặc hồ sơ không hợp lệ" });
@@ -582,20 +606,32 @@ namespace Depot.BackendApi.Controllers
         [HttpPost("{id}/repair/complete")]
         public async Task<IActionResult> CompleteRepair(long id, [FromBody] RepairCompleteRequest request)
         {
-            var success = await _depotService.CompleteRepairAsync(id, request);
-            return success ? Ok(new ResponseSingleContentModel<string> { StatusCode = 200, Message = "Hoàn tất sửa chữa", Data = "QC_PENDING" }) : BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = "Không thể hoàn tất sửa chữa", Data = "Chưa có lệnh sửa chữa đang thực hiện" });
+            try
+            {
+                var success = await _depotService.CompleteRepairAsync(id, request);
+                return success ? Ok(new ResponseSingleContentModel<string> { StatusCode = 200, Message = "Hoàn tất sửa chữa", Data = "QC_PENDING" }) : BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = "Không thể hoàn tất sửa chữa", Data = "Chưa có lệnh sửa chữa đang thực hiện" });
+            }
+            catch (DepotJobService.RepairPhotosMissingException ex)
+            {
+                return BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = "Không thể hoàn tất sửa chữa", Data = ex.Message });
+            }
         }
 
         /// <summary>
-        /// Upload 1 ảnh sau sửa cho hạng mục <paramref name="itemNo"/> — lưu vật lý ở Depot.FileServer, metadata
-        /// ở DepotFiles (TableName="RepairOrder", IdTable=RepairOrder.Id). Số hạng mục ghi vào đầu tên file
-        /// ("ITEM-{n}__tên gốc") vì DepotFiles không có cột phân nhóm con. Chỉ nhận khi job đang REPAIRING.
+        /// Upload 1 ảnh trước sửa / sau sửa cho hạng mục <paramref name="itemNo"/> — lưu vật lý ở Depot.FileServer,
+        /// metadata ở DepotFiles (TableName="RepairOrder", IdTable=RepairOrder.Id). Loại ảnh + số hạng mục ghi vào đầu
+        /// tên file vì DepotFiles không có cột phân nhóm con: sau sửa "ITEM-{n}__tên gốc", trước sửa
+        /// "BEFORE-ITEM-{n}__tên gốc". <paramref name="kind"/> bỏ trống = AFTER (client cũ). Chỉ nhận khi job đang REPAIRING.
         /// </summary>
         [RequirePermission(RolePermissions.Repair, RolePermissions.Qc)]
         [HttpPost("{id}/repair/photos")]
         [RequestSizeLimit(20 * 1024 * 1024)]
-        public async Task<IActionResult> UploadRepairPhoto(long id, IFormFile file, [FromForm] int itemNo)
+        public async Task<IActionResult> UploadRepairPhoto(long id, IFormFile file, [FromForm] int itemNo, [FromForm] string? kind)
         {
+            var photoKind = string.IsNullOrWhiteSpace(kind) ? DepotJobService.RepairPhotoKindAfter : kind.Trim().ToUpperInvariant();
+            if (photoKind is not (DepotJobService.RepairPhotoKindBefore or DepotJobService.RepairPhotoKindAfter))
+                return BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = "Loại ảnh không hợp lệ", Data = "kind chỉ nhận BEFORE hoặc AFTER" });
+            var label = photoKind == DepotJobService.RepairPhotoKindBefore ? "ảnh trước sửa" : "ảnh sau sửa";
             if (file == null || file.Length == 0)
                 return BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = "Thiếu file ảnh", Data = "file rỗng" });
             if (itemNo <= 0)
@@ -603,18 +639,18 @@ namespace Depot.BackendApi.Controllers
 
             var repairOrderId = await _depotService.GetRepairOrderIdAsync(id, requireRepairing: true);
             if (repairOrderId == null)
-                return BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = "Không thể lưu ảnh sau sửa", Data = "Container chưa ở trạng thái đang sửa chữa (REPAIRING) — bấm Bắt đầu Work Order trước." });
+                return BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = $"Không thể lưu {label}", Data = "Container chưa ở trạng thái đang sửa chữa (REPAIRING) — bấm Bắt đầu Work Order trước." });
 
             try
             {
                 await using var stream = file.OpenReadStream();
-                var fileName = $"ITEM-{itemNo}__{System.IO.Path.GetFileName(file.FileName)}";
+                var fileName = $"{DepotJobService.RepairPhotoPrefix(photoKind, itemNo)}{System.IO.Path.GetFileName(file.FileName)}";
                 var result = await _fileService.UploadAsync(stream, fileName, repairOrderId.Value, DepotJobService.RepairAfterPhotoTable, 1);
-                return Ok(new ResponseSingleContentModel<object> { StatusCode = 200, Message = "Đã lưu ảnh sau sửa", Data = result });
+                return Ok(new ResponseSingleContentModel<object> { StatusCode = 200, Message = $"Đã lưu {label}", Data = result });
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or System.Net.Http.HttpRequestException)
             {
-                return BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = "Không thể lưu ảnh sau sửa", Data = ex is System.Net.Http.HttpRequestException ? "Không kết nối được Depot.FileServer." : ex.Message });
+                return BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = $"Không thể lưu {label}", Data = ex is System.Net.Http.HttpRequestException ? "Không kết nối được Depot.FileServer." : ex.Message });
             }
         }
 
@@ -629,22 +665,56 @@ namespace Depot.BackendApi.Controllers
             return Ok(new ResponseSingleContentModel<object> { StatusCode = 200, Message = "Lấy ảnh sau sửa thành công", Data = files });
         }
 
-        /// <summary>Cấp vỏ cho xe, sinh EIR xuất và giải phóng ô bãi.</summary>
-        [RequirePermission(RolePermissions.Operation)]
+        /// <summary>
+        /// Cấp vỏ cho xe, sinh EIR xuất và giải phóng ô bãi. Theo booking cần quyền Operation (nhân viên cổng);
+        /// "không cần booking" cần quyền GateOutNoBooking (chỉ ADMIN / SUPERVISOR) — kiểm cả khi gọi thẳng API.
+        /// </summary>
+        [RequirePermission(RolePermissions.Operation, RolePermissions.GateOutNoBooking)]
         [HttpPost("{id}/gate-out")]
         public async Task<IActionResult> GateOut(long id, [FromBody] GateOutRequest request)
         {
+            request ??= new GateOutRequest();
+            if (request.WithoutBooking && !User.HasPermission(RolePermissions.GateOutNoBooking))
+                return StatusCode(403, new ResponseSingleContentModel<string> { StatusCode = 403, Message = "Chỉ quản lý / giám sát được cấp vỏ không theo booking — gọi giám sát để xử lý.", Data = null });
+            if (!request.WithoutBooking && !User.HasPermission(RolePermissions.Operation))
+                return StatusCode(403, new ResponseSingleContentModel<string> { StatusCode = 403, Message = "Tài khoản này chỉ được cấp vỏ không theo booking.", Data = null });
             try
             {
-                var success = await _depotService.GateOutAsync(id, request);
-                return success
-                    ? Ok(new ResponseSingleContentModel<string> { StatusCode = 200, Message = "Cấp vỏ và Gate-Out thành công", Data = "GATE_OUT" })
-                    : BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = "Không thể Gate-Out", Data = "Container chưa READY_FOR_OUT, còn phiếu dịch vụ chưa thanh toán, hoặc thiếu thông tin xe" });
+                await _depotService.GateOutAsync(id, request, User.GetFullName() ?? User.GetUsername() ?? string.Empty);
+                return Ok(new ResponseSingleContentModel<string> { StatusCode = 200, Message = "Cấp vỏ và Gate-Out thành công", Data = "GATE_OUT" });
             }
-            catch (Exception ex)
+            catch (DepotJobService.GateOutNotAllowedException ex)
             {
-                return StatusCode(500, new ResponseSingleContentModel<string> { StatusCode = 500, Message = "Lỗi khi Gate-Out", Data = ex.Message });
+                return GateOutError(ex);
             }
+        }
+
+        /// <summary>Kiểm tra 1 booking với hồ sơ trước khi cấp vỏ — chỉ đọc, không đổi booking hay hồ sơ.</summary>
+        [RequirePermission(RolePermissions.Operation)]
+        [HttpGet("{id:long}/gate-out/booking-check")]
+        public async Task<IActionResult> CheckGateOutBooking(long id, [FromQuery] string? bookingNo)
+        {
+            try
+            {
+                var result = await _depotService.CheckGateOutBookingAsync(id, bookingNo);
+                return Ok(new ResponseSingleContentModel<GateOutBookingCheckResult> { StatusCode = 200, Message = result.Message, Data = result });
+            }
+            catch (DepotJobService.GateOutNotAllowedException ex)
+            {
+                return GateOutError(ex);
+            }
+        }
+
+        private IActionResult GateOutError(DepotJobService.GateOutNotAllowedException ex)
+        {
+            var code = ex.Kind switch
+            {
+                DepotJobService.GateOutErrorKind.NotFound => 404,
+                DepotJobService.GateOutErrorKind.Conflict => 409,
+                DepotJobService.GateOutErrorKind.Forbidden => 403,
+                _ => 400
+            };
+            return StatusCode(code, new ResponseSingleContentModel<string> { StatusCode = code, Message = ex.Message, Data = null });
         }
 
         /// <summary>Điều độ xe nâng đổi tọa độ Block/Bay/Row/Tier.</summary>

@@ -101,6 +101,8 @@ export const PaymentPage: React.FC<PaymentPageProps> = ({
   const [paymentMethodTab, setPaymentMethodTab] = useState<'CASH' | 'BANK_TRANSFER'>('CASH');
   // Nhân viên tích sau khi đã thấy tiền về tài khoản (app / sao kê ngân hàng).
   const [transferChecked, setTransferChecked] = useState<boolean>(false);
+  // Chưa nối API ngân hàng: kế toán tự tích xác nhận đã nhận đủ tiền mặt (giống ô tích chuyển khoản).
+  const [cashChecked, setCashChecked] = useState<boolean>(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [lastPayment, setLastPayment] = useState<{ method: 'CASH' | 'BANK_TRANSFER'; transactionRef: string; amount: number; invoiceNo?: string | null; cashierName?: string | null; change?: number } | null>(null);
 
@@ -116,6 +118,16 @@ export const PaymentPage: React.FC<PaymentPageProps> = ({
   // Selected container object
   const currentCont = containers.find((c) => c.id === selectedContId) || pendingContainers[0];
   const amount = currentCont ? getOrderAmount(currentCont) : 0;
+
+  // Đổi container đang thanh toán (bấm chọn, hoặc tự rơi về container kế tiếp sau khi thu xong) thì kế toán phải
+  // kiểm tra và tích lại từ đầu — không mang ô tích / tiền tài xế đưa của container trước sang.
+  const currentContId = currentCont?.id;
+  useEffect(() => {
+    setTransferChecked(false);
+    setCashChecked(false);
+    setCashReceived('');
+    setPaymentError(null);
+  }, [currentContId]);
   const liftFee = currentCont ? getOrderFee(currentCont, 'LOLO') : 0;
   const cleaningFee = currentCont ? getOrderFee(currentCont, 'CLEANING') : 0;
   const storageFee = currentCont ? getOrderFee(currentCont, 'STORAGE') : 0;
@@ -185,6 +197,10 @@ export const PaymentPage: React.FC<PaymentPageProps> = ({
       setPaymentError(`Tiền khách đưa chưa đủ: cần ${formatVND(amount)}.`);
       return;
     }
+    if (method === 'CASH' && !cashChecked) {
+      setPaymentError('Tích xác nhận đã nhận đủ tiền mặt trước khi gạch nợ.');
+      return;
+    }
     if (method === 'BANK_TRANSFER' && !transferChecked) {
       setPaymentError('Tích xác nhận đã kiểm tra tiền về tài khoản trước khi gạch nợ.');
       return;
@@ -211,6 +227,7 @@ export const PaymentPage: React.FC<PaymentPageProps> = ({
       setIsSuccess(true);
       setCashReceived('');
       setTransferChecked(false);
+      setCashChecked(false);
       onConfirmPayment(container.id);
     } catch (error) {
       setIsSuccess(false);
@@ -700,7 +717,7 @@ export const PaymentPage: React.FC<PaymentPageProps> = ({
 
                     <div className="grid grid-cols-2 gap-2 bg-slate-50 p-1.5 rounded-2xl border border-slate-200">
                       <button
-                        onClick={() => { setPaymentMethodTab('CASH'); setPaymentError(null); }}
+                        onClick={() => { setPaymentMethodTab('CASH'); setPaymentError(null); setTransferChecked(false); setCashChecked(false); }}
                         className={`py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
                           paymentMethodTab === 'CASH'
                             ? 'bg-emerald-600 text-white shadow-lg '
@@ -712,7 +729,7 @@ export const PaymentPage: React.FC<PaymentPageProps> = ({
                       </button>
 
                       <button
-                        onClick={() => { setPaymentMethodTab('BANK_TRANSFER'); setPaymentError(null); }}
+                        onClick={() => { setPaymentMethodTab('BANK_TRANSFER'); setPaymentError(null); setTransferChecked(false); setCashChecked(false); }}
                         className={`py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
                           paymentMethodTab === 'BANK_TRANSFER'
                             ? 'bg-purple-600 text-white shadow-lg '
@@ -729,10 +746,25 @@ export const PaymentPage: React.FC<PaymentPageProps> = ({
                     <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs font-bold text-rose-700">{paymentError}</div>
                   )}
 
-                  {/* CHUYỂN KHOẢN: hiện mã VietQR + số tiền; khách quét chuyển, nhân viên kiểm tra tiền về rồi tích xác nhận */}
+                  {/* CHUYỂN KHOẢN: chưa nối API ngân hàng — luôn hiện số tiền + nội dung CK; mã VietQR chỉ hiện khi danh
+                      mục đã khai báo tài khoản nhận tiền. Kế toán tự kiểm tra tiền về rồi tích xác nhận. */}
                   {paymentMethodTab === 'BANK_TRANSFER' && (
                     <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-4 animate-fade-in text-xs">
-                      <VietQrCode amount={amount} addInfo={buildTransferContent(getServiceOrder(currentCont)?.customerName, currentCont.containerNo)} />
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-slate-500 mb-1">Số tiền phải thu:</label>
+                          <div className="p-2.5 bg-white border border-slate-200 rounded-xl font-mono text-purple-700 font-black text-base">
+                            {formatVND(amount)}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-slate-500 mb-1">Nội dung chuyển khoản:</label>
+                          <div className="p-2.5 bg-white border border-slate-200 rounded-xl font-mono font-bold text-slate-800">
+                            {buildTransferContent(getServiceOrder(currentCont)?.customerName, currentCont.containerNo)}
+                          </div>
+                        </div>
+                      </div>
+                      <VietQrCode hideWhenNotConfigured amount={amount} addInfo={buildTransferContent(getServiceOrder(currentCont)?.customerName, currentCont.containerNo)} />
                       <label className="flex items-start gap-2 p-3 bg-white border border-slate-200 rounded-xl cursor-pointer">
                         <input
                           type="checkbox"
@@ -805,9 +837,20 @@ export const PaymentPage: React.FC<PaymentPageProps> = ({
                       {parsedCash > 0 && parsedCash < amount && (
                         <p className="text-[11px] font-bold text-rose-600">Còn thiếu {formatVND(amount - parsedCash)}.</p>
                       )}
+                      <label className="flex items-start gap-2 p-3 bg-white border border-slate-200 rounded-xl cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={cashChecked}
+                          onChange={(e) => { setCashChecked(e.target.checked); setPaymentError(null); }}
+                          className="mt-0.5 accent-emerald-600"
+                        />
+                        <span className="text-slate-700">
+                          Đã nhận đủ tiền mặt <strong className="font-mono text-emerald-700">{formatVND(amount)}</strong> tại quầy.
+                        </span>
+                      </label>
                       <button
                         onClick={() => void submitPayment(currentCont, 'CASH')}
-                        disabled={isProcessing || parsedCash < amount || amount <= 0}
+                        disabled={isProcessing || !cashChecked || parsedCash < amount || amount <= 0}
                         className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs rounded-xl shadow-lg  transition flex items-center justify-center gap-2 cursor-pointer"
                       >
                         {isProcessing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}

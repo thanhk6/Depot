@@ -234,7 +234,8 @@ export const ServiceOrderFormModal: React.FC<ServiceOrderFormModalProps> = ({
         setTruckPlate(job.gateInTruckPlate || '');
         setDriverName(job.gateInDriverName || '');
         setDriverPhone(job.gateInDriverPhone || '');
-        setCustomerName(customer?.name || job.gateInTruckingCompany || '');
+        // Tên nhà xe lưu trên hồ sơ lúc Gate-In (gồm nhà xe vãng lai), rồi mới tra theo mã như hồ sơ cũ.
+        setCustomerName(job.gateInTruckingName || customer?.name || job.gateInTruckingCompany || '');
         setCustomerTaxCode(customer?.taxCode || '');
         setGateInDate(job.gateInDate || '');
         const rating = job.survey?.conditionRating;

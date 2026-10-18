@@ -15,5 +15,9 @@ namespace Depot.BackendApi.Security
         public static string? GetUsername(this ClaimsPrincipal principal) => principal.FindFirst(NameClaim)?.Value;
 
         public static string? GetFullName(this ClaimsPrincipal principal) => principal.FindFirst("FullName")?.Value;
+
+        /// <summary>Tài khoản có nhóm quyền này theo RolePermissions (dùng khi 1 endpoint rẽ nhánh theo quyền).</summary>
+        public static bool HasPermission(this ClaimsPrincipal principal, string permission) =>
+            Depot.Application.Services.RolePermissions.HasAny(principal.FindFirst(RoleClaim)?.Value, new[] { permission });
     }
 }

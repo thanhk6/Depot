@@ -55,11 +55,12 @@ export const generateWorkOrdersFromContainers = (containers: ContainerRecord[]):
               containerNo: c.containerNo,
               workOrderNo: woNumber,
               repairItemId: itemId,
-              type: 'BEFORE',
+              // Ảnh giám định chỉ để đối chiếu — KHÔNG tính là ảnh trước sửa (thợ phải tự chụp khi bắt tay vào sửa).
+              type: 'ADDITIONAL',
               url: dmg.image,
               photographer: c.surveyDetails?.surveyorName || '',
               timestamp: c.surveyDetails?.surveyDate || '',
-              description: `Ảnh hiện trường trước sửa: ${dmg.description}`
+              description: `Ảnh giám định: ${dmg.description}`
             }]
           : [];
 

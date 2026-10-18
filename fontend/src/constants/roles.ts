@@ -1,16 +1,18 @@
+// Đúng 11 RoleCode backend trả về lúc đăng nhập (`roleName`, xem DbSeeder.SeedRolesAsync) + UNKNOWN cho mã lạ.
+// Trước đây là bộ mã cũ (GATE_IN, REPAIR_TECH, QC_INSPECTOR...) nên vai trò thật bị quy sai → sidebar hiện "Khai Thác Cổng".
 export const SYSTEM_ROLES = {
   ADMIN: 'ADMIN',
-  DEPOT_MANAGER: 'DEPOT_MANAGER',
-  GATE_IN: 'GATE_IN',
   SURVEYOR: 'SURVEYOR',
-  ESTIMATOR: 'ESTIMATOR',
-  REPAIR_TECH: 'REPAIR_TECH',
-  QC_INSPECTOR: 'QC_INSPECTOR',
-  YARD_OPERATOR: 'YARD_OPERATOR',
-  FORKLIFT_DRIVER: 'FORKLIFT_DRIVER',
+  GATE_OP: 'GATE_OP',
   CASHIER: 'CASHIER',
-  GATE_OUT: 'GATE_OUT',
-  SHIPPING_LINE: 'SHIPPING_LINE',
+  ESTIMATOR: 'ESTIMATOR',
+  TECHNICIAN: 'TECHNICIAN',
+  QC_ENG: 'QC_ENG',
+  FORKLIFT: 'FORKLIFT',
+  CARRIER: 'CARRIER',
+  CLEANING: 'CLEANING',
+  SUPERVISOR: 'SUPERVISOR',
+  UNKNOWN: 'UNKNOWN',
 } as const;
 
 export type SystemRole = keyof typeof SYSTEM_ROLES;

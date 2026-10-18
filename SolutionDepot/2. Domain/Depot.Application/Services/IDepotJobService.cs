@@ -27,7 +27,7 @@ namespace Depot.Application.Services
         Task<bool> ApproveEstimateAsync(long jobId, ApproveEstimateRequest request, string enteredBy);
         /// <summary>Người báo giá xác nhận báo giá trên hệ thống (dùng khi chưa có API hãng tàu).</summary>
         Task ConfirmEstimateAsync(long jobId, string confirmedBy);
-        Task<bool> RejectEstimateAsync(long jobId, RejectEstimateRequest request);
+        Task<bool> RejectEstimateAsync(long jobId, RejectEstimateRequest request, string recordedBy);
         Task<bool> ProcessBankWebhookPaymentAsync(BankWebhookPaymentRequest webhook);
         Task<ProcessPaymentResult> ProcessPaymentAsync(long jobId, ProcessPaymentRequest request, string? cashierName);
         Task<List<PaymentLogItem>> GetPaymentLogsAsync(PaymentLogFilter filter);
@@ -44,9 +44,11 @@ namespace Depot.Application.Services
         Task<bool> CompleteRepairAsync(long jobId, RepairCompleteRequest request);
         /// <summary>Id RepairOrder của job (null nếu chưa có); requireRepairing = chỉ trả khi job đang REPAIRING.</summary>
         Task<long?> GetRepairOrderIdAsync(long jobId, bool requireRepairing);
-        Task<bool> CompleteQcInspectionAsync(QcInspectionRequest qcReq);
+        Task<bool> CompleteQcInspectionAsync(long jobId, QcInspectionRequest qcReq, string inspector);
         Task<bool> DispatchForkliftMoveAsync(ForkliftMoveOrderRequest moveReq);
-        Task<bool> GateOutAsync(long jobId, GateOutRequest request);
+        Task GateOutAsync(long jobId, GateOutRequest request, string actor);
+        Task<GateOutBookingCheckResult> CheckGateOutBookingAsync(long jobId, string? bookingNo);
+        Task<int> GetBookingValidityHoursAsync();
         Task<DepotStatisticsSummaryDto> GetDashboardStatsAsync();
         Task<KpiSummaryDto> GetKpiSummaryAsync();
     }

@@ -9,6 +9,8 @@ export type RoleType =
   | 'CLEANING_STAFF' // Tổ vệ sinh vỏ bãi
   | 'FORKLIFT_DRIVER'// Xe nâng
   | 'SHIPPING_LINE'  // Hãng tàu (Phê duyệt báo giá)
+  | 'SUPERVISOR'     // Giám sát / Trưởng ca (ghi nhận hãng tàu duyệt / từ chối)
+  | 'UNKNOWN'        // Vai trò backend trả về mà frontend chưa biết — nhãn "—", không mượn vai trò khác
   | 'DEPOT_MANAGER'  // Quản lý Depot
   | 'ADMIN';          // Quản trị hệ thống
 
