@@ -15,6 +15,8 @@ interface DamageListTableProps {
   onEditDamage: (damage: DamageRecord) => void;
   onDeleteDamage: (id: string) => void;
   onViewPhoto: (photoUrl: string, caption: string) => void;
+  /** Chế độ chỉ xem (mở từ Lịch sử): ẩn thêm / sửa / xoá, vẫn xem ảnh. */
+  readOnly?: boolean;
 }
 
 // Đồng bộ đúng khuôn giao diện "THÔNG BÁO & ZALO GATEWAY" (nền trắng + card trắng) theo yêu cầu người
@@ -24,6 +26,7 @@ export const DamageListTable: React.FC<DamageListTableProps> = ({
   onAddDamage,
   onEditDamage,
   onDeleteDamage,
+  readOnly = false,
   onViewPhoto
 }) => {
   return (
@@ -47,6 +50,7 @@ export const DamageListTable: React.FC<DamageListTableProps> = ({
           </div>
         </div>
 
+        {!readOnly && (
         <button
           onClick={onAddDamage}
           className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-rose-600/20 transition flex items-center gap-1.5 cursor-pointer"
@@ -54,6 +58,7 @@ export const DamageListTable: React.FC<DamageListTableProps> = ({
           <Plus className="w-4 h-4" />
           <span>+ Thêm Damage Mới</span>
         </button>
+        )}
       </div>
 
       {/* Table / Empty State */}
@@ -143,6 +148,7 @@ export const DamageListTable: React.FC<DamageListTableProps> = ({
                     <span className="font-mono text-[10px]">{dmg.createdAt}</span>
                   </td>
                   <td className="py-3 px-3 text-right">
+                    {readOnly ? <span className="text-[10px] text-slate-400">—</span> : (
                     <div className="flex items-center justify-end gap-1.5">
                       <button
                         onClick={() => onEditDamage(dmg)}
@@ -159,6 +165,7 @@ export const DamageListTable: React.FC<DamageListTableProps> = ({
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
+                    )}
                   </td>
                 </tr>
               ))}

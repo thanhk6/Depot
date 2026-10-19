@@ -58,7 +58,10 @@ Container **không hư hỏng** (giám định không ghi lỗi nào) đi tắt:
 **Các bước**
 1. Bấm **Giám định** trên container → hệ thống **khoá** container cho người này (người khác thấy "Đang giám định: tên"). Khoá tự hết sau 30 phút nếu bỏ dở.
 2. Ghi nhận tình trạng: **AV** (sạch, không hư hỏng) · **CL** (cần vệ sinh) · **DM** (hư hỏng).
-3. Tab *Hư hỏng*: thêm từng lỗi (vị trí, mã hư hỏng, phương án sửa, kích thước, ảnh) — bắt buộc ≥ 1 lỗi nếu chọn DM.
+3. Tab *Hư hỏng*: thêm từng lỗi (vị trí, mã hư hỏng, phương án sửa, kích thước, ảnh) — bắt buộc ≥ 1 lỗi nếu chọn DM. Vị trí, mã hư hỏng, mã sửa chỉ chọn từ danh mục.
+   - Tab *Checklist khu vực*: khu vực có hư hỏng **tự chuyển Không Đạt** kèm số lỗi (theo khu vực mà admin gắn cho từng vị trí ở *DM Vị Trí Cấu Kiện*); xoá hết lỗi thì về Đạt. Các khu vực khác giám định viên tự đánh Đạt / Không Đạt / N/A. "Không Đạt" ở khu vực Vệ sinh chỉ đổi AV → CL, không hạ DM.
+   - Hệ thống chặn lưu nếu checklist thiếu / thừa khu vực so với danh mục, hoặc khu vực đang có hư hỏng mà không phải Không Đạt.
+   - Danh sách khu vực do admin quản lý ở *DANH MỤC MASTER DATA → DM Khu Vực Checklist Giám Định* (thêm, đổi tên / thứ tự / mặc định Đạt hoặc N/A, tạm ngưng). Không đổi mã sau khi tạo; không tạm ngưng / xoá khu vực còn vị trí gắn; khu vực đã có trong phiếu chỉ được tạm ngưng. Phiếu nháp mở lại tự theo danh mục mới; phiếu đã nộp giữ nguyên.
 4. Tab *Vệ sinh*: **bắt buộc chọn ít nhất 1 dịch vụ vệ sinh** (theo *Biểu Phí Vệ Sinh*), chọn lý do nếu là CL.
 5. Tab *Hình ảnh*: **bắt buộc ít nhất 1 ảnh toàn cảnh**.
 6. Bấm **Hoàn Tất Giám Định - Chuyển Qua Vệ Sinh** (hoặc *Lưu tạm* để làm tiếp sau).
@@ -67,6 +70,8 @@ Container **không hư hỏng** (giám định không ghi lỗi nào) đi tắt:
 - Mọi container sau giám định đều **chuyển sang Tổ Vệ Sinh** (bắt buộc).
 - Tự tạo **lệnh vệ sinh** với đúng các dịch vụ đã chọn, kèm ảnh toàn cảnh làm ảnh "trước vệ sinh".
 - Hiện thông báo kết quả và quay về danh sách chờ giám định; ghi nhật ký *Hoàn tất giám định*.
+
+**Tra cứu lịch sử** — tab *Lịch sử Giám định*: mọi phiếu **đã nộp chính thức** (không gồm phiếu nháp), kèm trạng thái hồ sơ hiện tại (đang vệ sinh, đang sửa, chờ QC, đã ra cổng…). Lọc theo container / hãng tàu / phân loại / **ngày giám định**, và **xuất file CSV** đúng các dòng đang lọc. Bấm xem chi tiết một phiếu ở tab Lịch sử là **chỉ xem**: thấy đủ nội dung và ảnh nhưng không sửa, không lưu, không nộp lại hay chuyển vệ sinh; muốn giám định tiếp thì mở từ hàng chờ.
 
 ---
 
@@ -274,7 +279,7 @@ Tài khoản nhân viên do **Admin** tạo ở *Phân Quyền RBAC & Users*. H�
 | Danh mục | Dùng ở |
 |---|---|
 | DM Loại Container (ISO), Hãng Tàu, Khách hàng | Gate-In |
-| DM Vị trí cấu kiện, Mã hư hỏng IICL, Phương án sửa chữa, Tiêu chuẩn giám định, Phân hạng vỏ | Giám định |
+| DM Vị trí cấu kiện (kèm khu vực checklist), DM Khu vực checklist giám định, Mã hư hỏng IICL, Phương án sửa chữa, Tiêu chuẩn giám định, Phân hạng vỏ | Giám định |
 | Biểu phí vệ sinh | Giám định, Vệ sinh, Khai thác |
 | Cước nâng hạ (LoLo), Cước lưu bãi | Khai thác |
 | Tài khoản nhận tiền (VietQR) | Thanh toán |

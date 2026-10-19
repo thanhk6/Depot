@@ -20,7 +20,7 @@ import { RepairCodeMaster } from '../components/RepairCodeMaster';
 import { GradeMaster } from '../components/GradeMaster';
 import { InspectionStandardMaster } from '../components/InspectionStandardMaster';
 import { SurveyPhotoGallery } from '../components/SurveyPhotoGallery';
-import { SurveyHistoryTable } from '../components/SurveyHistoryTable';
+import { SurveyHistoryTable, jobStatusLabel } from '../components/SurveyHistoryTable';
 import { ContainerSearchModal } from '../components/ContainerSearchModal';
 import { EEIRModal } from '../components/EEIRModal';
 import { CreateSurveyModal } from '../components/CreateSurveyModal';
@@ -95,7 +95,7 @@ export const SurveyModulePage: React.FC<SurveyModulePageProps> = ({
         masterDataApi.getCatalog('INSPECTION_STANDARD'), masterDataApi.getCatalog('CLEANING_TARIFF')
       ]);
       const mapItems = (response: any) => response?.data || [];
-      setLocations(mapItems(locationResponse).map((item: any) => ({ id: item.id, code: item.code, name: item.name, vietnameseName: item.nameVi || item.name, description: item.description || '', category: readJson(item.jsonData).category || 'STRUCTURE', status: item.isActive ? 'ACTIVE' : 'INACTIVE', sortOrder: item.sortOrder })));
+      setLocations(mapItems(locationResponse).map((item: any) => ({ id: item.id, code: item.code, name: item.name, vietnameseName: item.nameVi || item.name, description: item.description || '', category: readJson(item.jsonData).category || 'STRUCTURE', checklistZone: readJson(item.jsonData).checklistZone ?? '', status: item.isActive ? 'ACTIVE' : 'INACTIVE', sortOrder: item.sortOrder })));
       setDamageCodes(mapItems(damageResponse).map((item: any) => ({ id: item.id, code: item.code, name: item.name, vietnameseName: item.nameVi || item.name, damageType: readJson(item.jsonData).damageType || 'OTHER', description: item.description || '', severity: readJson(item.jsonData).severity || 'MEDIUM', standard: readJson(item.jsonData).standard || 'UNIVERSAL', status: item.isActive ? 'ACTIVE' : 'INACTIVE' })));
       setRepairCodes(mapItems(repairResponse).map((item: any) => ({ id: item.id, repairCode: item.code, stsCode: readJson(item.jsonData).stsCode || item.code, name: item.name, vietnameseName: item.nameVi || item.name, description: item.description || '', repairType: readJson(item.jsonData).repairType || 'STRAIGHTEN', labourRate: readJson(item.jsonData).labourRate || 0, labourHours: readJson(item.jsonData).labourHours || 0, materialEstimatedCost: readJson(item.jsonData).materialEstimatedCost || 0, status: item.isActive ? 'ACTIVE' : 'INACTIVE' })));
       setGrades(mapItems(gradeResponse).map((item: any) => ({ id: item.id, gradeCode: item.code, gradeName: item.nameVi || item.name, description: item.description || '', shippingLine: readJson(item.jsonData).shippingLine || 'ALL', customer: readJson(item.jsonData).customer || 'ALL', status: item.isActive ? 'ACTIVE' : 'INACTIVE', sortOrder: item.sortOrder })));
@@ -148,6 +148,8 @@ export const SurveyModulePage: React.FC<SurveyModulePageProps> = ({
   // Active view
   const [activeTab, setActiveTab] = useState<string>(initialSubTab === 'dashboard' ? 'queue' : initialSubTab);
   const [selectedSurvey, setSelectedSurvey] = useState<SurveyItemRecord | null>(null);
+  // Mở từ tab Lịch sử → form chỉ xem (không khoá phiếu, không lưu / nộp).
+  const [selectedReadOnly, setSelectedReadOnly] = useState(false);
 
   React.useEffect(() => {
     if (initialSubTab) {
@@ -303,9 +305,44 @@ export const SurveyModulePage: React.FC<SurveyModulePageProps> = ({
     refreshSurveys();
   }, [refreshSurveys]);
 
+  // Lịch sử giám định: nguồn RIÊNG, khác hàng chờ. Trước đây tab Lịch sử dùng chung danh sách SURVEYING (container
+  // chưa giám định) nên giám định xong là biến mất khỏi "lịch sử". Giờ lấy mọi hồ sơ, giữ hồ sơ có phiếu và đã rời
+  // SURVEYING = phiếu đã nộp chính thức (nộp luôn chuyển sang CLEANING; lưu nháp giữ SURVEYING).
+  const [historySurveys, setHistorySurveys] = useState<SurveyItemRecord[]>([]);
+  const [historyLoadError, setHistoryLoadError] = useState<string | null>(null);
+  const mapJobToHistory = (job: any): SurveyItemRecord => ({
+    ...mapJobToSurvey(job),
+    // Chỉ dữ liệu thật của phiếu — không lấy số hồ sơ / giờ hiện tại / người đang đăng nhập làm giá trị tạm.
+    surveyNo: job.survey?.surveyNo || '',
+    surveyDate: job.survey?.surveyDate || '',
+    surveyor: job.survey?.surveyorName || '',
+    eeirNo: job.gateInEirNo || undefined,
+    jobStatus: job.status
+  });
+  const refreshSurveyHistory = React.useCallback(() => {
+    setHistoryLoadError(null);
+    return containerApi.getAll()
+      .then((response: any) => {
+        if (response?.statusCode !== 200 || !Array.isArray(response.data)) {
+          throw new Error(response?.message || 'Không thể tải lịch sử giám định.');
+        }
+        setHistorySurveys(response.data.filter((job: any) => job?.survey && job.status !== 'SURVEYING').map(mapJobToHistory));
+      })
+      .catch((error) => {
+        setHistoryLoadError(error instanceof Error ? error.message : 'Không thể tải lịch sử giám định.');
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Mở tab Lịch sử là tải lại → phiếu vừa nộp hiện ngay.
+  React.useEffect(() => {
+    if (activeTab === 'history') refreshSurveyHistory();
+  }, [activeTab, refreshSurveyHistory]);
+
   // Mở phiếu giám định: với hồ sơ thật từ Gate-In còn đang chờ (status NEW), phải "nhận" (khóa) trước
   // qua backend để chặn 2 surveyor cùng mở 1 container — hồ sơ đang/đã giám định (đã có người nhận từ trước, kể cả chính mình) thì mở thẳng, không cần khóa lại.
   const handleOpenSurvey = async (survey: SurveyItemRecord) => {
+    setSelectedReadOnly(false);
     const isBackendJob = /^\d+$/.test(survey.id);
     if (!isBackendJob || survey.status !== 'NEW') {
       setSelectedSurvey(survey);
@@ -345,6 +382,12 @@ export const SurveyModulePage: React.FC<SurveyModulePageProps> = ({
   // nhất 1 lần. Chỉ dựa vào chính chủ khóa (surveyClaimedByStaffId) — release vô hại nếu khóa đã được
   // backend tự giải phóng từ trước (nộp phiếu thật), vì backend chỉ 400 âm thầm khi không còn là chủ khóa.
   const handleBackFromDetail = () => {
+    if (selectedReadOnly) {
+      // Chỉ xem: không có khoá để nhả; activeTab vẫn là 'history' nên quay về đúng tab Lịch sử.
+      setSelectedReadOnly(false);
+      setSelectedSurvey(null);
+      return;
+    }
     if (
       selectedSurvey &&
       /^\d+$/.test(selectedSurvey.id) &&
@@ -361,6 +404,12 @@ export const SurveyModulePage: React.FC<SurveyModulePageProps> = ({
       );
     }
     setSelectedSurvey(null);
+  };
+
+  // Phiếu đã nộp mở từ Lịch sử: chỉ xem — không đi qua handleOpenSurvey nên không bao giờ gọi khoá phiếu.
+  const openHistorySurvey = (survey: SurveyItemRecord) => {
+    setSelectedReadOnly(true);
+    setSelectedSurvey(survey);
   };
 
   // Hoàn tất giám định thành công: thông báo bước tiếp theo (theo đúng quy tắc SubmitSurveyAsync ở backend)
@@ -700,6 +749,7 @@ export const SurveyModulePage: React.FC<SurveyModulePageProps> = ({
                 onClick={() => {
                   setActiveTab(item.id);
                   setSelectedSurvey(null);
+                  setSelectedReadOnly(false);
                 }}
                 className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
                   isActive
@@ -736,8 +786,10 @@ export const SurveyModulePage: React.FC<SurveyModulePageProps> = ({
           cleaningTariffs={cleaningTariffs}
           currentUser={currentUser}
           onBack={handleBackFromDetail}
-          onSaveSurvey={handleSaveSurvey}
-          onCompleted={handleSurveyCompleted}
+          onSaveSurvey={selectedReadOnly ? async () => {} : handleSaveSurvey}
+          onCompleted={selectedReadOnly ? undefined : handleSurveyCompleted}
+          readOnly={selectedReadOnly}
+          readOnlyStatusLabel={selectedReadOnly ? jobStatusLabel(selectedSurvey.jobStatus) : undefined}
         />
       ) : (
         <>
@@ -788,10 +840,10 @@ export const SurveyModulePage: React.FC<SurveyModulePageProps> = ({
 
           {activeTab === 'history' && (
             <SurveyHistoryTable
-              surveys={surveys}
-              onSelectSurvey={handleOpenSurvey}
+              surveys={historySurveys}
+              loadError={historyLoadError}
+              onSelectSurvey={openHistorySurvey}
               onOpenEEIR={(s) => setEeirSurvey(s)}
-              onTransferToOperation={handleTransferToOperation}
             />
           )}
 

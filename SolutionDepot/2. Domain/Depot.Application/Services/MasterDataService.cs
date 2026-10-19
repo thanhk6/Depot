@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Depot.Data.EF;
+using Depot.Data.Entities.Depot;
 using Depot.Data.Entities.Master;
 using Depot.Data.Entities.Inventory;
 using Depot.ViewModels;
@@ -160,6 +161,7 @@ namespace Depot.Application.Services
             var catalogType = request.CatalogType.Trim().ToUpperInvariant();
             var code = request.Code.Trim().ToUpperInvariant();
             ValidateGateOutSetting(catalogType, code, request.JsonData);
+            await ValidateSurveyChecklistAsync(catalogType, null, code, request.IsActive, request.JsonData);
             // So sánh trùng phải dùng đúng giá trị đã chuẩn hoá (Trim+Upper) — trước đây so trực tiếp
             // request.Code thô nên Code khác hoa/thường hoặc dư khoảng trắng lọt qua bước tiền-kiểm này,
             // rơi xuống bắt lỗi bằng unique index DB (trả message Postgres thô, không thân thiện).
@@ -193,6 +195,7 @@ namespace Depot.Application.Services
             if (item == null) return null;
             var code = request.Code.Trim().ToUpperInvariant();
             ValidateGateOutSetting(item.CatalogType, code, request.JsonData);
+            await ValidateSurveyChecklistAsync(item.CatalogType, item, code, request.IsActive, request.JsonData);
             // Kiểm tra trùng Code TRƯỚC khi gán — trước đây gán thẳng rồi để unique index DB bắt lỗi,
             // nhưng controller không try/catch nên exception bay thẳng ra ngoài thành lỗi 500 thô thay vì
             // 400 theo đúng envelope {statusCode,message,data} của app.
@@ -224,10 +227,63 @@ namespace Depot.Application.Services
                 throw new ArgumentException($"Số giờ hiệu lực booking phải là số nguyên từ 1 đến {DepotJobService.MaxBookingValidityHours} giờ.");
         }
 
+        public const string SurveyChecklistCatalog = "SURVEY_CHECKLIST";
+        private static readonly System.Text.RegularExpressions.Regex ChecklistZoneCodePattern = new("^[A-Z0-9_]{1,40}$");
+
+        /// <summary>Danh mục khu vực Checklist giám định (depot-fullstack-survey-checklist-catalog): mã chữ in hoa/số/gạch
+        /// dưới và KHÔNG đổi sau khi tạo (vị trí hư hỏng + phiếu tham chiếu theo mã); mặc định chỉ PASS/NA; tạm ngưng bị
+        /// chặn khi còn vị trí gắn (DAMAGE_LOCATION.checklistZone) hoặc là khu vực đang dùng cuối cùng.</summary>
+        private async Task ValidateSurveyChecklistAsync(string catalogType, MasterCatalogItem? existing, string code, bool isActive, string? jsonData)
+        {
+            if (!string.Equals(catalogType, SurveyChecklistCatalog, StringComparison.OrdinalIgnoreCase)) return;
+            if (existing != null && existing.Code != code)
+                throw new ArgumentException($"Không đổi mã khu vực '{existing.Code}' — vị trí hư hỏng và phiếu giám định tham chiếu theo mã. Chỉ sửa tên / thứ tự / mặc định.");
+            if (existing == null && !ChecklistZoneCodePattern.IsMatch(code))
+                throw new ArgumentException("Mã khu vực chỉ gồm chữ in hoa, số và dấu gạch dưới (tối đa 40 ký tự).");
+            var defaultStatus = ReadJsonString(jsonData, "defaultStatus") ?? "PASS";
+            if (defaultStatus is not ("PASS" or "NA"))
+                throw new ArgumentException("Trạng thái mặc định của khu vực chỉ nhận Đạt (PASS) hoặc N/A (NA).");
+            if (existing != null && existing.IsActive && !isActive)
+                await EnsureChecklistZoneRemovableAsync(existing, "tạm ngưng");
+        }
+
+        private async Task ValidateSurveyChecklistDeleteAsync(MasterCatalogItem item)
+        {
+            if (!string.Equals(item.CatalogType, SurveyChecklistCatalog, StringComparison.OrdinalIgnoreCase)) return;
+            if (item.IsActive) await EnsureChecklistZoneRemovableAsync(item, "xoá");
+            if (await _db.Set<SurveyChecklistItem>().AnyAsync(c => c.ZoneKey == item.Code))
+                throw new ArgumentException($"Khu vực '{item.Code}' đã có trong phiếu giám định nên không xoá được — hãy Tạm ngưng thay vì xoá.");
+        }
+
+        private async Task EnsureChecklistZoneRemovableAsync(MasterCatalogItem zone, string action)
+        {
+            var locations = await _db.MasterCatalogItems.AsNoTracking()
+                .Where(x => x.CatalogType == "DAMAGE_LOCATION" && !x.IsDeleted).ToListAsync();
+            var linked = locations.Where(l => ReadJsonString(l.JsonData, "checklistZone") == zone.Code).Select(l => l.Code).OrderBy(c => c).ToList();
+            if (linked.Count > 0)
+                throw new ArgumentException($"Không {action} được khu vực '{zone.Code}': còn {linked.Count} vị trí hư hỏng gắn vào ({string.Join(", ", linked)}). Gắn các vị trí này sang khu vực khác ở DM Vị Trí Cấu Kiện trước.");
+            var activeCount = await _db.MasterCatalogItems.CountAsync(x => x.CatalogType == SurveyChecklistCatalog && !x.IsDeleted && x.IsActive);
+            if (activeCount <= 1)
+                throw new ArgumentException($"Không {action} được khu vực đang dùng cuối cùng — checklist giám định phải còn ít nhất 1 khu vực.");
+        }
+
+        private static string? ReadJsonString(string? jsonData, string key)
+        {
+            if (string.IsNullOrWhiteSpace(jsonData)) return null;
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(jsonData);
+                return doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object
+                    && doc.RootElement.TryGetProperty(key, out var v) && v.ValueKind == System.Text.Json.JsonValueKind.String ? v.GetString() : null;
+            }
+            catch (System.Text.Json.JsonException) { throw new ArgumentException("JsonData không phải JSON hợp lệ."); }
+        }
+
         public async Task<bool> DeactivateCatalogItemAsync(long id)
         {
             var item = await _db.MasterCatalogItems.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
             if (item == null) return false;
+            await ValidateSurveyChecklistDeleteAsync(item);
             // Xóa = xóa mềm (IsDeleted), KHÔNG dùng IsActive — IsActive=false là trạng thái "Tạm ngưng".
             item.IsDeleted = true; item.DeletedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();

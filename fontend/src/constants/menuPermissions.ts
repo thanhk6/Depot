@@ -41,6 +41,7 @@ export const MENU_PERMISSION: Record<string, string | string[]> = {
   cleaning_tariffs: 'masterdata',
   container_types: 'masterdata',
   damage_locations: 'masterdata',
+  survey_checklist: 'masterdata', // danh mục khu vực Checklist giám định (SURVEY_CHECKLIST)
   damage_codes: 'masterdata',
   repair_codes: 'masterdata',
   grades: 'masterdata',

@@ -168,6 +168,8 @@ export interface SurveyItemRecord {
   surveyor: string;
   shift?: string;
   status: SurveyStatus;
+  /** Trạng thái hiện tại của hồ sơ container (DepotJob.Status) — chỉ dùng ở tab Lịch sử giám định. */
+  jobStatus?: string;
   // Khóa "nhận giám định" — set khi 1 surveyor bấm mở hồ sơ, chặn người khác nhận trùng
   // container này cho tới khi nộp phiếu hoặc tự bỏ nhận (xem SurveyModulePage.handleOpenSurvey).
   surveyClaimedByStaffId?: number;
@@ -243,6 +245,8 @@ export interface DamageLocationMasterItem {
   vietnameseName: string;
   description: string;
   category: 'EXTERIOR' | 'INTERIOR' | 'UNDER' | 'STRUCTURE' | 'REEFER';
+  /** Mã khu vực Checklist giám định (danh mục SURVEY_CHECKLIST) mà vị trí này thuộc về; '' = không gắn khu vực nào. */
+  checklistZone: string;
   status: 'ACTIVE' | 'INACTIVE';
   sortOrder: number;
 }

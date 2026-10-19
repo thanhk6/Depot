@@ -17,6 +17,8 @@ import {
 } from '../types';
 import { DamageListTable } from './DamageListTable';
 import { DamageFormModal } from './DamageFormModal';
+import { recomputeChecklistFromDamages, mergeChecklistWithTemplate } from '../utils/checklistSync';
+import { useSurveyChecklistTemplate } from '../../masterdata/utils/checklistCatalog';
 import { depotFileApi } from '../../../api';
 import {
   ClipboardCheck,
@@ -36,44 +38,6 @@ import {
   Clock
 } from 'lucide-react';
 
-// Ánh xạ mỗi zoneKey của checklist IICL-6 (11 khu vực) sang các locationCode tương ứng trong
-// INITIAL_DAMAGE_LOCATIONS (mockData.ts). Mảng rỗng = khu vực không có location code tương ứng
-// trong danh mục (VD "Fork Pockets" của UNDERSTRUCTURE) nên chỉ có thể tick tay ở tab Checklist,
-// không tự động suy ra được từ danh sách damages.
-const ZONE_LOCATION_CODES: Record<InspectionZoneKey, string[]> = {
-  ROOF: ['ROOF'],
-  FRONT_WALL: ['FRONT_W'],
-  LEFT_WALL: ['LEFT_W'],
-  RIGHT_WALL: ['RIGHT_W'],
-  DOOR: ['DOOR_L', 'DOOR_ROD'],
-  FLOOR: ['FLOOR_WD'],
-  FRAME: ['BOTTOM_R', 'CROSS_M'],
-  CORNER_CASTING: ['CORNER_P'],
-  UNDERSTRUCTURE: [],
-  REEFER_UNIT: ['REEFER_M'],
-  CLEANING: []
-};
-
-// Tính lại toàn bộ checklist từ danh sách damages hiện tại thay vì cộng dồn/trừ dần damageCount —
-// trước đây handleSaveDamage luôn +1 damageCount kể cả khi CHỈNH SỬA (không phải thêm mới) 1 damage
-// đã có, khiến số đếm bị nhân đôi mỗi lần sửa; còn handleDeleteDamage không hề đụng tới checklist nên
-// xóa hết damage của 1 khu vực vẫn để khu vực đó kẹt ở trạng thái FAIL vĩnh viễn. Chỉ tự đưa 1 zone về
-// PASS khi chính hệ thống đã set FAIL kèm damageCount>0 trước đó — không đụng tới zone giám định viên
-// tự tick FAIL bằng tay (damageCount = 0) ở tab Checklist.
-const recomputeChecklistFromDamages = (
-  checklist: InspectionChecklistItem[],
-  damages: DamageRecord[]
-): InspectionChecklistItem[] =>
-  checklist.map((zone) => {
-    const codes = ZONE_LOCATION_CODES[zone.zoneKey] || [];
-    if (codes.length === 0) return zone;
-    const count = damages.filter((d) => codes.includes(d.locationCode)).length;
-    if (count > 0) {
-      return { ...zone, status: 'FAIL', damageCount: count };
-    }
-    return zone.status === 'FAIL' && zone.damageCount > 0 ? { ...zone, status: 'PASS', damageCount: 0 } : zone;
-  });
-
 interface SurveyDetailFormProps {
 
   survey: SurveyItemRecord;
@@ -90,6 +54,10 @@ interface SurveyDetailFormProps {
   onSaveSurvey: (updated: SurveyItemRecord, isDraft?: boolean) => Promise<void>;
   /** Gọi sau khi Hoàn Tất Giám Định lưu thành công — trang cha báo thông báo và quay về danh sách. */
   onCompleted?: (completed: SurveyItemRecord) => void;
+  /** Mở từ tab Lịch sử: chỉ xem — không sửa, không lưu, không nộp / chuyển vệ sinh, không tải lên / xoá ảnh. */
+  readOnly?: boolean;
+  /** Nhãn trạng thái hồ sơ hiện tại hiện ở dải "chế độ chỉ xem". */
+  readOnlyStatusLabel?: string;
 }
 
 export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
@@ -103,10 +71,24 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
   currentUser,
   onBack,
   onSaveSurvey,
-  onCompleted
+  onCompleted,
+  readOnly = false,
+  readOnlyStatusLabel
 }) => {
   // Form working states - Default tab is directly DAMAGES
   const [formData, setFormData] = useState<SurveyItemRecord>({ ...survey });
+  // Mở phiếu (nháp cũ có thể lưu checklist lệch danh mục / lệch hư hỏng): ghép theo danh mục khu vực mới nhất (thêm khu
+  // vực mới, bỏ khu vực đã tạm ngưng) rồi đồng bộ theo danh mục vị trí, để lần lưu kế tiếp không bị server từ chối.
+  // Chế độ chỉ xem giữ nguyên đúng checklist đã lưu.
+  const checklistTemplate = useSurveyChecklistTemplate();
+  useEffect(() => {
+    if (readOnly) return;
+    setFormData((prev) => {
+      let checklist = mergeChecklistWithTemplate(prev.checklist || [], checklistTemplate);
+      if (locations.length > 0) checklist = recomputeChecklistFromDamages(checklist, prev.damages || [], locations);
+      return { ...prev, checklist };
+    });
+  }, [locations, checklistTemplate, readOnly]);
   const [activeTab, setActiveTab] = useState<'DAMAGES' | 'CHECKLIST' | 'CLEANING' | 'PHOTOS'>(
     survey.condition === 'CL' ? 'CLEANING' : 'DAMAGES'
   );
@@ -260,19 +242,24 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
   // Damage modal state
   const [isDamageModalOpen, setIsDamageModalOpen] = useState(false);
   const [editingDamage, setEditingDamage] = useState<DamageRecord | null>(null);
-  const [selectedLocationCode, setSelectedLocationCode] = useState<string>('RIGHT_W');
-  const [selectedLocationName, setSelectedLocationName] = useState<string>('Vách hông phải');
+  const [selectedLocationCode, setSelectedLocationCode] = useState<string>('');
+  const [selectedLocationName, setSelectedLocationName] = useState<string>('');
 
   // Quick Damage Direct Entry Inline State
-  const [quickLocation, setQuickLocation] = useState<string>('RIGHT_W');
-  const [quickDamageCode, setQuickDamageCode] = useState<string>('BENT');
-  
-  // Mã 'RP_STR_PANEL' (Straighten Corrugation) — trước đây để 'RP_STRAIGHT', mã này không tồn tại trong
-  // INITIAL_REPAIR_CODES nên dropdown "Mã Sửa" hiển thị lệch với state ngay từ lần render đầu tiên.
-  const [quickRepairCode, setQuickRepairCode] = useState<string>('RP_STR_PANEL');
+  // Mặc định = dòng đầu của danh mục DB khi tải xong; trước đây gõ cứng RIGHT_W / BENT / RP_STR_PANEL (mã mẫu cũ,
+  // RIGHT_W không có trong danh mục) nên ô chọn hiện dòng đầu nhưng lưu mã gõ cứng (depot-fullstack-survey-checklist-sync).
+  const [quickLocation, setQuickLocation] = useState<string>('');
+  const [quickDamageCode, setQuickDamageCode] = useState<string>('');
+  const [quickRepairCode, setQuickRepairCode] = useState<string>('');
+  useEffect(() => {
+    if (locations.length && !locations.some((l) => l.code === quickLocation)) setQuickLocation(locations[0].code);
+    if (damageCodes.length && !damageCodes.some((d) => d.code === quickDamageCode)) setQuickDamageCode(damageCodes[0].code);
+    if (repairCodes.length && !repairCodes.some((r) => r.repairCode === quickRepairCode)) setQuickRepairCode(repairCodes[0].repairCode);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locations, damageCodes, repairCodes]);
   const [quickSeverity, setQuickSeverity] = useState<'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'>('MEDIUM');
-  const [quickLength, setQuickLength] = useState<string>('150');
-  const [quickWidth, setQuickWidth] = useState<string>('60');
+  const [quickLength, setQuickLength] = useState<string>('');
+  const [quickWidth, setQuickWidth] = useState<string>('');
   const [quickQuantity] = useState<string>('1');
   const [quickNote, setQuickNote] = useState<string>('');
 
@@ -316,7 +303,7 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
   ) => {
     const file = e.target.files?.[0];
     e.target.value = '';
-    if (!file) return;
+    if (readOnly || !file) return;
 
     const jobId = Number(formData.id);
     if (!Number.isFinite(jobId) || jobId <= 0) {
@@ -357,6 +344,7 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
   };
 
   const handleDeletePhoto = (photoId: string) => {
+    if (readOnly) return;
     setFormData((prev) => ({
       ...prev,
       photos: (prev.photos || []).filter((p) => p.id !== photoId)
@@ -370,14 +358,12 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
         item.zoneKey === zoneKey ? { ...item, status } : item
       );
 
-      // Auto update condition if failure
+      // "Không Đạt" ở khu vực Vệ sinh chỉ nâng AV → CL, không hạ DM xuống CL; khu vực khác → DM.
+      // Đổi về Đạt / N/A không tự đổi phân loại (giám định viên tự chọn lại nếu cần).
       let autoCondition = prev.condition;
       if (status === 'FAIL') {
-        if (zoneKey === 'CLEANING') {
-          autoCondition = 'CL';
-        } else {
-          autoCondition = 'DM';
-        }
+        if (zoneKey !== 'CLEANING') autoCondition = 'DM';
+        else if (prev.condition === 'AV') autoCondition = 'CL';
       }
 
       return {
@@ -397,6 +383,7 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
   };
 
   const handleSaveDamage = (record: DamageRecord) => {
+    if (readOnly) return;
     setFormData((prev) => {
       const existing = prev.damages || [];
       const updatedDamages = editingDamage
@@ -407,7 +394,7 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
         ...prev,
         damages: updatedDamages,
         condition: 'DM', // Automatic DM when damage is added
-        checklist: recomputeChecklistFromDamages(prev.checklist, updatedDamages)
+        checklist: recomputeChecklistFromDamages(prev.checklist, updatedDamages, locations)
       };
     });
   };
@@ -415,6 +402,7 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
   // Quick Direct Add Handler
   const handleQuickAddDamage = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!quickLocation || !quickDamageCode || !quickRepairCode) return;
     const loc = locations.find((l) => l.code === quickLocation);
     const dmg = damageCodes.find((d) => d.code === quickDamageCode);
     const rep = repairCodes.find((r) => r.repairCode === quickRepairCode);
@@ -446,13 +434,14 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
   };
 
   const handleDeleteDamage = (id: string) => {
+    if (readOnly) return;
     setFormData((prev) => {
       const updatedDamages = (prev.damages || []).filter((d) => d.id !== id);
       return {
         ...prev,
         damages: updatedDamages,
         condition: updatedDamages.length > 0 ? 'DM' : 'AV',
-        checklist: recomputeChecklistFromDamages(prev.checklist, updatedDamages)
+        checklist: recomputeChecklistFromDamages(prev.checklist, updatedDamages, locations)
       };
     });
   };
@@ -498,6 +487,7 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
   };
 
   const handleCompleteSurvey = async () => {
+    if (readOnly) return;
     if (!validateForm()) {
       return;
     }
@@ -563,6 +553,7 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
         </div>
 
         {/* Top Control Buttons */}
+        {!readOnly && (
         <div className="flex flex-wrap items-center gap-2.5">
           <button
             onClick={handleCompleteSurvey}
@@ -572,7 +563,18 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
             <span>Hoàn Tất Giám Định - Chuyển Qua Vệ Sinh</span>
           </button>
         </div>
+        )}
       </div>
+
+      {readOnly && (
+        <div className="p-4 bg-slate-50 border border-slate-300 rounded-2xl flex flex-wrap items-center gap-2 text-xs text-slate-700">
+          <ShieldCheck className="w-4 h-4 text-slate-500" />
+          <span className="font-bold">Phiếu đã nộp — chế độ chỉ xem</span>
+          <span className="font-mono text-slate-500">[{formData.surveyNo}]</span>
+          {readOnlyStatusLabel && <span>&bull; Hồ sơ hiện tại: <strong>{readOnlyStatusLabel}</strong></span>}
+          <span className="text-slate-500">&bull; Không sửa / nộp lại từ Lịch sử.</span>
+        </div>
+      )}
 
       {/* Success Alert Banner */}
       {saveSuccessMessage && (
@@ -631,6 +633,7 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
             <select
               value={formData.standard}
               onChange={(e) => setFormData({ ...formData, standard: e.target.value })}
+              disabled={readOnly}
               className="mt-1 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-blue-700 font-bold text-xs focus:outline-none focus:border-blue-500 w-full"
             >
               {/* Lấy từ DM Tiêu Chuẩn Giám Định (trước gõ cứng 4 tiêu chuẩn không có trong danh mục). Giữ giá trị
@@ -696,6 +699,7 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
               <button
                 key={grade.id}
                 type="button"
+                disabled={readOnly}
                 onClick={() => setFormData({ ...formData, condition: bucket, qualityGrade: grade.gradeCode as any })}
                 className={`px-3 py-1.5 rounded-full border text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
                   isSelected ? selectedClasses : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
@@ -709,7 +713,7 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
           })}
         </div>
 
-        {formData.condition === 'DM' && (
+        {formData.condition === 'DM' && !readOnly && (
           <div className="flex items-center gap-2 text-xs">
             <span className="text-rose-700 font-bold">{formData.damages?.length || 0} mục tổn thất đã ghi</span>
             <button
@@ -764,7 +768,7 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
           }`}
         >
           <ClipboardCheck className="w-4 h-4" />
-          <span>Checklist 11 Khu Vực Khảo Sát</span>
+          <span>Checklist {formData.checklist.length} Khu Vực Khảo Sát</span>
         </button>
 
         <button
@@ -784,6 +788,7 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
       {activeTab === 'DAMAGES' && (
         <div className="space-y-5">
           {/* Quick Direct Code Input Bar */}
+          {!readOnly && (
           <div className="p-5 bg-white border border-slate-200 rounded-3xl space-y-4 shadow-xl">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
               <div className="flex items-center gap-2.5">
@@ -811,46 +816,6 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
                 <Plus className="w-4 h-4 text-rose-400" />
                 <span>Mở Form Chi Tiết Đầy Đủ</span>
               </button>
-            </div>
-
-            {/* Preset 1-Click Quick Chips */}
-            <div className="space-y-1.5">
-              <span className="text-[11px] text-slate-500 font-semibold block">
-                Phím Tắt Nhanh Các Lỗi Thường Gặp (1-Click Presets):
-              </span>
-              <div className="flex flex-wrap gap-2">
-                {/* Mã loc/dmg/rep của cả 8 preset đều phải trỏ đúng danh mục INITIAL_DAMAGE_LOCATIONS /
-                    INITIAL_DAMAGE_CODES / INITIAL_REPAIR_CODES trong mockData.ts — trước đây 6/8 preset
-                    (FLOOR, DOOR_R, CORNER_POST, UNDERSTRUCTURE, FLOOR_GOUGE, DOOR_SEAL_TEAR, CRACKED,
-                    CROSSMEMBER_BENT, RP_STRAIGHT, RP_DOOR_SEAL, RP_WELD, RP_INSERT) dùng mã KHÔNG tồn tại
-                    trong danh mục, khiến dropdown hiển thị lệch với state và nếu lưu, bản ghi hư hỏng bị
-                    lưu locationName/damageName/repairName bằng mã thô thay vì tên tiếng Việt thật. */}
-                {[
-                  { loc: 'RIGHT_W', dmg: 'BENT', rep: 'RP_STR_PANEL', label: 'Cong vách phải (BENT)', sev: 'MEDIUM' as const },
-                  { loc: 'LEFT_W', dmg: 'CUT', rep: 'RP_PATCH_S', label: 'Rách vách trái (CUT)', sev: 'HIGH' as const },
-                  { loc: 'ROOF', dmg: 'HOLE', rep: 'RP_PATCH_S', label: 'Thủng nóc (HOLE)', sev: 'CRITICAL' as const },
-                  { loc: 'FLOOR_WD', dmg: 'DELAM', rep: 'RP_FLOOR_SCT', label: 'Ván sàn bong tróc (DELAM)', sev: 'HIGH' as const },
-                  { loc: 'DOOR_L', dmg: 'GASKET', rep: 'RP_GASK_REP', label: 'Rách gioăng cửa (GASKET)', sev: 'MEDIUM' as const },
-                  { loc: 'FRONT_W', dmg: 'DENT', rep: 'RP_STR_PANEL', label: 'Móp vách trước (DENT)', sev: 'LOW' as const },
-                  { loc: 'CORNER_P', dmg: 'BENT', rep: 'RP_SEAL_WELD', label: 'Cong trụ góc (BENT)', sev: 'CRITICAL' as const },
-                  { loc: 'CROSS_M', dmg: 'BENT', rep: 'RP_STR_PANEL', label: 'Cong dầm đáy (X-MEMBER)', sev: 'HIGH' as const }
-                ].map((preset, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => {
-                      setQuickLocation(preset.loc);
-                      setQuickDamageCode(preset.dmg);
-                      setQuickRepairCode(preset.rep);
-                      setQuickSeverity(preset.sev);
-                    }}
-                    className="px-2.5 py-1 bg-slate-50 hover:bg-rose-50 text-slate-700 hover:text-rose-800 border border-slate-200 hover:border-rose-700/70 rounded-lg text-[11px] font-medium transition cursor-pointer flex items-center gap-1"
-                  >
-                    <Tag className="w-3 h-3 text-rose-400" />
-                    <span>{preset.label}</span>
-                  </button>
-                ))}
-              </div>
             </div>
 
             {/* Inline Fast Input Form */}
@@ -948,7 +913,8 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
               <div className="flex items-end">
                 <button
                   type="submit"
-                  className="w-full py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-rose-600/30 transition flex items-center justify-center gap-1.5 cursor-pointer"
+                  disabled={!quickLocation || !quickDamageCode || !quickRepairCode}
+                  className="w-full py-2.5 disabled:opacity-50 disabled:cursor-not-allowed bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-rose-600/30 transition flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
                   <span>+ Thêm Mã Lỗi</span>
@@ -956,6 +922,7 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
               </div>
             </form>
           </div>
+          )}
 
           {/* Damages List Table */}
           <DamageListTable
@@ -967,12 +934,14 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
             }}
             onDeleteDamage={handleDeleteDamage}
             onViewPhoto={(url, caption) => setPhotoViewerUrl({ url, caption })}
+            readOnly={readOnly}
           />
         </div>
       )}
 
       {/* Tab 2: Cleaning Tariffs & Specifications Management */}
       {activeTab === 'CLEANING' && (
+        <fieldset disabled={readOnly} className="contents">
         <div className="space-y-5">
           {/* Header Summary Card */}
           <div className="p-5 bg-gradient-to-r from-amber-50 via-white to-white border border-amber-200 rounded-3xl space-y-4 shadow-sm">
@@ -1060,7 +1029,7 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
             </div>
 
             {/* Quick Add from Master Tariffs Grid */}
-            <div className="space-y-2">
+            <div className={readOnly ? 'hidden' : 'space-y-2'}>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                   <Plus className="w-3.5 h-3.5 text-cyan-400" />
@@ -1229,13 +1198,13 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
                           </button>
                         </td>
                         <td className="py-3 px-3 text-right">
-                          <button
+                          {!readOnly && <button
                             type="button"
                             onClick={() => handleRemoveCleaningItem(item.id)}
                             className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-slate-100 transition cursor-pointer"
                           >
                             <Trash2 className="w-4 h-4" />
-                          </button>
+                          </button>}
                         </td>
                       </tr>
                     ))}
@@ -1245,17 +1214,19 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
             )}
           </div>
         </div>
+        </fieldset>
       )}
 
-      {/* Tab 3: Checklist 11 Khu Vực Khảo Sát — trước đây nút bấm chuyển tab được nhưng không có
+      {/* Tab 3: Checklist các khu vực khảo sát (danh mục SURVEY_CHECKLIST) — trước đây nút bấm chuyển tab được nhưng không có
           bất kỳ nội dung nào render ra (thiếu hẳn khối JSX cho activeTab === 'CHECKLIST'), khiến
           giám định viên bấm vào thấy màn hình trắng trơn dù handleToggleChecklistStatus đã có sẵn. */}
       {activeTab === 'CHECKLIST' && (
+        <fieldset disabled={readOnly} className="contents">
         <div className="p-5 bg-white border border-slate-200 rounded-3xl space-y-4">
           <div className="border-b border-slate-200 pb-3">
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
               <ClipboardCheck className="w-4 h-4 text-blue-400" />
-              <span>Checklist 11 Khu Vực Khảo Sát Theo Chuẩn {formData.standard}</span>
+              <span>Checklist {formData.checklist.length} Khu Vực Khảo Sát Theo Chuẩn {formData.standard}</span>
             </h3>
             <p className="text-xs text-slate-500">
               Đánh giá Đạt / Không Đạt / Không Áp Dụng cho từng khu vực kết cấu container. Chọn "Không Đạt" sẽ tự
@@ -1323,6 +1294,7 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
             ))}
           </div>
         </div>
+        </fieldset>
       )}
 
       {/* Tab 4: Photos Management */}
@@ -1340,7 +1312,7 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
             </div>
 
             {/* Quick Upload Buttons — chọn file thật, upload qua Depot.FileServer */}
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className={readOnly ? 'hidden' : 'flex items-center gap-2 flex-wrap'}>
               <input
                 type="file"
                 accept="image/*"
@@ -1436,13 +1408,13 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
                     >
                       <Maximize2 className="w-3.5 h-3.5" /> Xem lớn
                     </button>
-                    <button
+                    {!readOnly && <button
                       type="button"
                       onClick={() => handleDeletePhoto(photo.id)}
                       className="text-xs text-slate-500 hover:text-rose-400 transition cursor-pointer"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    </button>}
                   </div>
                 </div>
               ))}
@@ -1460,6 +1432,7 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
           rows={2}
           value={formData.remarks || ''}
           onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+          disabled={readOnly}
           placeholder="Nhập ghi chú tình trạng đặc biệt, yêu cầu chuyển bãi sửa chữa EMR hoặc lưu ý khi cấp vỏ cho khách..."
           className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 text-xs focus:outline-none resize-none"
         />
@@ -1479,13 +1452,13 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
           >
             Đóng Lại
           </button>
-          <button
+          {!readOnly && <button
             onClick={handleCompleteSurvey}
             className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-lg transition flex items-center gap-1.5 cursor-pointer"
           >
             <CheckCircle2 className="w-4 h-4" />
             <span>Hoàn Tất Giám Định - Chuyển Qua Vệ Sinh</span>
-          </button>
+          </button>}
         </div>
       </div>
 

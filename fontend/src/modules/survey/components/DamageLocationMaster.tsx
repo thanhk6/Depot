@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { DamageLocationMasterItem } from '../types';
+import { useSurveyChecklistTemplate } from '../../masterdata/utils/checklistCatalog';
 import {
   MapPin,
   Plus,
@@ -38,6 +39,10 @@ export const DamageLocationMaster: React.FC<DamageLocationMasterProps> = ({
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState<'EXTERIOR' | 'INTERIOR' | 'UNDER' | 'STRUCTURE' | 'REEFER'>('EXTERIOR');
   const [sortOrder, setSortOrder] = useState('1');
+  const [checklistZone, setChecklistZone] = useState('');
+  // Khu vực Checklist giám định (danh mục SURVEY_CHECKLIST) — hư hỏng ở vị trí này tự đánh "Không Đạt" khu vực đó.
+  const checklistZones = useSurveyChecklistTemplate();
+  const zoneLabel = (key: string) => checklistZones.find((z) => z.zoneKey === key)?.zoneName || key;
 
   const filtered = locations.filter((item) => {
     const matchesSearch =
@@ -57,6 +62,7 @@ export const DamageLocationMaster: React.FC<DamageLocationMasterProps> = ({
       setDescription(item.description);
       setCategory(item.category);
       setSortOrder(item.sortOrder.toString());
+      setChecklistZone(item.checklistZone || '');
     } else {
       setEditingItem(null);
       setCode('');
@@ -65,6 +71,7 @@ export const DamageLocationMaster: React.FC<DamageLocationMasterProps> = ({
       setDescription('');
       setCategory('EXTERIOR');
       setSortOrder((locations.length + 1).toString());
+      setChecklistZone('');
     }
     setShowModal(true);
   };
@@ -83,6 +90,7 @@ export const DamageLocationMaster: React.FC<DamageLocationMasterProps> = ({
               vietnameseName,
               description,
               category,
+              checklistZone,
               sortOrder: Number(sortOrder) || 1
             }
           : loc
@@ -96,6 +104,7 @@ export const DamageLocationMaster: React.FC<DamageLocationMasterProps> = ({
         vietnameseName,
         description,
         category,
+        checklistZone,
         status: 'ACTIVE',
         sortOrder: Number(sortOrder) || 1
       };
@@ -195,6 +204,7 @@ export const DamageLocationMaster: React.FC<DamageLocationMasterProps> = ({
                 <th className="py-3.5 px-4">Tên Tiếng Việt</th>
                 <th className="py-3.5 px-4">Tên Quốc Tế (EN)</th>
                 <th className="py-3.5 px-4">Phân Nhóm</th>
+                <th className="py-3.5 px-4">Khu Vực Checklist</th>
                 <th className="py-3.5 px-4">Mô Tả Cấu Kiện</th>
                 <th className="py-3.5 px-4 text-center">Trạng Thái</th>
                 <th className="py-3.5 px-4 text-right">Thao Tác</th>
@@ -221,6 +231,9 @@ export const DamageLocationMaster: React.FC<DamageLocationMasterProps> = ({
                     <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
                       {item.category}
                     </span>
+                  </td>
+                  <td className="py-3.5 px-4 text-slate-700">
+                    {item.checklistZone ? zoneLabel(item.checklistZone) : <span className="text-slate-400">(không gắn)</span>}
                   </td>
                   <td className="py-3.5 px-4 text-slate-500 max-w-xs truncate">
                     {item.description}
@@ -315,6 +328,21 @@ export const DamageLocationMaster: React.FC<DamageLocationMasterProps> = ({
                     <option value="REEFER">Máy lạnh PTI (REEFER)</option>
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Khu Vực Checklist Giám Định</label>
+                <select
+                  value={checklistZone}
+                  onChange={(e) => setChecklistZone(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 focus:outline-none font-medium"
+                >
+                  <option value="">(không gắn)</option>
+                  {checklistZones.map((z) => (
+                    <option key={z.zoneKey} value={z.zoneKey}>{z.zoneName}</option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-slate-500 mt-1">Hư hỏng ghi ở vị trí này sẽ tự đánh "Không Đạt" khu vực đã chọn trong Checklist giám định.</p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

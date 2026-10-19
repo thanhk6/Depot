@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Depot.Data.Entities.Depot;
@@ -52,6 +55,7 @@ namespace Depot.Data.EF
             await SeedServiceTariffsFromLegacyCatalogAsync(context);
             await SeedStorageTariffsFromLegacyCatalogAsync(context);
             await SeedEstimateCatalogsAsync(context);
+            await SeedDamageLocationChecklistZonesAsync(context);
             // Không seed hồ sơ container mẫu (JOB-SEED-0001) nữa — mọi container phải đi từ Gate-In thật
             // (yêu cầu 2026-10-07: xoá sạch dữ liệu mẫu để làm lại từ đầu).
         }
@@ -516,6 +520,37 @@ namespace Depot.Data.EF
 
             var existing = await context.MasterCatalogItems.Select(x => new { x.CatalogType, x.Code }).ToListAsync();
             context.MasterCatalogItems.AddRange(catalogs.Where(item => !existing.Any(x => x.CatalogType == item.CatalogType && x.Code == item.Code)));
+        }
+
+        // Gắn mỗi vị trí hư hỏng (DAMAGE_LOCATION) vào 1 khu vực Checklist giám định (SURVEY_CHECKLIST) qua khoá
+        // "checklistZone" trong JsonData — server dùng để đếm số lỗi theo khu vực (depot-fullstack-survey-checklist-sync).
+        // Chỉ điền cho dòng CHƯA có khoá này: admin đã đổi / bỏ trống ở màn danh mục thì giữ nguyên.
+        private static readonly Dictionary<string, string> DefaultChecklistZoneByLocation = new()
+        {
+            ["RF1"] = "ROOF", ["FW1"] = "FRONT_WALL", ["SW1"] = "LEFT_WALL", ["SW2"] = "RIGHT_WALL",
+            ["DR1"] = "DOOR", ["DS1"] = "DOOR", ["DH1"] = "DOOR", ["LG1"] = "DOOR",
+            ["FL1"] = "FLOOR", ["CR1"] = "FRAME", ["TR1"] = "FRAME", ["BR1"] = "FRAME",
+            ["CP1"] = "CORNER_CASTING", ["CC1"] = "CORNER_CASTING", ["FP1"] = "UNDERSTRUCTURE"
+        };
+
+        private static async Task SeedDamageLocationChecklistZonesAsync(DepotDbContext context)
+        {
+            var codes = DefaultChecklistZoneByLocation.Keys.ToList();
+            var rows = await context.MasterCatalogItems
+                .Where(x => x.CatalogType == "DAMAGE_LOCATION" && codes.Contains(x.Code))
+                .ToListAsync();
+            var changed = false;
+            foreach (var row in rows)
+            {
+                JsonObject json;
+                try { json = (string.IsNullOrWhiteSpace(row.JsonData) ? null : JsonNode.Parse(row.JsonData) as JsonObject) ?? new JsonObject(); }
+                catch (System.Text.Json.JsonException) { continue; } // JsonData hỏng: không đoán, để admin sửa ở màn danh mục
+                if (json.ContainsKey("checklistZone")) continue;
+                json["checklistZone"] = DefaultChecklistZoneByLocation[row.Code];
+                row.JsonData = json.ToJsonString();
+                changed = true;
+            }
+            if (changed) await context.SaveChangesAsync();
         }
 
         private static async Task SeedYardAsync(DepotDbContext context)

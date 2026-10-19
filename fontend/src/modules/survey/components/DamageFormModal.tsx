@@ -32,13 +32,16 @@ export const DamageFormModal: React.FC<DamageFormModalProps> = ({
   repairCodes,
   currentUser
 }) => {
-  const [locationCode, setLocationCode] = useState(defaultLocationCode || 'RIGHT_W');
-  const [damageCode, setDamageCode] = useState('CUT');
-  const [repairCode, setRepairCode] = useState('RP_PATCH_S');
+  // Mặc định lấy từ danh mục DB (dòng đầu) — trước đây gõ cứng RIGHT_W / CUT / RP_PATCH_S không có trong danh mục,
+  // ô chọn hiện dòng đầu nhưng lưu mã gõ cứng (depot-fullstack-survey-checklist-sync).
+  const firstLocation = () => (defaultLocationCode && locations.some((l) => l.code === defaultLocationCode) ? defaultLocationCode : locations[0]?.code || '');
+  const [locationCode, setLocationCode] = useState(firstLocation);
+  const [damageCode, setDamageCode] = useState(damageCodes[0]?.code || '');
+  const [repairCode, setRepairCode] = useState(repairCodes[0]?.repairCode || '');
   const [description, setDescription] = useState('');
   const [severity, setSeverity] = useState<'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'>('HIGH');
-  const [lengthMm, setLengthMm] = useState('120');
-  const [widthMm, setWidthMm] = useState('40');
+  const [lengthMm, setLengthMm] = useState('');
+  const [widthMm, setWidthMm] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [photoUrl, setPhotoUrl] = useState('');
 
@@ -58,22 +61,24 @@ export const DamageFormModal: React.FC<DamageFormModalProps> = ({
       setQuantity(initialData.quantity?.toString() || '1');
       setPhotoUrl(initialData.photoUrl || '');
     } else {
-      setLocationCode(defaultLocationCode || 'RIGHT_W');
-      setDamageCode('CUT');
-      setRepairCode('RP_PATCH_S');
+      setLocationCode(firstLocation());
+      setDamageCode(damageCodes[0]?.code || '');
+      setRepairCode(repairCodes[0]?.repairCode || '');
       setDescription('');
       setSeverity('HIGH');
-      setLengthMm('120');
-      setWidthMm('40');
+      setLengthMm('');
+      setWidthMm('');
       setQuantity('1');
       setPhotoUrl('');
     }
-  }, [initialData, defaultLocationCode, isOpen]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialData, defaultLocationCode, isOpen, locations, damageCodes, repairCodes]);
 
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!locationCode || !damageCode || !repairCode) return;
 
     const selectedLoc = locations.find((l) => l.code === locationCode);
     const selectedDmg = damageCodes.find((d) => d.code === damageCode);
@@ -302,7 +307,8 @@ export const DamageFormModal: React.FC<DamageFormModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl shadow-lg shadow-rose-600/20 transition flex items-center gap-2 cursor-pointer"
+              disabled={!locationCode || !damageCode || !repairCode}
+              className="px-5 py-2 disabled:opacity-50 disabled:cursor-not-allowed bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl shadow-lg shadow-rose-600/20 transition flex items-center gap-2 cursor-pointer"
             >
               <CheckCircle2 className="w-4 h-4" />
               <span>{initialData ? 'Cập Nhật Tổn Thất' : 'Lưu Tổn Thất'}</span>

@@ -211,6 +211,11 @@ namespace Depot.BackendApi.Controllers
                     ? Ok(new ResponseSingleContentModel<string> { StatusCode = 200, Message = "Đã xóa catalog", Data = "DELETED" })
                     : NotFound(new ResponseSingleContentModel<string> { StatusCode = 404, Message = "Không tìm thấy catalog", Data = id.ToString() });
             }
+            catch (ArgumentException ex)
+            {
+                // Quy tắc danh mục (vd khu vực Checklist còn vị trí gắn / đã có trong phiếu) — lỗi nghiệp vụ, không phải 500.
+                return BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = ex.Message, Data = "Không xoá được catalog" });
+            }
             catch (Exception ex)
             {
                 return StatusCode(500, new ResponseSingleContentModel<string> { StatusCode = 500, Message = "Lỗi khi vô hiệu hóa catalog", Data = ex.Message });

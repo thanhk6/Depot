@@ -21,6 +21,7 @@ import { validateContainerNumber } from '../utils/containerValidator';
 import { fetchContainerTypes } from '../../masterdata/utils/containerTypeCatalog';
 import { masterDataApi } from '../../../api';
 import { useSurveyChecklistTemplate } from '../../masterdata/utils/checklistCatalog';
+import { recomputeChecklistFromDamages } from '../utils/checklistSync';
 import {
   ClipboardCheck,
   Boxes,
@@ -267,6 +268,12 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
   const handleRemoveDamage = (id: string) => {
     setDamages((prev) => prev.filter((d) => d.id !== id));
   };
+
+  // Khu vực có hư hỏng tự "Không Đạt" theo danh mục Vị trí (checklistZone) — server cũng chặn khu vực có hư hỏng mà Đạt.
+  useEffect(() => {
+    if (locations.length === 0) return;
+    setChecklist((prev) => recomputeChecklistFromDamages(prev, damages, locations));
+  }, [damages, locations, checklistTemplate]);
 
   // Toggle checklist status
   const handleToggleChecklist = (zoneKey: InspectionZoneKey, status: ZoneCheckStatus) => {
@@ -1257,7 +1264,7 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
                 <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                   <h4 className="font-bold text-slate-700 flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    <span>Checklist Kiểm Tra 9 Khu Vực Cấu Kiện</span>
+                    <span>Checklist Kiểm Tra {checklist.length} Khu Vực Cấu Kiện</span>
                   </h4>
                   <span className="text-[11px] text-slate-500">Đánh dấu Pass / Fail / NA</span>
                 </div>

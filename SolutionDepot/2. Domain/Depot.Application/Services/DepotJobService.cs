@@ -451,6 +451,64 @@ namespace Depot.Application.Services
             return newJob;
         }
 
+        // Checklist 11 khu vực (danh mục SURVEY_CHECKLIST) phải khớp danh mục và khớp hư hỏng thật — áp cho cả lưu
+        // nháp lẫn nộp (depot-fullstack-survey-checklist-sync). Mã vị trí hư hỏng phải thuộc DAMAGE_LOCATION; khu vực
+        // của vị trí lấy từ khoá "checklistZone" trong JsonData. Số lỗi + tên khu vực do server điền lại, không tin trình duyệt.
+        private async Task ValidateAndNormalizeSurveyChecklistAsync(SurveyRecordViewModel surveyVm)
+        {
+            var catalogs = await _db.MasterCatalogItems.AsNoTracking()
+                .Where(x => !x.IsDeleted && (x.CatalogType == "SURVEY_CHECKLIST" || x.CatalogType == "DAMAGE_LOCATION"))
+                .ToListAsync();
+            var zones = catalogs.Where(x => x.CatalogType == "SURVEY_CHECKLIST" && x.IsActive).OrderBy(x => x.SortOrder).ToList();
+            var zoneOfLocation = catalogs.Where(x => x.CatalogType == "DAMAGE_LOCATION")
+                .GroupBy(x => x.Code).ToDictionary(g => g.Key, g => ReadChecklistZone(g.First().JsonData));
+
+            var unknownLocations = surveyVm.Damages.Select(d => d.LocationCode).Where(c => !zoneOfLocation.ContainsKey(c ?? "")).Distinct().ToList();
+            if (unknownLocations.Count > 0)
+                throw new ArgumentException($"Mã vị trí hư hỏng không có trong danh mục Vị trí: {string.Join(", ", unknownLocations.Select(c => $"'{c}'"))}. Chọn lại vị trí trong danh mục.");
+
+            var sent = surveyVm.Checklist.Select(c => c.ZoneKey ?? "").ToList();
+            var duplicated = sent.GroupBy(k => k).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
+            var unknownZones = sent.Where(k => zones.All(z => z.Code != k)).Distinct().ToList();
+            var missingZones = zones.Where(z => !sent.Contains(z.Code)).Select(ZoneLabel).ToList();
+            if (duplicated.Count > 0 || unknownZones.Count > 0 || missingZones.Count > 0)
+            {
+                var parts = new List<string>();
+                if (missingZones.Count > 0) parts.Add($"thiếu khu vực {string.Join(", ", missingZones)}");
+                if (unknownZones.Count > 0) parts.Add($"mã khu vực không có trong danh mục: {string.Join(", ", unknownZones.Select(k => $"'{k}'"))}");
+                if (duplicated.Count > 0) parts.Add($"trùng khu vực: {string.Join(", ", duplicated)}");
+                throw new ArgumentException($"Checklist khu vực không khớp danh mục ({string.Join("; ", parts)}).");
+            }
+            var badStatus = surveyVm.Checklist.Where(c => c.Status is not ("PASS" or "FAIL" or "NA")).ToList();
+            if (badStatus.Count > 0)
+                throw new ArgumentException($"Trạng thái khu vực chỉ nhận PASS, FAIL hoặc NA (sai: {string.Join(", ", badStatus.Select(c => $"{c.ZoneKey}='{c.Status}'"))}).");
+
+            foreach (var item in surveyVm.Checklist)
+            {
+                var zone = zones.First(z => z.Code == item.ZoneKey);
+                var count = surveyVm.Damages.Count(d => zoneOfLocation[d.LocationCode] == item.ZoneKey);
+                if (count > 0 && item.Status != "FAIL")
+                    throw new ArgumentException($"Khu vực {ZoneLabel(zone)} đang có {count} hư hỏng, phải là Không Đạt.");
+                item.DamageCount = count;
+                item.ZoneName = ZoneLabel(zone);
+            }
+        }
+
+        private static string ZoneLabel(MasterCatalogItem zone) => string.IsNullOrWhiteSpace(zone.NameVi) ? zone.Name : zone.NameVi;
+
+        private static string? ReadChecklistZone(string? jsonData)
+        {
+            if (string.IsNullOrWhiteSpace(jsonData)) return null;
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(jsonData);
+                return doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object
+                    && doc.RootElement.TryGetProperty("checklistZone", out var v) && v.ValueKind == System.Text.Json.JsonValueKind.String
+                    && !string.IsNullOrWhiteSpace(v.GetString()) ? v.GetString() : null;
+            }
+            catch (System.Text.Json.JsonException) { return null; }
+        }
+
         /// <summary>Survey ghi hư hỏng và chuyển sang ESTIMATING; không có hư hỏng thì chuyển READY_FOR_OUT.</summary>
         public async Task<bool> SubmitSurveyAsync(long jobId, SurveyRecordViewModel surveyVm)
         {
@@ -468,6 +526,7 @@ namespace Depot.Application.Services
             // nộp thật phải có ít nhất 1 dịch vụ vệ sinh (lệnh vệ sinh rỗng không bàn giao Khai thác được).
             if (!surveyVm.IsDraft && surveyVm.CleaningItems.Count == 0)
                 throw new ArgumentException("Chọn ít nhất 01 dịch vụ vệ sinh ở tab Vệ Sinh — mọi container sau giám định đều chuyển Tổ Vệ Sinh.");
+            await ValidateAndNormalizeSurveyChecklistAsync(surveyVm);
 
             // Giám định viên lấy tự động theo tài khoản đang đăng nhập (Users.Id), không cho nhập tay.
             // Bắt buộc phải resolve được thật trong bảng Users, giống nguyên tắc đã áp dụng ở Gate-In.

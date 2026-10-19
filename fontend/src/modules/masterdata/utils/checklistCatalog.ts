@@ -26,6 +26,14 @@ export const fetchSurveyChecklistTemplate = (): Promise<InspectionChecklistItem[
   return surveyCache;
 };
 
+// Màn "DM Khu Vực Checklist Giám Định" gọi sau mỗi lần thêm / sửa / tạm ngưng / xoá: bỏ cache và báo các màn đang mở
+// (DM Vị Trí Cấu Kiện, Thêm mới giám định...) tải lại danh mục mà không cần F5.
+export const SURVEY_CHECKLIST_CHANGED_EVENT = 'survey-checklist-changed';
+export const resetSurveyChecklistCache = () => {
+  surveyCache = null;
+  window.dispatchEvent(new Event(SURVEY_CHECKLIST_CHANGED_EVENT));
+};
+
 export const fetchQcChecklistTemplate = (): Promise<QCCheckItem[]> => {
   qcCache ??= masterDataApi.getCatalog('QC_CHECKLIST')
     .then((res: any) => (res?.data || []).map((item: any) => ({
@@ -44,8 +52,10 @@ export const useSurveyChecklistTemplate = (): InspectionChecklistItem[] => {
   const [items, setItems] = useState<InspectionChecklistItem[]>([]);
   useEffect(() => {
     let alive = true;
-    fetchSurveyChecklistTemplate().then((list) => { if (alive) setItems(list); });
-    return () => { alive = false; };
+    const load = () => fetchSurveyChecklistTemplate().then((list) => { if (alive) setItems(list); });
+    load();
+    window.addEventListener(SURVEY_CHECKLIST_CHANGED_EVENT, load);
+    return () => { alive = false; window.removeEventListener(SURVEY_CHECKLIST_CHANGED_EVENT, load); };
   }, []);
   return items;
 };

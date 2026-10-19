@@ -100,7 +100,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       damage_codes: 'DAMAGE_CODE',
       repair_codes: 'REPAIR_CODE',
       grades: 'GRADE',
-      standards: 'INSPECTION_STANDARD'
+      standards: 'INSPECTION_STANDARD',
+      survey_checklist: 'SURVEY_CHECKLIST'
       // "Cước Nâng Hạ" (tariff_lolo) và "Cước Lưu Bãi" (tariff_storage) đã có bảng riêng
       // (ServiceTariff/StorageTariffRule), đọc qua 2 endpoint khác hẳn — xử lý tách biệt bên dưới,
       // KHÔNG đưa vào map này. Xem docs/frontend-tariff-catalog-split.md.
@@ -398,6 +399,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           label: 'DM Vị Trí Cấu Kiện',
           icon: <MapPin className="w-4 h-4 text-amber-400" />,
           badge: masterDataCatalogCounts.damage_locations ? `${masterDataCatalogCounts.damage_locations} Vị Trí` : undefined
+        },
+        {
+          id: 'survey_checklist',
+          label: 'DM Khu Vực Checklist Giám Định',
+          icon: <ClipboardCheck className="w-4 h-4 text-blue-400" />,
+          badge: masterDataCatalogCounts.survey_checklist ? `${masterDataCatalogCounts.survey_checklist} Khu Vực` : undefined
         },
         {
           id: 'damage_codes',

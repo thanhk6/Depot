@@ -537,6 +537,7 @@ function AppContent({ onLogout }: AppContentProps) {
       case 'cleaning_tariffs':
       case 'container_types':
       case 'damage_locations':
+      case 'survey_checklist':
       case 'damage_codes':
       case 'repair_codes':
       case 'grades':

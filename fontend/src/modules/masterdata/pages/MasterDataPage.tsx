@@ -9,6 +9,8 @@ import {
   CleaningTariffMasterItem
 } from '../../survey/types';
 import { DamageLocationMaster } from '../../survey/components/DamageLocationMaster';
+import { SurveyChecklistMaster } from '../components/SurveyChecklistMaster';
+import { useSurveyChecklistTemplate } from '../utils/checklistCatalog';
 import { DamageCodeMaster } from '../../survey/components/DamageCodeMaster';
 import { RepairCodeMaster } from '../../survey/components/RepairCodeMaster';
 import { GradeMaster } from '../../survey/components/GradeMaster';
@@ -49,7 +51,8 @@ import {
   Droplets,
   Tag,
   Truck,
-  Calculator
+  Calculator,
+  ClipboardCheck,
 } from 'lucide-react';
 import { getApiErrorMessage } from '../../../utils/apiError';
 
@@ -66,6 +69,8 @@ export const MasterDataPage: React.FC<MasterDataPageProps> = ({
 
   // Master Data collections state
   const [locations, setLocations] = useState<DamageLocationMasterItem[]>([]);
+  // Số khu vực Checklist đang dùng (thẻ ở Tất Cả Danh Mục) — tự cập nhật khi màn danh mục khu vực thay đổi.
+  const surveyChecklistZones = useSurveyChecklistTemplate();
   const [damageCodes, setDamageCodes] = useState<DamageCodeMasterItem[]>([]);
   const [repairCodes, setRepairCodes] = useState<RepairCodeMasterItem[]>([]);
   const [grades, setGrades] = useState<GradeMasterItem[]>([]);
@@ -114,7 +119,7 @@ export const MasterDataPage: React.FC<MasterDataPageProps> = ({
         masterDataApi.getCatalog('INSPECTION_STANDARD', { includeInactive: true }), masterDataApi.getCatalog('DEPARTMENT', { includeInactive: true })
       ]);
       const mapItems = (response: any) => response?.data || [];
-      setLocations(mapItems(locationResponse).map((item: any) => ({ id: item.id, code: item.code, name: item.name, vietnameseName: item.nameVi || item.name, description: item.description || '', category: readJson(item.jsonData).category || 'STRUCTURE', status: item.isActive ? 'ACTIVE' : 'INACTIVE', sortOrder: item.sortOrder })));
+      setLocations(mapItems(locationResponse).map((item: any) => ({ id: item.id, code: item.code, name: item.name, vietnameseName: item.nameVi || item.name, description: item.description || '', category: readJson(item.jsonData).category || 'STRUCTURE', checklistZone: readJson(item.jsonData).checklistZone ?? '', status: item.isActive ? 'ACTIVE' : 'INACTIVE', sortOrder: item.sortOrder })));
       setDamageCodes(mapItems(damageResponse).map((item: any) => ({ id: item.id, code: item.code, name: item.name, vietnameseName: item.nameVi || item.name, damageType: readJson(item.jsonData).damageType || 'OTHER', description: item.description || '', severity: readJson(item.jsonData).severity || 'MEDIUM', standard: readJson(item.jsonData).standard || 'UNIVERSAL', status: item.isActive ? 'ACTIVE' : 'INACTIVE' })));
       setRepairCodes(mapItems(repairResponse).map((item: any) => ({ id: item.id, repairCode: item.code, stsCode: readJson(item.jsonData).stsCode || item.code, name: item.name, vietnameseName: item.nameVi || item.name, description: item.description || '', repairType: readJson(item.jsonData).repairType || 'STRAIGHTEN', labourRate: readJson(item.jsonData).labourRate || 0, labourHours: readJson(item.jsonData).labourHours || 0, materialEstimatedCost: readJson(item.jsonData).materialEstimatedCost || 0, status: item.isActive ? 'ACTIVE' : 'INACTIVE' })));
       setGrades(mapItems(gradeResponse).map((item: any) => ({ id: item.id, gradeCode: item.code, gradeName: item.nameVi || item.name, description: item.description || '', shippingLine: readJson(item.jsonData).shippingLine || 'ALL', customer: readJson(item.jsonData).customer || 'ALL', status: item.isActive ? 'ACTIVE' : 'INACTIVE', sortOrder: item.sortOrder })));
@@ -218,6 +223,15 @@ export const MasterDataPage: React.FC<MasterDataPageProps> = ({
           count: locations.length,
           color: 'text-amber-600',
           bg: 'bg-amber-50'
+        },
+        {
+          id: 'survey_checklist',
+          label: 'Khu Vực Checklist Giám Định',
+          desc: 'Các khu vực đánh giá Đạt / Không Đạt / N/A trên phiếu giám định',
+          icon: ClipboardCheck,
+          count: surveyChecklistZones.length,
+          color: 'text-blue-600',
+          bg: 'bg-blue-50'
         },
         {
           id: 'damage_codes',
@@ -441,6 +455,8 @@ export const MasterDataPage: React.FC<MasterDataPageProps> = ({
             persistedToBackend
           />
         )}
+
+        {activeMasterTab === 'survey_checklist' && <SurveyChecklistMaster />}
 
         {activeMasterTab === 'damage_codes' && (
           <DamageCodeMaster
