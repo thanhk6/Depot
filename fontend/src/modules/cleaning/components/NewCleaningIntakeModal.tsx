@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { CleaningExecutionRecord } from '../types';
 import { ContainerTypeMasterItem, CleaningTariffMasterItem } from '../../survey/types';
-import { cleaningPriceForType } from '../../masterdata/utils/cleaningTariffCatalog';
+// Giá theo đúng mã loại container (DM Loại Container) — server tra lại khi tạo lệnh (depot-fullstack-cleaning-tariff-pricing).
 import { useDepot } from '../../../context/DepotContext';
 import { cleaningApi } from '../../../api';
 import { mapCleaningRecordDto } from '../utils/mapCleaningRecord';
@@ -98,14 +98,14 @@ export const NewCleaningIntakeModal: React.FC<NewCleaningIntakeModalProps> = ({
     );
   };
 
-  // Dịch vụ + đơn giá lấy từ Biểu Phí Vệ Sinh thật (CLEANING_TARIFF), giá theo loại container đang chọn —
-  // trước đây là 6 dịch vụ + giá viết cứng trong code.
+  // Dịch vụ + đơn giá lấy từ Biểu Phí Vệ Sinh thật (bảng CleaningTariffs), giá theo đúng loại container đang chọn;
+  // 0 = chưa có giá cho loại đó (không chọn được, server cũng chặn).
   const servicePresets = cleaningTariffs
     .filter((t) => t.status !== 'INACTIVE')
     .map((t) => ({
       code: t.cleaningCode,
       name: t.vietnameseName || t.name,
-      price: cleaningPriceForType(t, selectedContainerType?.typeCode || ''),
+      price: t.prices?.[(selectedContainerType?.typeCode || '').toUpperCase()] || 0,
       chemicalName: t.chemicalRequired || '',
       durationMin: t.estimatedDurationMin || 0,
       responsibleParty: t.responsiblePartyDefault || 'U'
@@ -373,7 +373,8 @@ export const NewCleaningIntakeModal: React.FC<NewCleaningIntakeModalProps> = ({
                 return (
                   <div
                     key={sp.code}
-                    onClick={() => handleToggleService(sp.code)}
+                    onClick={() => { if (sp.price > 0 || isChecked) handleToggleService(sp.code); }}
+                    title={sp.price > 0 ? undefined : 'Chưa có giá cho loại container này — nhập giá ở Biểu Phí Vệ Sinh Container'}
                     className={`p-2.5 rounded-xl border transition cursor-pointer flex items-center justify-between text-xs ${
                       isChecked
                         ? 'bg-cyan-50 border-cyan-200 text-slate-900'
@@ -385,7 +386,7 @@ export const NewCleaningIntakeModal: React.FC<NewCleaningIntakeModalProps> = ({
                       <span className="font-semibold text-[11px] truncate max-w-[180px]">{sp.name}</span>
                     </div>
                     <span className="font-mono font-bold text-amber-600 text-[10px]">
-                      {sp.price.toLocaleString('vi-VN')} đ
+                      {sp.price > 0 ? `${sp.price.toLocaleString('vi-VN')} đ` : 'Chưa có giá'}
                     </span>
                   </div>
                 );

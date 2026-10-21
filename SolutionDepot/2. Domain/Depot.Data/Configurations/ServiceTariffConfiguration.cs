@@ -17,15 +17,15 @@ namespace Depot.Data.Configurations
             builder.Property(x => x.Currency).IsRequired().HasMaxLength(10);
             builder.Property(x => x.ApplicableShift).IsRequired().HasMaxLength(30);
 
-            builder.Property(x => x.Price20GP).HasPrecision(18, 2);
-            builder.Property(x => x.Price40HC).HasPrecision(18, 2);
-            builder.Property(x => x.Price45HC).HasPrecision(18, 2);
-            builder.Property(x => x.Price20RF).HasPrecision(18, 2);
-            builder.Property(x => x.Price40RH).HasPrecision(18, 2);
-            builder.Property(x => x.PriceSpecial).HasPrecision(18, 2);
             builder.Property(x => x.VatPercent).HasPrecision(5, 2);
 
             builder.HasIndex(x => x.ServiceCategory);
+
+            // Giá theo loại container là dòng con thuần tuý của biểu cước — xoá biểu cước thì xoá luôn giá.
+            builder.HasMany(x => x.Prices)
+                .WithOne()
+                .HasForeignKey(x => x.ServiceTariffId)
+                .OnDelete(DeleteBehavior.Cascade);
         }
     }
 }

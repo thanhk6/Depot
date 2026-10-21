@@ -35,6 +35,15 @@ import {
 import { getApiErrorMessage } from '../../../utils/apiError';
 import { LoadErrorBanner } from '../../../components/common/LoadErrorBanner';
 
+/** Ngày đầu / cuối tháng hiện tại (giờ máy, dạng yyyy-MM-dd). */
+const currentMonthRange = () => {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const last = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const ym = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+  return { from: `${ym}-01`, to: `${ym}-${pad(last)}` };
+};
+
 export const BillingPage: React.FC = () => {
   const { currentUser } = useAuth();
 
@@ -84,8 +93,9 @@ export const BillingPage: React.FC = () => {
   const [searchContainerNo, setSearchContainerNo] = useState<string>('');
   const [searchQuotationNo, setSearchQuotationNo] = useState<string>('');
   const [searchInvoiceNo, setSearchInvoiceNo] = useState<string>('');
-  const [fromDate, setFromDate] = useState<string>('2026-08-01');
-  const [toDate, setToDate] = useState<string>('2026-08-31');
+  // Bộ lọc ngày nợ mặc định = tháng hiện tại (trước đây gõ cứng 01–31/08/2026 và không lọc gì).
+  const [fromDate, setFromDate] = useState<string>(() => currentMonthRange().from);
+  const [toDate, setToDate] = useState<string>(() => currentMonthRange().to);
 
   // Modals
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState<boolean>(false);
@@ -113,12 +123,8 @@ export const BillingPage: React.FC = () => {
       .reduce((sum, d) => sum + d.remainingAmount, 0);
   }, [debts]);
 
-  const overdueAmount = useMemo(() => {
-    const today = '2026-08-18';
-    return debts
-      .filter((d) => d.status !== 'CANCELLED' && d.remainingAmount > 0 && d.dueDate < today)
-      .reduce((sum, d) => sum + d.remainingAmount, 0);
-  }, [debts]);
+  // Nợ quá hạn lấy từ báo cáo tuổi nợ của server (ngày Việt Nam hiện tại) — trước đây so với ngày gõ cứng 2026-08-18.
+  const overdueAmount = useMemo(() => agingData.reduce((sum, b) => sum + (b.overdueTotal || 0), 0), [agingData]);
 
   const currentPeriodDebit = useMemo(() => {
     return periods
@@ -151,9 +157,7 @@ export const BillingPage: React.FC = () => {
       const partialCount = carrierDebts.filter((d) => d.status === 'PARTIAL').length;
       const paidCount = carrierDebts.filter((d) => d.status === 'PAID').length;
 
-      const overdue = carrierDebts
-        .filter((d) => d.remainingAmount > 0 && d.dueDate < '2026-08-18')
-        .reduce((sum, d) => sum + d.remainingAmount, 0);
+      const overdue = agingData.find((b) => b.shippingLineId === carrier.id)?.overdueTotal || 0;
 
       const openingBalance = openPeriod ? openPeriod.openingBalance : latestPeriod?.openingBalance || 0;
       const periodDebit = openPeriod ? openPeriod.periodDebit : latestPeriod?.periodDebit || 0;
@@ -176,7 +180,7 @@ export const BillingPage: React.FC = () => {
         currency: 'VND'
       };
     });
-  }, [debts, periods, shippingLines]);
+  }, [debts, periods, shippingLines, agingData]);
 
   // Filtered Debts for Container Ledger
   const filteredDebts = useMemo(() => {
@@ -198,9 +202,11 @@ export const BillingPage: React.FC = () => {
           return false;
         }
       }
+      if (fromDate && d.debtDate < fromDate) return false;
+      if (toDate && d.debtDate > toDate) return false;
       return true;
     });
-  }, [debts, selectedCarrier, selectedStatus, searchContainerNo, searchQuotationNo, searchInvoiceNo]);
+  }, [debts, selectedCarrier, selectedStatus, searchContainerNo, searchQuotationNo, searchInvoiceNo, fromDate, toDate]);
 
   // Handler 1: Submit Payment & Allocation
   const handleSubmitPayment = (
@@ -221,7 +227,6 @@ export const BillingPage: React.FC = () => {
       referenceNo,
       paymentDate,
       notes,
-      recordedBy: currentUser?.name || 'Kế toán AR',
       allocations: allocationList.map((alc) => ({
         debtCode: alc.debtId,
         containerNo: alc.containerNo,
@@ -237,7 +242,7 @@ export const BillingPage: React.FC = () => {
 
   // Handler 2: Sync Debts from Completed Repairs — nhận danh sách JobNo được chọn trong SyncDebtModal
   const handleSyncDebts = (jobNos: string[]) => {
-    billingApi.syncDebts(jobNos, currentUser?.name).then((res) => {
+    billingApi.syncDebts(jobNos).then((res) => {
       if (res.statusCode !== 200) throw new Error(res.message);
       reloadBillingData();
       showToast(`Đã đồng bộ thành công ${(res.data || []).length} khoản công nợ container mới vào sổ kế toán!`);
@@ -258,7 +263,7 @@ export const BillingPage: React.FC = () => {
     const targetPeriod = periods.find((p) => p.id === periodId);
     if (!targetPeriod) return;
 
-    billingApi.closePeriod(periodId, closingNotes, currentUser?.name || 'Kế toán trưởng').then((res) => {
+    billingApi.closePeriod(periodId, closingNotes).then((res) => {
       if (res.statusCode !== 200) throw new Error(res.message);
       reloadBillingData();
       showToast(res.message || `Đã khóa sổ kỳ ${targetPeriod.periodCode} thành công.`);
@@ -270,7 +275,7 @@ export const BillingPage: React.FC = () => {
     const targetPayment = payments.find((p) => p.id === paymentId);
     if (!targetPayment || targetPayment.status === 'REVERSED') return;
 
-    billingApi.reversePayment(paymentId, reason, currentUser?.name || 'Kế toán trưởng').then((res) => {
+    billingApi.reversePayment(paymentId, reason).then((res) => {
       if (res.statusCode !== 200) throw new Error(res.message);
       reloadBillingData();
       showToast(res.message || `Đã hủy phiếu ${paymentId} và hoàn trả công nợ cho các container tương ứng!`);
@@ -283,8 +288,8 @@ export const BillingPage: React.FC = () => {
     setSearchContainerNo('');
     setSearchQuotationNo('');
     setSearchInvoiceNo('');
-    setFromDate('2026-08-01');
-    setToDate('2026-08-31');
+    setFromDate(currentMonthRange().from);
+    setToDate(currentMonthRange().to);
     showToast('Đã đặt lại toàn bộ bộ lọc về mặc định.');
   };
 

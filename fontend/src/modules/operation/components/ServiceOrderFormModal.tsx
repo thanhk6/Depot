@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ServiceOrder, ServiceOrderItem, ServiceCategory } from '../types';
 import { StandardTariffItem } from '../types';
-import { masterDataApi, containerApi, customerApi } from '../../../api';
+import { masterDataApi, containerApi, customerApi, cleaningApi } from '../../../api';
 import { getApiErrorMessage } from '../../../utils/apiError';
 import { formatVND } from '../../../utils/format';
 import {
@@ -24,6 +24,7 @@ import { useDepot } from '../../../context/DepotContext';
 import { VietQrCode } from '../../../components/common/VietQrCode';
 import { buildTransferContent } from '../../../utils/vietqr';
 import { useContainerTypeOptions } from '../../masterdata/utils/containerTypeCatalog';
+import { priceForContainer, TariffPriceResult } from '../../masterdata/utils/tariffPricing';
 
 interface ServiceOrderFormModalProps {
   isOpen: boolean;
@@ -89,6 +90,10 @@ export const ServiceOrderFormModal: React.FC<ServiceOrderFormModalProps> = ({
 
   // Selected new tariff line
   const [selectedTariffCode, setSelectedTariffCode] = useState<string>('');
+  // Biểu cước nâng hạ chưa có giá cho cỡ container (hoặc loại không có trong DM) — báo, không thêm dòng giá 0 / giá thay thế.
+  const [pricingWarning, setPricingWarning] = useState<string | null>(null);
+  // Hạng mục của lệnh vệ sinh đã bàn giao Khai thác cho hồ sơ này — mỗi hạng mục 1 dòng trên phiếu (không gộp tổng).
+  const [handedOverCleaning, setHandedOverCleaning] = useState<{ code: string; items: { cleaningCode: string; cleaningName: string }[] } | null>(null);
 
   // Trước đây handleSubmit/handleSaveAndGoToPayment gọi onSave rồi onClose() ngay lập tức, không await và
   // không bắt lỗi — nếu backend từ chối (container không có Job SQL, đã có phiếu dịch vụ rồi...) thì
@@ -109,58 +114,40 @@ export const ServiceOrderFormModal: React.FC<ServiceOrderFormModalProps> = ({
     };
     Promise.all([
       masterDataApi.getServiceTariffs(),
-      masterDataApi.getStorageTariffs(),
-      masterDataApi.getCatalog('CLEANING_TARIFF')
-    ]).then(([loloRes, storageRes, cleaningRes]: any[]) => {
+      masterDataApi.getCleaningTariffs()
+    ]).then(([loloRes, cleaningRes]: any[]) => {
       const lolo: StandardTariffItem[] = (loloRes.data || []).map((t: any) => ({
         code: t.code,
         name: t.nameVi || t.nameEn || t.code,
-        // Phân loại theo ServiceTariff.ServiceCategory thật (PTI, giám sát hải quan, đảo chuyển...).
-        category: t.serviceCategory === 'PTI' ? 'PTI' : t.serviceCategory === 'CUSTOMS' ? 'CUSTOMS' : t.serviceCategory === 'SHIFTING' ? 'YARD_SHIFT' : 'LOLO',
+        // Phân loại theo ServiceTariff.ServiceCategory thật (PTI, giám sát hải quan, đảo chuyển, cân, phụ phí đêm...).
+        category: t.serviceCategory === 'PTI' ? 'PTI' : t.serviceCategory === 'CUSTOMS' ? 'CUSTOMS' : t.serviceCategory === 'SHIFTING' ? 'YARD_SHIFT'
+          : t.serviceCategory === 'WEIGHING' || t.serviceCategory === 'NIGHT_SURCHARGE' ? 'EXTRA' : 'LOLO',
+        serviceCategory: t.serviceCategory,
+        // Giá nâng hạ theo từng loại container của DM Loại Container (giống server, tariffPricing.ts) —
+        // `rates` chỉ để giữ kiểu StandardTariffItem, không dùng cho dòng biểu cước nâng hạ.
+        serviceTariff: { code: t.code, prices: t.prices || [] },
         unit: t.unit || 'Lần/Cont',
-        rates: {
-          '20DC': t.price20GP || 0, '40DC': t.price40HC || 0, '40HC': t.price40HC || 0,
-          '45HC': t.price45HC || 0, '20RF': t.price20RF || 0, '40HR': t.price40RH || 0,
-          DEFAULT: t.priceSpecial || t.price40HC || 0
-        },
+        rates: { '20DC': 0, '40DC': 0, '40HC': 0, '45HC': 0, '20RF': 0, '40HR': 0, DEFAULT: 0 },
         vatPercent: t.vatPercent ?? 8
       }));
 
-      // Cước lưu bãi tính theo bậc thang ngày (tiers) — mỗi tier hiện thành 1 dòng chọn riêng trong
-      // dropdown (kèm khoảng ngày áp dụng trong tên) thay vì cố tính tự động số ngày lưu bãi thực tế,
-      // để nhân viên Gate-In tự chọn đúng bậc rồi tự nhập số lượng ngày ở cột Số Lượng như các hạng mục khác.
-      const storage: StandardTariffItem[] = (storageRes.data || []).flatMap((rule: any) =>
-        (rule.tiers || []).map((tier: any, idx: number) => ({
-          code: `${rule.code}_T${idx + 1}`,
-          name: `Lưu bãi ${rule.code}${rule.shippingLineCode && rule.shippingLineCode !== 'ALL' ? ' - ' + rule.shippingLineCode : ''} (${tier.tierName || `Ngày ${tier.fromDay}-${tier.toDay ?? '∞'}`})`,
-          category: 'STORAGE',
-          unit: rule.calculationUnit || 'Cont/Ngày',
-          rates: {
-            '20DC': tier.price20Dry || 0, '40DC': tier.price40Dry || 0, '40HC': tier.price40Dry || 0,
-            '45HC': tier.price45Dry || 0, '20RF': tier.price20Reefer || 0, '40HR': tier.price40Reefer || 0,
-            DEFAULT: tier.priceSpecial || tier.price40Dry || 0
-          },
-          vatPercent: rule.vatPercent ?? 8
-        }))
-      );
+      // Phí lưu bãi KHÔNG lập trên phiếu dịch vụ — hệ thống tự tính khi Gate-Out theo Cước Lưu Bãi (server cũng từ chối
+      // hạng mục STORAGE, depot-fullstack-storage-tariff-pricing).
 
-      const cleaning: StandardTariffItem[] = (cleaningRes.data || []).map((item: any) => {
-        const data = readJson(item.jsonData);
-        return {
-          code: item.code,
-          name: item.nameVi || item.name || item.code,
-          category: 'CLEANING',
-          unit: 'Cont',
-          rates: {
-            '20DC': data.price20DC || 0, '40DC': data.price40DC || 0, '40HC': data.price40HC || 0,
-            '45HC': data.price45HC || 0, '20RF': data.price20RF || 0, '40HR': data.price40HR || 0,
-            DEFAULT: data.price40HC || 0
-          },
-          vatPercent: data.vatPercent ?? 8
-        };
-      });
+      // Biểu Phí Vệ Sinh (bảng CleaningTariffs): giá theo từng loại container của DM, tra bằng priceForContainer như dòng
+      // nâng hạ — khoá đơn giá / VAT trên phiếu, server tra lại khi lưu (depot-fullstack-cleaning-tariff-pricing).
+      const cleaning: StandardTariffItem[] = (cleaningRes.data || []).map((item: any) => ({
+        code: item.code,
+        name: item.nameVi || item.nameEn || item.code,
+        category: 'CLEANING',
+        serviceCategory: 'CLEANING',
+        serviceTariff: { code: item.code, prices: item.prices || [] },
+        unit: 'Cont',
+        rates: { '20DC': 0, '40DC': 0, '40HC': 0, '45HC': 0, '20RF': 0, '40HR': 0, DEFAULT: 0 },
+        vatPercent: item.vatPercent ?? 8
+      }));
 
-      setRealTariffs([...lolo, ...storage, ...cleaning]);
+      setRealTariffs([...lolo, ...cleaning]);
     }).catch((error) => console.error('Không thể tải biểu phí Tariff thật từ backend:', error));
   }, []);
 
@@ -183,6 +170,12 @@ export const ServiceOrderFormModal: React.FC<ServiceOrderFormModalProps> = ({
   // cấu hình thì KHÔNG thêm dòng — người dùng chọn thêm từ danh sách biểu phí.
   const priceFromTariff = (tariff: StandardTariffItem | undefined, sizeKey: string) =>
     tariff ? (tariff.rates[sizeKey as keyof typeof tariff.rates] || tariff.rates['DEFAULT'] || 0) : 0;
+  // Biểu cước nâng hạ: tra đúng cột giá theo DM Loại Container, giá 0 = chưa có giá (server cũng tra lại khi lưu).
+  // Lưu bãi / vệ sinh (ngoài phạm vi) vẫn theo `rates` như cũ.
+  const tariffPrice = (tariff: StandardTariffItem, sizeKey: string): TariffPriceResult =>
+    tariff.serviceTariff
+      ? priceForContainer(tariff.serviceTariff, sizeKey, containerTypeOptions)
+      : { ok: true, price: priceFromTariff(tariff, sizeKey) };
   const makeItem = (tariff: StandardTariffItem, price: number, remarks: string): ServiceOrderItem => ({
     id: 'ITM-' + Math.random().toString(36).substring(2, 7),
     serviceCode: tariff.code,
@@ -195,7 +188,8 @@ export const ServiceOrderFormModal: React.FC<ServiceOrderFormModalProps> = ({
     amount: price,
     vatAmount: Math.round(price * (tariff.vatPercent / 100)),
     total: Math.round(price * (1 + tariff.vatPercent / 100)),
-    remarks
+    remarks,
+    locked: !!tariff.serviceTariff
   });
 
   // Mở form: số container lấy từ hàng đợi (prefill) hoặc chờ người dùng chọn trong danh sách.
@@ -222,11 +216,27 @@ export const ServiceOrderFormModal: React.FC<ServiceOrderFormModalProps> = ({
     let alive = true;
     setJobLoading(true);
     setJobError(null);
-    Promise.all([containerApi.getById(containerNo), customerApi.getAll().catch(() => ({ data: [] }))])
-      .then(([jobRes, custRes]: any[]) => {
+    Promise.all([
+      containerApi.getById(containerNo),
+      customerApi.getAll().catch(() => ({ data: [] })),
+      cleaningApi.getAll().catch(() => ({ data: [] }))
+    ])
+      .then(([jobRes, custRes, cleaningRes]: any[]) => {
         if (!alive) return;
         const job = jobRes?.data;
         if (!job) throw new Error('Không tìm thấy hồ sơ Gate-In của container này.');
+        // Lệnh vệ sinh đã bàn giao gần nhất của đúng hồ sơ này (theo JobNo).
+        const handed = ((cleaningRes?.data || []) as any[])
+          .filter((r) => r.jobNo === job.jobNo && r.status === 'HANDOVER_TO_OPERATION')
+          .sort((x, y) => String(y.code).localeCompare(String(x.code)))[0];
+        setHandedOverCleaning(handed ? {
+          code: handed.code,
+          items: ((handed.items || handed.workItems || []) as any[]).map((i) => ({ cleaningCode: i.cleaningCode, cleaningName: i.cleaningName }))
+        } : null);
+        if (handed && !prefillContainer?.cleaningDetails) {
+          setCleaningStatus('COMPLETED');
+          setCleaningNote(`Tiếp nhận từ Trạm Vệ Sinh: lệnh ${handed.code} — ${((handed.items || handed.workItems || []) as any[]).map((i) => i.cleaningName).join(', ')}`);
+        }
         const customer = (custRes?.data || []).find((c: any) => c?.code && c.code === job.gateInTruckingCompany);
         setShippingLine(job.shippingLineCode || '');
         setSize(job.isoSize || '');
@@ -268,30 +278,43 @@ export const ServiceOrderFormModal: React.FC<ServiceOrderFormModalProps> = ({
 
   // Dòng phí tự động theo biểu phí thật, tạo 1 lần sau khi đã đọc hồ sơ và có biểu phí.
   useEffect(() => {
-    if (!jobLoadedKey || tariffCatalog.length === 0 || itemsBuiltForRef.current === jobLoadedKey) return;
+    if (!jobLoadedKey || tariffCatalog.length === 0 || containerTypeOptions.length === 0 || itemsBuiltForRef.current === jobLoadedKey) return;
     itemsBuiltForRef.current = jobLoadedKey;
     const initialItems: ServiceOrderItem[] = [];
     const sizeKey = size;
-    const isReefer = sizeKey.includes('RF') || sizeKey.includes('RH') || sizeKey.includes('HR');
+    const containerType = containerTypeOptions.find((t) => t.typeCode === sizeKey);
+    const isReefer = String(containerType?.category || '').toUpperCase() === 'REEFER';
+    setPricingWarning(null);
 
-    // 1. Phí nâng hạ — biểu cước LOLO đầu tiên có giá cho cỡ container này.
-    const lolo = tariffCatalog.find((t) => t.category === 'LOLO' && priceFromTariff(t, sizeKey) > 0);
-    if (lolo) initialItems.push(makeItem(lolo, priceFromTariff(lolo, sizeKey), 'Tiếp nhận hạ bãi vỏ rỗng'));
-
-    // 2. Phí vệ sinh — chi phí thật của lệnh vệ sinh đã bàn giao.
-    if (prefillContainer?.cleaningDetails) {
-      const cleaningTariff = tariffCatalog.find((t) => t.category === 'CLEANING' && priceFromTariff(t, sizeKey) > 0);
-      const cleaningCost = prefillContainer.cleaningDetails.totalCost || priceFromTariff(cleaningTariff, sizeKey);
-      if (cleaningTariff && cleaningCost > 0) initialItems.push(makeItem(cleaningTariff, cleaningCost, 'Tiếp nhận từ Nghiệp vụ Vệ sinh'));
+    // 1. Phí nâng hạ — biểu cước nhóm Nâng hạ vỏ rỗng (LIFT_EMPTY) đang dùng đầu tiên theo thứ tự (không lấy nhóm khác).
+    //    Chưa có giá cho cỡ này → báo, không thêm dòng (server cũng từ chối).
+    const lolo = tariffCatalog.find((t) => t.serviceCategory === 'LIFT_EMPTY');
+    if (lolo) {
+      const result = tariffPrice(lolo, sizeKey);
+      if (result.ok) initialItems.push(makeItem(lolo, result.price, 'Tiếp nhận hạ bãi vỏ rỗng'));
+      else setPricingWarning(`${result.reason} — nhập giá ở DANH MỤC MASTER DATA → Cước Nâng Hạ.`);
     }
+
+    // 2. Phí vệ sinh — MỖI hạng mục của lệnh vệ sinh đã bàn giao là 1 dòng riêng, giá theo Biểu Phí Vệ Sinh (trước đây gộp
+    //    tổng chi phí vào 1 dòng mang tên dịch vụ đầu tiên). Dịch vụ không còn / chưa có giá → báo, không thêm dòng.
+    const cleaningWarnings: string[] = [];
+    for (const work of handedOverCleaning?.items || []) {
+      const tariff = tariffCatalog.find((t) => t.category === 'CLEANING' && t.code === work.cleaningCode);
+      if (!tariff) { cleaningWarnings.push(`Dịch vụ vệ sinh ${work.cleaningCode} không còn trong Biểu Phí Vệ Sinh đang dùng`); continue; }
+      const result = tariffPrice(tariff, sizeKey);
+      if (result.ok) initialItems.push(makeItem(tariff, result.price, `Lệnh vệ sinh ${handedOverCleaning?.code}`));
+      else cleaningWarnings.push(`${result.reason} — nhập giá ở DANH MỤC MASTER DATA → Biểu Phí Vệ Sinh Container`);
+    }
+    if (cleaningWarnings.length) setPricingWarning((prev) => [prev, ...cleaningWarnings].filter(Boolean).join(' · '));
 
     // 3. Phí PTI cho container lạnh — chỉ khi biểu cước có dịch vụ PTI.
     if (isReefer) {
-      const pti = tariffCatalog.find((t) => t.category === 'PTI' && priceFromTariff(t, sizeKey) > 0);
-      if (pti) initialItems.push(makeItem(pti, priceFromTariff(pti, sizeKey), 'Kiểm tra máy lạnh'));
+      const pti = tariffCatalog.find((t) => t.serviceCategory === 'PTI');
+      const ptiPrice = pti ? tariffPrice(pti, sizeKey) : null;
+      if (pti && ptiPrice?.ok) initialItems.push(makeItem(pti, ptiPrice.price, 'Kiểm tra máy lạnh'));
     }
     setItems(initialItems);
-  }, [jobLoadedKey, tariffCatalog]);
+  }, [jobLoadedKey, tariffCatalog, containerTypeOptions, handedOverCleaning]);
 
   // Mã ISO thật theo DM Loại Container (trước đây ghi lại chính mã loại, vd "45HC").
   const containerType = containerTypeOptions.find((t) => t.typeCode === size);
@@ -303,7 +326,13 @@ export const ServiceOrderFormModal: React.FC<ServiceOrderFormModalProps> = ({
     const tariff = tariffCatalog.find(t => t.code === selectedTariffCode);
     if (!tariff) return;
 
-    const price = priceFromTariff(tariff, size);
+    const result = tariffPrice(tariff, size);
+    if (!result.ok) {
+      setPricingWarning(`${result.reason} — nhập giá ở DANH MỤC MASTER DATA → Cước Nâng Hạ.`);
+      return;
+    }
+    setPricingWarning(null);
+    const price = result.price;
 
     const newItem: ServiceOrderItem = {
       id: 'ITM-' + Math.random().toString(36).substring(2, 7),
@@ -317,7 +346,8 @@ export const ServiceOrderFormModal: React.FC<ServiceOrderFormModalProps> = ({
       amount: price,
       vatAmount: Math.round(price * (tariff.vatPercent / 100)),
       total: Math.round(price * (1 + tariff.vatPercent / 100)),
-      remarks: ''
+      remarks: '',
+      locked: !!tariff.serviceTariff
     };
 
     setItems([...items, newItem]);
@@ -610,6 +640,13 @@ export const ServiceOrderFormModal: React.FC<ServiceOrderFormModalProps> = ({
               </div>
             </div>
 
+            {pricingWarning && (
+              <div data-testid="pricing-warning" className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+                {pricingWarning}
+              </div>
+            )}
+            <p className="text-[11px] text-slate-500">Dòng nâng hạ và vệ sinh: đơn giá và VAT theo biểu cước / biểu phí, không sửa tay (chỉ sửa số lượng).</p>
+
             {/* Table of Items */}
             <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-slate-50">
               <table className="w-full text-left text-xs">
@@ -657,16 +694,20 @@ export const ServiceOrderFormModal: React.FC<ServiceOrderFormModalProps> = ({
                           type="number"
                           step="1000"
                           value={item.unitPrice}
+                          disabled={item.locked}
+                          title={item.locked ? 'Giá theo biểu cước nâng hạ — không sửa tay' : undefined}
                           onChange={(e) => handleUpdateItem(item.id, 'unitPrice', e.target.value)}
-                          className="w-24 px-1.5 py-1 bg-white border border-slate-200 rounded-lg text-emerald-700 font-mono font-bold text-xs text-right focus:outline-none"
+                          className="w-24 px-1.5 py-1 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed bg-white border border-slate-200 rounded-lg text-emerald-700 font-mono font-bold text-xs text-right focus:outline-none"
                         />
                       </td>
                       <td className="py-2.5 px-3 text-center">
                         <input
                           type="number"
                           value={item.vatPercent}
+                          disabled={item.locked}
+                          title={item.locked ? 'VAT theo biểu cước nâng hạ — không sửa tay' : undefined}
                           onChange={(e) => handleUpdateItem(item.id, 'vatPercent', e.target.value)}
-                          className="w-12 px-1 py-1 bg-white border border-slate-200 rounded-lg text-slate-500 text-xs text-center focus:outline-none"
+                          className="w-12 px-1 py-1 disabled:bg-slate-100 disabled:cursor-not-allowed bg-white border border-slate-200 rounded-lg text-slate-500 text-xs text-center focus:outline-none"
                         />
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-700">

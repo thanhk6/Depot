@@ -1,3 +1,5 @@
+import { PricedTariff } from '../masterdata/utils/tariffPricing';
+
 export type ServiceCategory =
   | 'LOLO'
   | 'STORAGE'
@@ -22,6 +24,8 @@ export interface ServiceOrderItem {
   vatAmount: number; // amount * (vatPercent / 100)
   total: number; // amount + vatAmount
   remarks?: string;
+  /** Dòng biểu cước nâng hạ (ServiceTariffs): đơn giá / VAT do hệ thống tra theo biểu cước, khoá không sửa tay. */
+  locked?: boolean;
 }
 
 export type PaymentStatus = 'UNPAID' | 'PAID' | 'CANCELLED';
@@ -104,4 +108,8 @@ export interface StandardTariffItem {
     'DEFAULT': number;
   };
   vatPercent: number;
+  /** Có khi lấy từ biểu cước nâng hạ (ServiceTariffs) — giá tra bằng priceForContainer, không dùng `rates`. */
+  serviceTariff?: PricedTariff & { code: string };
+  /** ServiceTariff.ServiceCategory thật (LIFT_EMPTY, LIFT_LADEN, NIGHT_SURCHARGE, WEIGHING...). */
+  serviceCategory?: string;
 }

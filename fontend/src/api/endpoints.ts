@@ -34,6 +34,7 @@ export const API_ENDPOINTS = {
     REPAIR_COMPLETE: (id: string) => `/DepotJobs/${id}/repair/complete`,
     REPAIR_PHOTOS: (id: string) => `/DepotJobs/${id}/repair/photos`,
     GATE_OUT: (id: string) => `/DepotJobs/${id}/gate-out`,
+    STORAGE_FEE: (id: string) => `/DepotJobs/${id}/storage-fee`,
     GATE_OUT_BOOKING_CHECK: (id: string, bookingNo: string) => `/DepotJobs/${id}/gate-out/booking-check?bookingNo=${encodeURIComponent(bookingNo)}`,
     PAYMENT: (id: string) => `/depot/jobs/${id}/payment`,
   },
@@ -48,6 +49,7 @@ export const API_ENDPOINTS = {
     // Cước Nâng Hạ (LoLo) / Cước Lưu Bãi (Storage) — bảng riêng, tách khỏi catalog dùng chung cũ (xem
     // docs/frontend-tariff-catalog-split.md).
     SERVICE_TARIFFS: '/MasterData/service-tariffs',
+    CLEANING_TARIFFS: '/MasterData/cleaning-tariffs',
     STORAGE_TARIFFS: '/MasterData/storage-tariffs',
   },
 

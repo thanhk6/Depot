@@ -5,12 +5,8 @@ export interface LoLoTariffItem {
   nameVi: string;
   nameEn: string;
   unit: string;
-  price20GP: number;
-  price40GP_HC: number;
-  price45HC: number;
-  price20RF: number;
-  price40RH: number;
-  priceSpecial: number; // OT / FR / Tank Rỗng
+  /** Đơn giá theo từng loại container của DM Loại Container: { "40HC": 420000, "40GP": 400000, ... }; thiếu = chưa có giá. */
+  prices: Record<string, number>;
   vatPercent: number;
   currency: 'VND' | 'USD';
   description: string;
@@ -24,13 +20,9 @@ export interface LoLoTariffItem {
 export interface StorageTariffTier {
   tierName: string;
   fromDay: number;
-  toDay: number | null; // null = above
-  price20Dry: number;
-  price40Dry: number;
-  price45Dry: number;
-  price20Reefer: number;
-  price40Reefer: number;
-  priceSpecial: number;
+  toDay: number | null; // null = từ fromDay trở đi (chỉ bậc cuối)
+  /** Đơn giá/ngày theo từng loại container của DM Loại Container: { "40HC": 60000, ... }; thiếu / 0 = chưa có giá. */
+  prices: Record<string, number>;
 }
 
 export interface StorageTariffRule {
@@ -38,9 +30,8 @@ export interface StorageTariffRule {
   ruleCode: string;
   shippingLineCode: string; // 'ALL' or specific shipping line
   shippingLineName: string;
-  containerTypeCategory: 'DRY_STANDARD' | 'SPECIAL_OOG' | 'IMO_HAZARDOUS' | 'ISO_TANK';
+  /** Ngày miễn phí — bậc đầu bắt đầu ngày (defaultFreeDays + 1). */
   defaultFreeDays: number;
-  calculationUnit: 'VND/Cont/Day' | 'USD/Cont/Day';
   tiers: StorageTariffTier[];
   vatPercent: number;
   status: 'ACTIVE' | 'INACTIVE';

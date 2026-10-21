@@ -22,6 +22,9 @@ import { fetchContainerTypes } from '../../masterdata/utils/containerTypeCatalog
 import { masterDataApi } from '../../../api';
 import { useSurveyChecklistTemplate } from '../../masterdata/utils/checklistCatalog';
 import { recomputeChecklistFromDamages } from '../utils/checklistSync';
+import { priceForContainer } from '../../masterdata/utils/tariffPricing';
+import { useContainerTypeOptions } from '../../masterdata/utils/containerTypeCatalog';
+import { asPricedTariff } from '../../masterdata/utils/cleaningTariffCatalog';
 import {
   ClipboardCheck,
   Boxes,
@@ -134,18 +137,10 @@ export const CreateSurveyModal: React.FC<CreateSurveyModalProps> = ({
   const [cleaningEstimatedCost, setCleaningEstimatedCost] = useState<number>(0);
 
   // Helper to calculate price of a cleaning tariff for current container size & type
-  const getTariffCost = (tariff: CleaningTariffMasterItem): number => {
-    const exact = tariff.priceByContainerType?.[sizeType];
-    if (exact && exact > 0) return exact;
-    if (isReefer) {
-      if (sizeType.includes('20')) return tariff.price20RF;
-      return tariff.price40HR;
-    }
-    if (sizeType.includes('20')) return tariff.price20DC;
-    if (sizeType.includes('45')) return tariff.price45HC;
-    if (sizeType.includes('HC')) return tariff.price40HC;
-    return tariff.price40DC;
-  };
+  // Giá dịch vụ vệ sinh theo đúng loại container (DM Loại Container), cùng quy tắc với server — chưa có giá = 0 (server sẽ chặn).
+  const cleaningTypeOptions = useContainerTypeOptions();
+  const getTariffCost = (tariff: CleaningTariffMasterItem): number =>
+    priceForContainer(asPricedTariff(tariff), sizeType, cleaningTypeOptions).price;
 
   // Re-calculate cost whenever sizeType, isReefer, or selectedCleaningCodes change
   useEffect(() => {

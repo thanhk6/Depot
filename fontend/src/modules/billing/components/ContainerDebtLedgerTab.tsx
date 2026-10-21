@@ -234,9 +234,22 @@ export const ContainerDebtLedgerTab: React.FC<ContainerDebtLedgerTabProps> = ({
               Từ ngày
             </label>
             <input
+              data-testid="billing-from-date"
               type="date"
               value={fromDate}
               onChange={(e) => onChangeFromDate(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-sky-500"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-500 mb-1">
+              Đến ngày
+            </label>
+            <input
+              data-testid="billing-to-date"
+              type="date"
+              value={toDate}
+              onChange={(e) => onChangeToDate(e.target.value)}
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-sky-500"
             />
           </div>

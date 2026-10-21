@@ -17,14 +17,13 @@ import { GradeMaster } from '../../survey/components/GradeMaster';
 import { InspectionStandardMaster } from '../../survey/components/InspectionStandardMaster';
 import { ContainerTypeMaster } from '../components/ContainerTypeMaster';
 import { mapContainerTypeCatalogItem } from '../utils/containerTypeCatalog';
-import { mapCleaningTariffCatalogItem } from '../utils/cleaningTariffCatalog';
+import { mapCleaningTariff } from '../utils/cleaningTariffCatalog';
 import { CleaningMaster } from '../components/CleaningMaster';
 // "Cước Nâng Hạ & Lưu Bãi" đã tách thành 3 danh mục riêng biệt theo yêu cầu người dùng (thay cho
 // component gộp chung `LiftOnLiftOffAndStorageMaster.tsx` cũ, đã xoá) — xem
 // docs/frontend-tariff-catalog-split.md.
 import { LoloTariffMaster } from '../components/LoloTariffMaster';
 import { StorageTariffMaster } from '../components/StorageTariffMaster';
-import { TariffCalculatorPage } from '../components/TariffCalculatorPage';
 import { CustomerClassificationMaster } from '../../customer/components/CustomerClassificationMaster';
 import { DepartmentMaster } from '../components/DepartmentMaster';
 import { DepartmentItem } from '../types/department';
@@ -51,7 +50,6 @@ import {
   Droplets,
   Tag,
   Truck,
-  Calculator,
   ClipboardCheck,
 } from 'lucide-react';
 import { getApiErrorMessage } from '../../../utils/apiError';
@@ -135,10 +133,10 @@ export const MasterDataPage: React.FC<MasterDataPageProps> = ({
     };
     Promise.all([
       masterDataApi.getCatalog('CONTAINER_TYPE', { includeInactive: true }),
-      masterDataApi.getCatalog('CLEANING_TARIFF', { includeInactive: true })
+      masterDataApi.getCleaningTariffs({ includeInactive: true })
     ]).then(([containerResponse, cleaningResponse]: any[]) => {
       const containersFromApi = (containerResponse.data || []).map(mapContainerTypeCatalogItem);
-      const cleaningFromApi = (cleaningResponse.data || []).map(mapCleaningTariffCatalogItem);
+      const cleaningFromApi = (cleaningResponse.data || []).map(mapCleaningTariff);
       setContainerTypes(containersFromApi);
       setCleaningTariffs(cleaningFromApi);
     }).catch((error) => setMasterDataError(getApiErrorMessage(error, 'Không thể tải catalog từ backend.')));
@@ -324,15 +322,6 @@ export const MasterDataPage: React.FC<MasterDataPageProps> = ({
           bg: 'bg-indigo-50'
         },
         {
-          id: 'tariff_calculator',
-          label: 'Máy Tính Cước Nâng Hạ & Lưu Bãi',
-          desc: 'Công cụ mô phỏng tính tổng chi phí Nâng Hạ + Lưu Bãi + VAT',
-          icon: Calculator,
-          count: loloTariffCount + storageTariffCount,
-          color: 'text-emerald-600',
-          bg: 'bg-emerald-50'
-        },
-        {
           id: 'customer_classifications',
           label: 'Phân Loại Khách Hàng',
           desc: 'Danh mục nhóm phân loại khách hàng, nhà xe, forwarder và mô tả chi tiết',
@@ -494,7 +483,8 @@ export const MasterDataPage: React.FC<MasterDataPageProps> = ({
         {activeMasterTab === 'cleaning_tariffs' && (
           <CleaningMaster
             cleaningTariffs={cleaningTariffs}
-            onUpdateCleaningTariffs={(updated) => { setCleaningTariffs(updated); void persistCatalog('CLEANING_TARIFF', cleaningTariffs, updated, 'cleaningCode', setCleaningTariffs); }}
+            // CleaningMaster tự lưu từng dòng qua API /MasterData/cleaning-tariffs — ở đây chỉ cập nhật state hiển thị.
+            onUpdateCleaningTariffs={setCleaningTariffs}
             containerTypes={containerTypes}
           />
         )}
@@ -513,9 +503,6 @@ export const MasterDataPage: React.FC<MasterDataPageProps> = ({
         )}
         {activeMasterTab === 'tariff_storage' && (
           <StorageTariffMaster />
-        )}
-        {activeMasterTab === 'tariff_calculator' && (
-          <TariffCalculatorPage />
         )}
 
         {/* Customer Classifications Master */}

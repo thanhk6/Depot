@@ -25,8 +25,9 @@ export const billingApi = {
     const res = await apiClient.get<BackendResponse<any[]>>('/billing/sync-candidates');
     return res.data;
   },
-  syncDebts: async (jobNos: string[], performedBy?: string) => {
-    const res = await apiClient.post<BackendResponse<any[]>>('/billing/sync', { jobNos, performedBy });
+  // Người thao tác (đồng bộ / thu / huỷ / khoá sổ) server lấy từ tài khoản đăng nhập — không gửi tên từ trình duyệt.
+  syncDebts: async (jobNos: string[]) => {
+    const res = await apiClient.post<BackendResponse<any[]>>('/billing/sync', { jobNos });
     return res.data;
   },
   issueInvoice: async (debtCode: string, invoiceNo: string) => {
@@ -41,18 +42,17 @@ export const billingApi = {
     referenceNo?: string;
     paymentDate: string;
     notes?: string;
-    recordedBy: string;
     allocations: { debtCode: string; containerNo: string; quotationNo: string; amount: number }[];
   }) => {
     const res = await apiClient.post<BackendResponse<any>>('/billing/payments', request);
     return res.data;
   },
-  closePeriod: async (periodCode: string, closingNotes: string | undefined, closedBy: string) => {
-    const res = await apiClient.post<BackendResponse<any>>(`/billing/periods/${periodCode}/close`, { closingNotes, closedBy });
+  closePeriod: async (periodCode: string, closingNotes: string | undefined) => {
+    const res = await apiClient.post<BackendResponse<any>>(`/billing/periods/${periodCode}/close`, { closingNotes });
     return res.data;
   },
-  reversePayment: async (paymentCode: string, reason: string, reversedBy: string) => {
-    const res = await apiClient.post<BackendResponse<any>>(`/billing/payments/${paymentCode}/reverse`, { reason, reversedBy });
+  reversePayment: async (paymentCode: string, reason: string) => {
+    const res = await apiClient.post<BackendResponse<any>>(`/billing/payments/${paymentCode}/reverse`, { reason });
     return res.data;
   },
   getAgingReport: async () => {

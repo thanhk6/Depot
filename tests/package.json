@@ -1,0 +1,20 @@
+{
+  "name": "depot-tests",
+  "private": true,
+  "description": "Bộ test API + giao diện SolutionDepot (chỉ chạy trên local) — xem tests/README.md",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:api": "playwright test --project=api",
+    "test:e2e": "playwright test --project=e2e",
+    "cleanup": "tsx support/cleanup-cli.ts",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "^20.19.0",
+    "@types/pg": "^8.11.10",
+    "pg": "^8.13.1",
+    "tsx": "^4.19.2"
+  }
+}

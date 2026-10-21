@@ -412,6 +412,42 @@ namespace Depot.ViewModels
         public string? NoBookingNote { get; set; }
     }
 
+    /// <summary>Phí lưu bãi của 1 hồ sơ do server tính theo biểu cước lưu bãi (depot-fullstack-storage-tariff-pricing).
+    /// Ok=false: thiếu quy tắc / thiếu giá, Message nêu lý do, không có số tiền.</summary>
+    public class StorageFeeResult
+    {
+        public bool Ok { get; set; }
+        public string Message { get; set; } = string.Empty;
+        public string JobNo { get; set; } = string.Empty;
+        public string ContainerNo { get; set; } = string.Empty;
+        public string ContainerTypeCode { get; set; } = string.Empty;
+        public string? ShippingLineCode { get; set; }
+        /// <summary>Ngày Gate-In / ngày tính (dd/MM/yyyy, giờ Việt Nam).</summary>
+        public string GateInDate { get; set; } = string.Empty;
+        public string ToDate { get; set; } = string.Empty;
+        public int TotalDays { get; set; }
+        public int FreeDays { get; set; }
+        public int ChargeableDays { get; set; }
+        public string? RuleCode { get; set; }
+        public string? RuleName { get; set; }
+        public List<StorageFeeLine> Lines { get; set; } = new();
+        public decimal Subtotal { get; set; }
+        public decimal VatPercent { get; set; }
+        public decimal VatAmount { get; set; }
+        public decimal Total { get; set; }
+    }
+
+    /// <summary>1 bậc giá có ngày tính tiền trong phí lưu bãi.</summary>
+    public class StorageFeeLine
+    {
+        public string TierName { get; set; } = string.Empty;
+        public int FromDay { get; set; }
+        public int ToDay { get; set; }
+        public int Days { get; set; }
+        public decimal UnitPrice { get; set; }
+        public decimal Amount { get; set; }
+    }
+
     /// <summary>Kết quả kiểm tra 1 booking với 1 hồ sơ trước khi Gate-Out (chỉ đọc, không đổi dữ liệu).</summary>
     public class GateOutBookingCheckResult
     {

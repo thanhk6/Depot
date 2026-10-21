@@ -296,6 +296,7 @@ namespace Depot.Application.Services
         public async Task<List<ServiceTariff>> GetServiceTariffsAsync(bool includeInactive = false)
         {
             return await _db.ServiceTariffs
+                .Include(x => x.Prices.Where(p => !p.IsDeleted))
                 .Where(x => !x.IsDeleted && (includeInactive || x.IsActive))
                 .OrderBy(x => x.SortOrder).ThenBy(x => x.Code)
                 .ToListAsync();
@@ -306,65 +307,211 @@ namespace Depot.Application.Services
             if (string.IsNullOrWhiteSpace(request.Code) || string.IsNullOrWhiteSpace(request.NameVi))
                 throw new ArgumentException("Mã biểu cước và tên dịch vụ là bắt buộc.");
             ValidateServiceTariff(request);
+            var prices = await NormalizeServiceTariffPricesAsync(request.Prices);
             var code = request.Code.Trim().ToUpperInvariant();
             var existing = await _db.ServiceTariffs.FirstOrDefaultAsync(x => x.Code == code);
             if (existing != null && !existing.IsDeleted) throw new InvalidOperationException("Mã biểu cước nâng hạ đã tồn tại.");
+            await using var tx = await _db.Database.BeginTransactionAsync();
+            ServiceTariff item;
             if (existing != null)
             {
-                // Mã đã xóa mềm vẫn chiếm unique index Code — tạo lại cùng mã thì hồi sinh đúng dòng cũ.
+                // Mã đã xóa mềm vẫn chiếm unique index Code — tạo lại cùng mã thì hồi sinh đúng dòng cũ (giá cũ bỏ hẳn).
                 existing.IsDeleted = false; existing.DeletedAt = null; existing.DeletedBy = null;
                 ApplyServiceTariffRequest(existing, request, code);
-                await _db.SaveChangesAsync();
-                return existing;
+                await _db.Set<ServiceTariffPrice>().Where(p => p.ServiceTariffId == existing.Id).ExecuteDeleteAsync();
+                item = existing;
             }
-            var item = new ServiceTariff
+            else
             {
-                Code = code, ServiceCategory = request.ServiceCategory, NameVi = request.NameVi.Trim(), NameEn = request.NameEn?.Trim(),
-                Unit = request.Unit, Price20GP = request.Price20GP, Price40HC = request.Price40HC, Price45HC = request.Price45HC,
-                Price20RF = request.Price20RF, Price40RH = request.Price40RH, PriceSpecial = request.PriceSpecial,
-                VatPercent = request.VatPercent, Currency = request.Currency, ApplicableShift = request.ApplicableShift,
-                Description = request.Description?.Trim(), IsActive = request.IsActive, SortOrder = request.SortOrder
-            };
-            _db.ServiceTariffs.Add(item);
+                item = new ServiceTariff { Code = code };
+                ApplyServiceTariffRequest(item, request, code);
+                _db.ServiceTariffs.Add(item);
+                await _db.SaveChangesAsync();
+            }
+            foreach (var p in prices) _db.Set<ServiceTariffPrice>().Add(new ServiceTariffPrice { ServiceTariffId = item.Id, ContainerTypeCode = p.Code, Price = p.Price });
             await _db.SaveChangesAsync();
-            return item;
+            await tx.CommitAsync();
+            return await ReloadServiceTariffAsync(item.Id);
         }
 
         public async Task<ServiceTariff?> UpdateServiceTariffAsync(long id, ServiceTariffRequest request)
         {
+            // Không Include(Prices) — ExecuteDeleteAsync xoá thẳng dưới DB (giống UpdateStorageTariffAsync).
             var item = await _db.ServiceTariffs.FirstOrDefaultAsync(x => x.Id == id);
             if (item == null) return null;
             if (string.IsNullOrWhiteSpace(request.Code) || string.IsNullOrWhiteSpace(request.NameVi))
                 throw new ArgumentException("Mã biểu cước và tên dịch vụ là bắt buộc.");
             ValidateServiceTariff(request);
+            var prices = await NormalizeServiceTariffPricesAsync(request.Prices);
             var code = request.Code.Trim().ToUpperInvariant();
-            var duplicate = await _db.ServiceTariffs.FirstOrDefaultAsync(x => x.Id != id && x.Code == code);
-            if (duplicate != null && !duplicate.IsDeleted) throw new InvalidOperationException("Mã biểu cước nâng hạ đã tồn tại.");
-            if (duplicate != null)
-            {
-                // Đổi sang mã của 1 dòng đã xóa mềm: giải phóng mã đó trước (lưu riêng để tránh vướng unique index).
-                var releasedCode = $"#DEL{duplicate.Id}:{duplicate.Code}";
-                duplicate.Code = releasedCode.Length <= 40 ? releasedCode : releasedCode[..40];
-                await _db.SaveChangesAsync();
-            }
+            // Phiếu dịch vụ lưu mã biểu cước dạng chữ (ServiceOrderItem.ServiceCode) — đổi mã làm phiếu cũ mất liên kết
+            // tra cứu, và server tra giá theo mã (depot-fullstack-lolo-tariff-pricing).
+            if (code != item.Code)
+                throw new ArgumentException($"Không đổi mã biểu cước '{item.Code}' — phiếu dịch vụ tham chiếu theo mã. Chỉ sửa tên / giá / phân loại.");
+            await using var tx = await _db.Database.BeginTransactionAsync();
             ApplyServiceTariffRequest(item, request, code);
+            // Lưu = thay toàn bộ danh sách giá theo loại container (xoá cứng dòng cũ để không vướng unique (biểu cước, loại)).
+            await _db.Set<ServiceTariffPrice>().Where(p => p.ServiceTariffId == id).ExecuteDeleteAsync();
+            foreach (var p in prices) _db.Set<ServiceTariffPrice>().Add(new ServiceTariffPrice { ServiceTariffId = id, ContainerTypeCode = p.Code, Price = p.Price });
             await _db.SaveChangesAsync();
-            return item;
+            await tx.CommitAsync();
+            return await ReloadServiceTariffAsync(id);
         }
 
-        // BUG-017: trước đây nhận đơn giá âm và VAT ngoài 0–100%, làm Máy tính cước / phiếu dịch vụ ra tiền âm.
+        private async Task<ServiceTariff> ReloadServiceTariffAsync(long id)
+        {
+            _db.ChangeTracker.Clear();
+            return await _db.ServiceTariffs.AsNoTracking().Include(x => x.Prices.Where(p => !p.IsDeleted)).FirstAsync(x => x.Id == id);
+        }
+
+        /// <summary>Giá theo loại container: mã loại phải thuộc DM Loại Container (CONTAINER_TYPE.Name, chưa xoá), không trùng,
+        /// giá ≥ 0. Giá 0 / trống = chưa có giá → không lưu dòng (depot-fullstack-lolo-tariff-pricing).</summary>
+        private async Task<List<(string Code, decimal Price)>> NormalizeServiceTariffPricesAsync(List<ServiceTariffPriceViewModel>? prices)
+        {
+            var list = (prices ?? new()).Select(p => (Code: (p.ContainerTypeCode ?? string.Empty).Trim().ToUpperInvariant(), p.Price)).ToList();
+            if (list.Any(p => p.Price < 0)) throw new ArgumentException("Đơn giá cước không được âm.");
+            var duplicated = list.GroupBy(p => p.Code).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
+            if (duplicated.Count > 0) throw new ArgumentException($"Trùng loại container trong biểu cước: {string.Join(", ", duplicated)}.");
+            var typeCodes = (await _db.MasterCatalogItems.AsNoTracking()
+                .Where(x => x.CatalogType == "CONTAINER_TYPE" && !x.IsDeleted).Select(x => x.Name).ToListAsync())
+                .Select(n => (n ?? string.Empty).Trim().ToUpperInvariant()).ToHashSet();
+            var unknown = list.Where(p => !typeCodes.Contains(p.Code)).Select(p => p.Code).Distinct().ToList();
+            if (unknown.Count > 0) throw new ArgumentException($"Loại container không có trong DM Loại Container: {string.Join(", ", unknown.Select(c => $"'{c}'"))}.");
+            return list.Where(p => p.Price > 0).ToList();
+        }
+
         private static void ValidateServiceTariff(ServiceTariffRequest r)
         {
-            if (new[] { r.Price20GP, r.Price40HC, r.Price45HC, r.Price20RF, r.Price40RH, r.PriceSpecial }.Any(p => p < 0))
-                throw new ArgumentException("Đơn giá cước không được âm.");
             if (r.VatPercent < 0 || r.VatPercent > 100)
                 throw new ArgumentException("VAT phải trong khoảng 0–100%.");
+            if (!ServiceTariffCategories.Contains(r.ServiceCategory ?? ""))
+                throw new ArgumentException($"Phân loại '{r.ServiceCategory}' không hợp lệ — chỉ nhận {string.Join(", ", ServiceTariffCategories)}.");
+            if (!ServiceTariffShifts.Contains(r.ApplicableShift ?? ""))
+                throw new ArgumentException($"Ca áp dụng '{r.ApplicableShift}' không hợp lệ — chỉ nhận {string.Join(", ", ServiceTariffShifts)}.");
+            // Phiếu dịch vụ cộng tiền như VND, chưa quy đổi ngoại tệ.
+            if (r.Currency != "VND")
+                throw new ArgumentException("Biểu cước nâng hạ chỉ dùng tiền VND.");
+            if (string.IsNullOrWhiteSpace(r.Unit))
+                throw new ArgumentException("Đơn vị tính là bắt buộc.");
         }
 
-        // BUG-018: bậc lũy tiến sai (đến ngày < từ ngày, chồng lấn, không có bậc) làm tính tiền lưu bãi sai.
-        // ToDay = null là bậc "trở đi" không giới hạn, chỉ được là bậc cuối.
+        // ===== Biểu phí vệ sinh (depot-fullstack-cleaning-tariff-pricing) — cùng khuôn Service Tariff =====
+        public static readonly string[] CleaningTariffCategories =
+        {
+            "GENERAL_SWEEP", "WATER_PRESSURE", "HOT_WATER_WASH", "CHEMICAL_WASH", "DEODORIZATION", "OIL_REMOVAL", "STICKER_REMOVAL",
+            "REEFER_SANITATION", "FLOOR_TREATMENT", "SPECIAL_TREATMENT", "FOOD_GRADE", "ODOR_REMOVAL", "FUMIGATION"
+        };
+        // Giữ nguyên các giá trị bên chịu phí đang có trong dữ liệu (quyết định giữ cách tính bên chịu phí hiện tại).
+        private static readonly string[] CleaningResponsibleParties = { "O", "U", "T", "C" };
+
+        public async Task<List<CleaningTariff>> GetCleaningTariffsAsync(bool includeInactive = false)
+        {
+            return await _db.CleaningTariffs
+                .Include(x => x.Prices.Where(p => !p.IsDeleted))
+                .Where(x => !x.IsDeleted && (includeInactive || x.IsActive))
+                .OrderBy(x => x.SortOrder).ThenBy(x => x.Code)
+                .ToListAsync();
+        }
+
+        public async Task<CleaningTariff> CreateCleaningTariffAsync(CleaningTariffRequest request)
+        {
+            ValidateCleaningTariff(request);
+            var prices = await NormalizeServiceTariffPricesAsync(request.Prices);
+            var code = request.Code.Trim().ToUpperInvariant();
+            var existing = await _db.CleaningTariffs.FirstOrDefaultAsync(x => x.Code == code);
+            if (existing != null && !existing.IsDeleted) throw new InvalidOperationException("Mã biểu phí vệ sinh đã tồn tại.");
+            await using var tx = await _db.Database.BeginTransactionAsync();
+            CleaningTariff item;
+            if (existing != null)
+            {
+                // Mã đã xoá mềm vẫn chiếm unique index Code — tạo lại cùng mã thì hồi sinh dòng cũ (giá cũ bỏ hẳn).
+                existing.IsDeleted = false; existing.DeletedAt = null; existing.DeletedBy = null;
+                ApplyCleaningTariffRequest(existing, request);
+                await _db.Set<CleaningTariffPrice>().Where(p => p.CleaningTariffId == existing.Id).ExecuteDeleteAsync();
+                item = existing;
+            }
+            else
+            {
+                item = new CleaningTariff { Code = code };
+                ApplyCleaningTariffRequest(item, request);
+                _db.CleaningTariffs.Add(item);
+                await _db.SaveChangesAsync();
+            }
+            foreach (var p in prices) _db.Set<CleaningTariffPrice>().Add(new CleaningTariffPrice { CleaningTariffId = item.Id, ContainerTypeCode = p.Code, Price = p.Price });
+            await _db.SaveChangesAsync();
+            await tx.CommitAsync();
+            return await ReloadCleaningTariffAsync(item.Id);
+        }
+
+        public async Task<CleaningTariff?> UpdateCleaningTariffAsync(long id, CleaningTariffRequest request)
+        {
+            var item = await _db.CleaningTariffs.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+            if (item == null) return null;
+            ValidateCleaningTariff(request);
+            var prices = await NormalizeServiceTariffPricesAsync(request.Prices);
+            var code = request.Code.Trim().ToUpperInvariant();
+            if (code != item.Code)
+                throw new ArgumentException($"Không đổi mã biểu phí vệ sinh '{item.Code}' — phiếu giám định / lệnh vệ sinh / phiếu dịch vụ tham chiếu theo mã.");
+            await using var tx = await _db.Database.BeginTransactionAsync();
+            ApplyCleaningTariffRequest(item, request);
+            await _db.Set<CleaningTariffPrice>().Where(p => p.CleaningTariffId == id).ExecuteDeleteAsync();
+            foreach (var p in prices) _db.Set<CleaningTariffPrice>().Add(new CleaningTariffPrice { CleaningTariffId = id, ContainerTypeCode = p.Code, Price = p.Price });
+            await _db.SaveChangesAsync();
+            await tx.CommitAsync();
+            return await ReloadCleaningTariffAsync(id);
+        }
+
+        public async Task<bool> DeactivateCleaningTariffAsync(long id)
+        {
+            var item = await _db.CleaningTariffs.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+            if (item == null) return false;
+            item.IsDeleted = true; item.DeletedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+            return true;
+        }
+
+        private async Task<CleaningTariff> ReloadCleaningTariffAsync(long id)
+        {
+            _db.ChangeTracker.Clear();
+            return await _db.CleaningTariffs.AsNoTracking().Include(x => x.Prices.Where(p => !p.IsDeleted)).FirstAsync(x => x.Id == id);
+        }
+
+        private static void ValidateCleaningTariff(CleaningTariffRequest r)
+        {
+            if (string.IsNullOrWhiteSpace(r.Code) || string.IsNullOrWhiteSpace(r.NameVi))
+                throw new ArgumentException("Mã biểu phí và tên tiếng Việt là bắt buộc.");
+            if (r.VatPercent < 0 || r.VatPercent > 100)
+                throw new ArgumentException("VAT phải trong khoảng 0–100%.");
+            if (r.Currency != "VND")
+                throw new ArgumentException("Biểu phí vệ sinh chỉ dùng tiền VND.");
+            if (!CleaningTariffCategories.Contains(r.Category ?? ""))
+                throw new ArgumentException($"Nhóm dịch vụ '{r.Category}' không hợp lệ — chỉ nhận {string.Join(", ", CleaningTariffCategories)}.");
+            if (!CleaningResponsibleParties.Contains(r.ResponsiblePartyDefault ?? ""))
+                throw new ArgumentException($"Bên chịu phí '{r.ResponsiblePartyDefault}' không hợp lệ — chỉ nhận {string.Join(", ", CleaningResponsibleParties)}.");
+            if (r.EstimatedDurationMin < 0 || r.WaterUsageLiters < 0)
+                throw new ArgumentException("Thời gian thực hiện và lượng nước không được âm.");
+        }
+
+        private static void ApplyCleaningTariffRequest(CleaningTariff item, CleaningTariffRequest r)
+        {
+            item.NameVi = r.NameVi.Trim(); item.NameEn = r.NameEn?.Trim(); item.Category = r.Category;
+            item.CedexCode = string.IsNullOrWhiteSpace(r.CedexCode) ? null : r.CedexCode.Trim().ToUpperInvariant();
+            item.Description = r.Description?.Trim(); item.VatPercent = r.VatPercent; item.Currency = r.Currency;
+            item.ResponsiblePartyDefault = r.ResponsiblePartyDefault; item.EstimatedDurationMin = r.EstimatedDurationMin;
+            item.WaterUsageLiters = r.WaterUsageLiters; item.ChemicalRequired = r.ChemicalRequired?.Trim();
+            item.EquipmentUsed = r.EquipmentUsed?.Trim(); item.IsActive = r.IsActive; item.SortOrder = r.SortOrder;
+        }
+
+        public static readonly string[] ServiceTariffCategories = { "LIFT_EMPTY", "LIFT_LADEN", "SHIFTING", "NIGHT_SURCHARGE", "PTI", "CUSTOMS", "WEIGHING" };
+        private static readonly string[] ServiceTariffShifts = { "ALL", "DAY_ONLY", "NIGHT_SURCHARGE" };
+
+        public const string StorageCalculationUnit = "VND/Cont/Ngày";
+
+        // BUG-018 + depot-fullstack-storage-tariff-pricing: ngày miễn phí chỉ khai ở DefaultFreeDays; bậc đầu bắt đầu đúng
+        // ngày (miễn phí + 1), các bậc liền nhau không hở / chồng, chỉ bậc cuối không giới hạn và bắt buộc có.
         private static void ValidateStorageTariff(StorageTariffRuleRequest r)
         {
+            if (string.IsNullOrWhiteSpace(r.Code)) throw new ArgumentException("Mã quy tắc lưu bãi là bắt buộc.");
             if (r.DefaultFreeDays < 0) throw new ArgumentException("Số ngày miễn phí không được âm.");
             if (r.VatPercent < 0 || r.VatPercent > 100) throw new ArgumentException("VAT phải trong khoảng 0–100%.");
             if (r.Tiers.Count == 0) throw new ArgumentException("Quy tắc lưu bãi phải có ít nhất 1 bậc giá.");
@@ -372,13 +519,15 @@ namespace Depot.Application.Services
             for (var i = 0; i < tiers.Count; i++)
             {
                 var t = tiers[i];
-                var name = string.IsNullOrWhiteSpace(t.TierName) ? $"Bậc {i + 1}" : t.TierName;
-                if (t.FromDay < 0) throw new ArgumentException($"{name}: từ ngày không được âm.");
+                var name = string.IsNullOrWhiteSpace(t.TierName) ? $"Bậc {i + 1}" : t.TierName.Trim();
+                var expectedFrom = i == 0 ? r.DefaultFreeDays + 1 : (tiers[i - 1].ToDay ?? 0) + 1;
+                if (t.FromDay != expectedFrom)
+                    throw new ArgumentException(i == 0
+                        ? $"{name}: bậc đầu phải bắt đầu ngày {expectedFrom} (ngay sau {r.DefaultFreeDays} ngày miễn phí), đang là ngày {t.FromDay}."
+                        : $"{name}: phải bắt đầu ngày {expectedFrom} (liền sau bậc trước), đang là ngày {t.FromDay}.");
                 if (t.ToDay.HasValue && t.ToDay < t.FromDay) throw new ArgumentException($"{name}: đến ngày ({t.ToDay}) nhỏ hơn từ ngày ({t.FromDay}).");
                 if (!t.ToDay.HasValue && i < tiers.Count - 1) throw new ArgumentException($"{name}: bậc không giới hạn đến ngày phải là bậc cuối cùng.");
-                if (i > 0 && t.FromDay <= tiers[i - 1].ToDay) throw new ArgumentException($"{name} (từ ngày {t.FromDay}) chồng lấn bậc trước (đến ngày {tiers[i - 1].ToDay}).");
-                if (new[] { t.Price20Dry, t.Price40Dry, t.Price45Dry, t.Price20Reefer, t.Price40Reefer, t.PriceSpecial }.Any(p => p < 0))
-                    throw new ArgumentException($"{name}: đơn giá không được âm.");
+                if (t.ToDay.HasValue && i == tiers.Count - 1) throw new ArgumentException($"{name}: bậc cuối phải để trống \"đến ngày\" (từ ngày {t.FromDay} trở đi).");
             }
         }
 
@@ -386,8 +535,6 @@ namespace Depot.Application.Services
         {
             item.Code = code; item.ServiceCategory = request.ServiceCategory;
             item.NameVi = request.NameVi.Trim(); item.NameEn = request.NameEn?.Trim(); item.Unit = request.Unit;
-            item.Price20GP = request.Price20GP; item.Price40HC = request.Price40HC; item.Price45HC = request.Price45HC;
-            item.Price20RF = request.Price20RF; item.Price40RH = request.Price40RH; item.PriceSpecial = request.PriceSpecial;
             item.VatPercent = request.VatPercent; item.Currency = request.Currency; item.ApplicableShift = request.ApplicableShift;
             item.Description = request.Description?.Trim(); item.IsActive = request.IsActive; item.SortOrder = request.SortOrder;
         }
@@ -402,89 +549,134 @@ namespace Depot.Application.Services
             return true;
         }
 
-        private static StorageTariffTier MapTier(StorageTariffTierViewModel t, int fallbackSortOrder) => new()
-        {
-            TierName = t.TierName, FromDay = t.FromDay, ToDay = t.ToDay,
-            Price20Dry = t.Price20Dry, Price40Dry = t.Price40Dry, Price45Dry = t.Price45Dry,
-            Price20Reefer = t.Price20Reefer, Price40Reefer = t.Price40Reefer, PriceSpecial = t.PriceSpecial,
-            SortOrder = t.SortOrder == 0 ? fallbackSortOrder : t.SortOrder
-        };
-
-        public async Task<List<StorageTariffRule>> GetStorageTariffsAsync()
+        public async Task<List<StorageTariffRule>> GetStorageTariffsAsync(bool includeInactive = false)
         {
             return await _db.StorageTariffRules
-                .Include(x => x.Tiers.OrderBy(t => t.SortOrder))
-                .Where(x => x.IsActive)
+                .Include(x => x.Tiers.Where(t => !t.IsDeleted).OrderBy(t => t.SortOrder))
+                .ThenInclude(t => t.Prices.Where(p => !p.IsDeleted))
+                .Where(x => !x.IsDeleted && (includeInactive || x.IsActive))
                 .OrderBy(x => x.SortOrder).ThenBy(x => x.Code)
                 .ToListAsync();
         }
 
+        /// <summary>Kiểm tra request + chuẩn hoá: hãng tàu (ALL / DM Hãng Tàu, tên lấy từ DM), một quy tắc đang dùng mỗi hãng,
+        /// bậc liền nhau sau ngày miễn phí, giá theo loại container của DM. Trả tên hãng và danh sách bậc kèm giá đã chuẩn hoá.</summary>
+        private async Task<(string LineCode, string LineName, List<(StorageTariffTierViewModel Tier, List<(string Code, decimal Price)> Prices)> Tiers)>
+            PrepareStorageTariffAsync(StorageTariffRuleRequest request, long? selfId)
+        {
+            ValidateStorageTariff(request);
+            var lineCode = string.IsNullOrWhiteSpace(request.ShippingLineCode) ? "ALL" : request.ShippingLineCode.Trim().ToUpperInvariant();
+            string lineName;
+            if (lineCode == "ALL") lineName = "Mọi hãng tàu";
+            else
+            {
+                var line = await _db.ShippingLines.AsNoTracking().FirstOrDefaultAsync(l => l.Code == lineCode && !l.IsDeleted)
+                    ?? throw new ArgumentException($"Hãng tàu '{lineCode}' không có trong DM Hãng Tàu.");
+                lineName = line.Name;
+            }
+            if (request.IsActive)
+            {
+                var other = await _db.StorageTariffRules.AsNoTracking()
+                    .Where(x => !x.IsDeleted && x.IsActive && x.ShippingLineCode == lineCode && (selfId == null || x.Id != selfId))
+                    .Select(x => x.Code).FirstOrDefaultAsync();
+                if (other != null)
+                    throw new ArgumentException($"Hãng tàu {lineCode} đã có quy tắc lưu bãi đang dùng ({other}) — tạm ngưng quy tắc đó trước, mỗi hãng chỉ một quy tắc đang dùng.");
+            }
+            var tiers = new List<(StorageTariffTierViewModel, List<(string, decimal)>)>();
+            foreach (var t in request.Tiers.OrderBy(t => t.FromDay))
+                tiers.Add((t, await NormalizeServiceTariffPricesAsync(t.Prices)));
+            return (lineCode, lineName, tiers);
+        }
+
+        private static void ApplyStorageTariffRequest(StorageTariffRule item, StorageTariffRuleRequest request, string lineCode, string lineName)
+        {
+            item.ShippingLineCode = lineCode; item.ShippingLineName = lineName;
+            item.DefaultFreeDays = request.DefaultFreeDays; item.CalculationUnit = StorageCalculationUnit;
+            item.VatPercent = request.VatPercent; item.Notes = request.Notes?.Trim();
+            item.IsActive = request.IsActive; item.SortOrder = request.SortOrder;
+        }
+
+        private void AddStorageTiers(long ruleId, List<(StorageTariffTierViewModel Tier, List<(string Code, decimal Price)> Prices)> tiers)
+        {
+            var order = 0;
+            foreach (var (t, prices) in tiers)
+            {
+                order++;
+                var tier = new StorageTariffTier
+                {
+                    StorageTariffRuleId = ruleId,
+                    TierName = string.IsNullOrWhiteSpace(t.TierName) ? $"Bậc {order}" : t.TierName.Trim(),
+                    FromDay = t.FromDay, ToDay = t.ToDay, SortOrder = order
+                };
+                foreach (var p in prices) tier.Prices.Add(new StorageTariffTierPrice { ContainerTypeCode = p.Code, Price = p.Price });
+                _db.Set<StorageTariffTier>().Add(tier);
+            }
+        }
+
         public async Task<StorageTariffRule> CreateStorageTariffAsync(StorageTariffRuleRequest request)
         {
-            if (string.IsNullOrWhiteSpace(request.Code) || string.IsNullOrWhiteSpace(request.ShippingLineName))
-                throw new ArgumentException("Mã quy tắc và tên hãng tàu/nhóm áp dụng là bắt buộc.");
-            ValidateStorageTariff(request);
-            var code = request.Code.Trim().ToUpperInvariant();
-            var exists = await _db.StorageTariffRules.AnyAsync(x => x.Code == code);
-            if (exists) throw new InvalidOperationException("Mã quy tắc lưu bãi đã tồn tại.");
-            var item = new StorageTariffRule
+            var code = (request.Code ?? string.Empty).Trim().ToUpperInvariant();
+            var existing = await _db.StorageTariffRules.FirstOrDefaultAsync(x => x.Code == code);
+            if (existing != null && !existing.IsDeleted) throw new InvalidOperationException("Mã quy tắc lưu bãi đã tồn tại.");
+            var (lineCode, lineName, tiers) = await PrepareStorageTariffAsync(request, existing?.Id);
+
+            await using var tx = await _db.Database.BeginTransactionAsync();
+            StorageTariffRule item;
+            if (existing != null)
             {
-                Code = code, ShippingLineCode = request.ShippingLineCode, ShippingLineName = request.ShippingLineName.Trim(),
-                ContainerTypeCategory = request.ContainerTypeCategory, DefaultFreeDays = request.DefaultFreeDays,
-                CalculationUnit = request.CalculationUnit, VatPercent = request.VatPercent, Notes = request.Notes?.Trim(),
-                IsActive = request.IsActive, SortOrder = request.SortOrder
-            };
-            for (var i = 0; i < request.Tiers.Count; i++) item.Tiers.Add(MapTier(request.Tiers[i], i + 1));
-            _db.StorageTariffRules.Add(item);
+                // Mã từng bị xoá (xoá mềm) — dùng lại dòng cũ vì Code là unique index.
+                item = existing;
+                item.IsDeleted = false; item.DeletedAt = null; item.DeletedBy = null;
+                await _db.Set<StorageTariffTier>().Where(t => t.StorageTariffRuleId == item.Id).ExecuteDeleteAsync();
+            }
+            else
+            {
+                item = new StorageTariffRule { Code = code };
+                _db.StorageTariffRules.Add(item);
+            }
+            ApplyStorageTariffRequest(item, request, lineCode, lineName);
             await _db.SaveChangesAsync();
-            return item;
+            AddStorageTiers(item.Id, tiers);
+            await _db.SaveChangesAsync();
+            await tx.CommitAsync();
+            return (await GetStorageTariffByIdAsync(item.Id))!;
         }
 
         public async Task<StorageTariffRule?> UpdateStorageTariffAsync(long id, StorageTariffRuleRequest request)
         {
-            // Không Include(x => x.Tiers) — ExecuteDeleteAsync bên dưới xoá thẳng dưới DB, không qua
-            // ChangeTracker, nên nếu Include trước sẽ để lại entity con "ma" (đã xoá ở DB nhưng vẫn nằm
-            // trong tracker) — cùng lý do đã áp dụng cho DamageItem ở SubmitSurveyAsync.
-            var item = await _db.StorageTariffRules.FirstOrDefaultAsync(x => x.Id == id);
+            // Không Include(Tiers) — ExecuteDeleteAsync xoá thẳng dưới DB, Include trước sẽ để lại entity con "ma" trong tracker.
+            var item = await _db.StorageTariffRules.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
             if (item == null) return null;
-            if (string.IsNullOrWhiteSpace(request.Code) || string.IsNullOrWhiteSpace(request.ShippingLineName))
-                throw new ArgumentException("Mã quy tắc và tên hãng tàu/nhóm áp dụng là bắt buộc.");
-            ValidateStorageTariff(request);
-            var code = request.Code.Trim().ToUpperInvariant();
-            var duplicate = await _db.StorageTariffRules.AnyAsync(x => x.Id != id && x.Code == code);
-            if (duplicate) throw new InvalidOperationException("Mã quy tắc lưu bãi đã tồn tại.");
+            var code = (request.Code ?? string.Empty).Trim().ToUpperInvariant();
+            if (code != item.Code)
+                throw new ArgumentException($"Không đổi mã quy tắc lưu bãi '{item.Code}'.");
+            var (lineCode, lineName, tiers) = await PrepareStorageTariffAsync(request, id);
 
-            // ExecuteDeleteAsync chạy thẳng xuống DB ngay lập tức, KHÔNG tự gộp chung transaction với
-            // SaveChangesAsync phía sau — nếu SaveChangesAsync sau đó lỗi (vd trùng Code lọt qua do race
-            // condition), tier cũ đã bị xoá thật nhưng tier mới chưa kịp ghi, mất trắng dữ liệu lũy tiến.
-            // Bọc tường minh 1 transaction để đảm bảo atomic, giống nguyên tắc đã dùng ở
-            // DepotJobService.SubmitSurveyAsync.
+            // ExecuteDelete chạy thẳng xuống DB, không tự gộp transaction với SaveChanges — bọc 1 transaction để không mất bậc giá.
             await using var tx = await _db.Database.BeginTransactionAsync();
-
-            item.Code = code; item.ShippingLineCode = request.ShippingLineCode;
-            item.ShippingLineName = request.ShippingLineName.Trim(); item.ContainerTypeCategory = request.ContainerTypeCategory;
-            item.DefaultFreeDays = request.DefaultFreeDays; item.CalculationUnit = request.CalculationUnit;
-            item.VatPercent = request.VatPercent; item.Notes = request.Notes?.Trim();
-            item.IsActive = request.IsActive; item.SortOrder = request.SortOrder;
-
+            ApplyStorageTariffRequest(item, request, lineCode, lineName);
             await _db.Set<StorageTariffTier>().Where(t => t.StorageTariffRuleId == id).ExecuteDeleteAsync();
-            for (var i = 0; i < request.Tiers.Count; i++)
-            {
-                var tier = MapTier(request.Tiers[i], i + 1);
-                tier.StorageTariffRuleId = id;
-                _db.Set<StorageTariffTier>().Add(tier);
-            }
-
+            AddStorageTiers(id, tiers);
             await _db.SaveChangesAsync();
             await tx.CommitAsync();
-            return item;
+            return await GetStorageTariffByIdAsync(id);
+        }
+
+        private async Task<StorageTariffRule?> GetStorageTariffByIdAsync(long id)
+        {
+            _db.ChangeTracker.Clear();
+            return await _db.StorageTariffRules.AsNoTracking()
+                .Include(x => x.Tiers.Where(t => !t.IsDeleted).OrderBy(t => t.SortOrder))
+                .ThenInclude(t => t.Prices.Where(p => !p.IsDeleted))
+                .FirstOrDefaultAsync(x => x.Id == id);
         }
 
         public async Task<bool> DeactivateStorageTariffAsync(long id)
         {
-            var item = await _db.StorageTariffRules.FirstOrDefaultAsync(x => x.Id == id);
+            var item = await _db.StorageTariffRules.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
             if (item == null) return false;
-            item.IsActive = false;
+            // Xóa = xóa mềm (IsDeleted); IsActive=false là "Tạm ngưng", do form tự đặt.
+            item.IsDeleted = true; item.DeletedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();
             return true;
         }

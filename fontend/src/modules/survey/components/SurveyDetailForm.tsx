@@ -19,6 +19,9 @@ import { DamageListTable } from './DamageListTable';
 import { DamageFormModal } from './DamageFormModal';
 import { recomputeChecklistFromDamages, mergeChecklistWithTemplate } from '../utils/checklistSync';
 import { useSurveyChecklistTemplate } from '../../masterdata/utils/checklistCatalog';
+import { useContainerTypeOptions } from '../../masterdata/utils/containerTypeCatalog';
+import { priceForContainer, TariffPriceResult } from '../../masterdata/utils/tariffPricing';
+import { asPricedTariff } from '../../masterdata/utils/cleaningTariffCatalog';
 import { depotFileApi } from '../../../api';
 import {
   ClipboardCheck,
@@ -117,24 +120,12 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
     return 'DM';
   };
 
-  // Helper to calculate price of a cleaning tariff for current container size & type
-  const getTariffCost = (tariff: CleaningTariffMasterItem): number => {
-    // `isReefer` là field bắt buộc trên SurveyItemRecord, không cần (và không nên) đoán thêm qua
-    // `.includes('R')` — cách cũ khớp nhầm cả Flat Rack (FR) thành Reefer.
-    const isReefer = formData.isReefer;
-    // Trước đây `${formData.size}${formData.type}` luôn ra chuỗi truthy (kể cả "undefinedundefined" khi
-    // cả 2 đều rỗng) nên `|| '40HC'` không bao giờ chạy tới — ép `|| ''` từng phần để chuỗi rỗng thật sự
-    // khi thiếu dữ liệu, lúc đó fallback '40HC' mới có tác dụng.
-    const size = formData.sizeType || `${formData.size || ''}${formData.type || ''}` || '40HC';
-    if (isReefer) {
-      if (size.includes('20')) return tariff.price20RF;
-      return tariff.price40HR;
-    }
-    if (size.includes('20')) return tariff.price20DC;
-    if (size.includes('45')) return tariff.price45HC;
-    if (size.includes('HC')) return tariff.price40HC;
-    return tariff.price40DC;
-  };
+  // Giá dịch vụ vệ sinh theo đúng loại container của hồ sơ (DM Loại Container) — cùng quy tắc với server, server tra lại khi
+  // lưu (depot-fullstack-cleaning-tariff-pricing). Trước đây đoán theo chuỗi cỡ (20/45/HC) và tự lấy 40HC khi thiếu cỡ.
+  const containerTypeOptions = useContainerTypeOptions();
+  const [cleaningPriceWarning, setCleaningPriceWarning] = useState<string | null>(null);
+  const getTariffCost = (tariff: CleaningTariffMasterItem): TariffPriceResult =>
+    priceForContainer(asPricedTariff(tariff), formData.sizeType || '', containerTypeOptions);
 
   const handleAddCleaningItem = (tariff: CleaningTariffMasterItem) => {
     // Thẻ dịch vụ đã bấm rồi hiện badge "✓ Đã có" nhưng trước đây chỉ là trang trí — onClick vẫn chạy
@@ -142,7 +133,13 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
     if ((formData.cleaningItems || []).some((item) => item.cleaningCode === tariff.cleaningCode)) {
       return;
     }
-    const unitPrice = getTariffCost(tariff);
+    const priced = getTariffCost(tariff);
+    if (!priced.ok) {
+      setCleaningPriceWarning(`${priced.reason} — nhập giá ở DANH MỤC MASTER DATA → Biểu Phí Vệ Sinh Container.`);
+      return;
+    }
+    setCleaningPriceWarning(null);
+    const unitPrice = priced.price;
     const newItem: SurveyCleaningItemRecord = {
       id: 'CLN-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
       cleaningCode: tariff.cleaningCode,
@@ -1040,11 +1037,14 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
                 </span>
               </div>
 
+              {cleaningPriceWarning && (
+                <div data-testid="cleaning-price-warning" className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">{cleaningPriceWarning}</div>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5">
-                {/* cleaningTariffs lấy thật từ backend qua masterDataApi.getCatalog('CLEANING_TARIFF') —
-                    sửa/thêm/xóa dịch vụ ở màn Master Data sẽ phản ánh ngay tại đây. */}
+                {/* cleaningTariffs lấy thật từ backend (/MasterData/cleaning-tariffs) — sửa / thêm / xoá dịch vụ ở màn
+                    Master Data sẽ phản ánh ngay tại đây. Dịch vụ chưa có giá cho loại container của hồ sơ thì báo, không thêm. */}
                 {cleaningTariffs.filter((t) => t.status === 'ACTIVE').map((tariff) => {
-                  const unitPrice = getTariffCost(tariff);
+                  const priced = getTariffCost(tariff);
                   const isAlreadyAdded = (formData.cleaningItems || []).some(
                     (item) => item.cleaningCode === tariff.cleaningCode
                   );
@@ -1089,7 +1089,7 @@ export const SurveyDetailForm: React.FC<SurveyDetailFormProps> = ({
                       <div className="pt-2 mt-1 border-t border-slate-100 flex items-center justify-between">
                         <span className="text-[10px] text-slate-500">{tariff.estimatedDurationMin}p</span>
                         <span className="font-mono font-bold text-amber-700 text-xs">
-                          {unitPrice.toLocaleString('vi-VN')} đ
+                          {priced.ok ? `${priced.price.toLocaleString('vi-VN')} đ` : <span className="font-sans font-normal text-[10px] text-amber-700">Chưa có giá</span>}
                         </span>
                       </div>
                     </button>

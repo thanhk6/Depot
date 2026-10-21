@@ -125,7 +125,7 @@ export const DebtDashboardKPI: React.FC<DebtDashboardKPIProps> = ({
               <AlertTriangle className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-xl sm:text-2xl font-black text-red-600 tracking-tight">
+          <div data-testid="billing-overdue-kpi" className="text-xl sm:text-2xl font-black text-red-600 tracking-tight">
             {formatMoney(overdueAmount)}
           </div>
           <div className="flex items-center gap-1.5 text-[11px] text-red-500">

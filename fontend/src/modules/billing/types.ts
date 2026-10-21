@@ -132,9 +132,14 @@ export interface DebtAgingBucket {
   shippingLineId: string;
   shippingLineName: string;
   currency: CurrencyType;
+  /** Chưa đến hạn thanh toán. */
+  bucketNotDue: number;
+  /** Quá hạn 1–30 ngày. */
   bucket0_30: number;
   bucket31_60: number;
   bucket61_90: number;
   bucketOver90: number;
+  /** Tổng quá hạn (server tính theo ngày Việt Nam). */
+  overdueTotal: number;
   totalReceivable: number;
 }

@@ -48,6 +48,34 @@ namespace Depot.ViewModels
     /// Request tạo/sửa biểu cước nâng hạ (Lift-On/Off) — bảng riêng <c>ServiceTariff</c>, thay cho
     /// catalog dùng chung "SERVICE_TARIFF" cũ (xem docs/frontend-tariff-catalog-split.md).
     /// </summary>
+    /// <summary>1 đơn giá của biểu cước nâng hạ cho 1 loại container (CONTAINER_TYPE.Name, vd 40HC).</summary>
+    public class ServiceTariffPriceViewModel
+    {
+        public string ContainerTypeCode { get; set; } = string.Empty;
+        public decimal Price { get; set; }
+    }
+
+    /// <summary>Tạo / sửa biểu phí vệ sinh (bảng CleaningTariffs). Giá theo từng loại container; lưu = thay toàn bộ danh sách.</summary>
+    public class CleaningTariffRequest
+    {
+        public string Code { get; set; } = string.Empty;
+        public string NameVi { get; set; } = string.Empty;
+        public string? NameEn { get; set; }
+        public string Category { get; set; } = "GENERAL_SWEEP";
+        public string? CedexCode { get; set; }
+        public string? Description { get; set; }
+        public decimal VatPercent { get; set; } = 8;
+        public string Currency { get; set; } = "VND";
+        public string ResponsiblePartyDefault { get; set; } = "U";
+        public int EstimatedDurationMin { get; set; }
+        public int WaterUsageLiters { get; set; }
+        public string? ChemicalRequired { get; set; }
+        public string? EquipmentUsed { get; set; }
+        public bool IsActive { get; set; } = true;
+        public int SortOrder { get; set; }
+        public List<ServiceTariffPriceViewModel> Prices { get; set; } = new();
+    }
+
     public class ServiceTariffRequest
     {
         public string Code { get; set; } = string.Empty;
@@ -55,12 +83,8 @@ namespace Depot.ViewModels
         public string NameVi { get; set; } = string.Empty;
         public string? NameEn { get; set; }
         public string Unit { get; set; } = "Lần / Cont";
-        public decimal Price20GP { get; set; }
-        public decimal Price40HC { get; set; }
-        public decimal Price45HC { get; set; }
-        public decimal Price20RF { get; set; }
-        public decimal Price40RH { get; set; }
-        public decimal PriceSpecial { get; set; }
+        /// <summary>Đơn giá theo từng loại container (mã = DM Loại Container). Lưu = thay toàn bộ danh sách.</summary>
+        public List<ServiceTariffPriceViewModel> Prices { get; set; } = new();
         public decimal VatPercent { get; set; } = 8;
         public string Currency { get; set; } = "VND";
         public string ApplicableShift { get; set; } = "ALL";
@@ -75,26 +99,22 @@ namespace Depot.ViewModels
         public string TierName { get; set; } = string.Empty;
         public int FromDay { get; set; }
         public int? ToDay { get; set; }
-        public decimal Price20Dry { get; set; }
-        public decimal Price40Dry { get; set; }
-        public decimal Price45Dry { get; set; }
-        public decimal Price20Reefer { get; set; }
-        public decimal Price40Reefer { get; set; }
-        public decimal PriceSpecial { get; set; }
+        /// <summary>Đơn giá/ngày theo từng mã loại container của DM Loại Container.</summary>
+        public List<ServiceTariffPriceViewModel> Prices { get; set; } = new();
         public int SortOrder { get; set; }
     }
 
     /// <summary>
     /// Request tạo/sửa quy tắc cước lưu bãi — bảng riêng <c>StorageTariffRule</c> + bảng con
     /// <c>StorageTariffTier</c>, thay cho catalog dùng chung "STORAGE_TARIFF" cũ (xem
-    /// docs/frontend-tariff-catalog-split.md).
+    /// docs/frontend-tariff-catalog-split.md). Tên hãng tàu do server lấy theo DM Hãng Tàu; đơn vị luôn VND/Cont/Ngày
+    /// (depot-fullstack-storage-tariff-pricing).
     /// </summary>
     public class StorageTariffRuleRequest
     {
         public string Code { get; set; } = string.Empty;
         public string ShippingLineCode { get; set; } = "ALL";
         public string ShippingLineName { get; set; } = string.Empty;
-        public string ContainerTypeCategory { get; set; } = "DRY_STANDARD";
         public int DefaultFreeDays { get; set; }
         public string CalculationUnit { get; set; } = "VND/Cont/Day";
         public decimal VatPercent { get; set; } = 8;

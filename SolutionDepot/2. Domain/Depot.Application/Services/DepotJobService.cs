@@ -527,6 +527,8 @@ namespace Depot.Application.Services
             if (!surveyVm.IsDraft && surveyVm.CleaningItems.Count == 0)
                 throw new ArgumentException("Chọn ít nhất 01 dịch vụ vệ sinh ở tab Vệ Sinh — mọi container sau giám định đều chuyển Tổ Vệ Sinh.");
             await ValidateAndNormalizeSurveyChecklistAsync(surveyVm);
+            // Dịch vụ vệ sinh: đơn giá do server tra theo Biểu Phí Vệ Sinh + loại container của hồ sơ (depot-fullstack-cleaning-tariff-pricing).
+            await CleaningTariffPricing.ApplyToSurveyAsync(_db, job.IsoSize, surveyVm.CleaningItems);
 
             // Giám định viên lấy tự động theo tài khoản đang đăng nhập (Users.Id), không cho nhập tay.
             // Bắt buộc phải resolve được thật trong bảng Users, giống nguyên tắc đã áp dụng ở Gate-In.
@@ -1397,6 +1399,11 @@ namespace Depot.Application.Services
             if (request.Items.Count == 0) throw new InvalidOperationException("Phiếu dịch vụ phải có ít nhất 1 hạng mục.");
             if (request.Items.Any(x => x.Quantity <= 0 || x.UnitPrice < 0 || x.VatPercent < 0 || x.VatPercent > 100))
                 throw new InvalidOperationException("Hạng mục không hợp lệ: số lượng phải > 0, đơn giá ≥ 0, VAT 0–100%.");
+            // Hạng mục biểu cước nâng hạ: server tự tra đơn giá / VAT theo loại container của HỒ SƠ (không theo cỡ / giá
+            // trình duyệt gửi) — depot-fullstack-lolo-tariff-pricing.
+            await RejectStorageItemsAsync(request.Items);
+            await ServiceTariffPricing.ApplyAsync(_db, job.IsoSize, request.Items);
+            await CleaningTariffPricing.ApplyToServiceOrderAsync(_db, job.IsoSize, request.Items);
             // Mỗi hồ sơ chỉ có 1 phiếu dịch vụ (DB có unique index DepotJobId, kể cả phiếu đã huỷ).
             var existingOrder = await _db.ServiceOrders.AsNoTracking().FirstOrDefaultAsync(x => x.DepotJobId == job.Id);
             if (existingOrder != null)
@@ -1405,7 +1412,7 @@ namespace Depot.Application.Services
             {
                 OrderNo = $"SO-{DateTime.UtcNow:yyyyMMdd}-{Random.Shared.Next(100, 999)}",
                 DepotJobId = job.Id, ContainerNo = job.ContainerNo,
-                ShippingLineCode = request.ShippingLineCode, IsoCode = request.IsoCode, Size = request.Size, Type = request.Type,
+                ShippingLineCode = request.ShippingLineCode, IsoCode = request.IsoCode, Size = job.IsoSize, Type = request.Type,
                 CustomerName = request.CustomerName, CustomerTaxCode = request.CustomerTaxCode,
                 DriverName = request.DriverName, TruckPlate = request.TruckPlate, DriverPhone = request.DriverPhone,
                 Condition = request.Condition, SurveyNote = request.SurveyNote, CleaningNote = request.CleaningNote, Notes = request.Notes
@@ -1458,7 +1465,7 @@ namespace Depot.Application.Services
                         JobNo = job.JobNo,
                         ContainerNo = job.ContainerNo,
                         IsoCode = request.IsoCode,
-                        SizeType = request.Size ?? job.IsoSize,
+                        SizeType = job.IsoSize,
                         TypeName = request.Type,
                         ShippingLine = request.ShippingLineCode,
                         Status = "PENDING_CLEANING",
@@ -1487,6 +1494,12 @@ namespace Depot.Application.Services
             var order = await _db.ServiceOrders.Include(x => x.Items).Include(x => x.DepotJob).FirstOrDefaultAsync(x => x.Id == orderId);
             if (order == null || order.Status is "PAID" or "CANCELLED") return null;
             if (request.Items.Count == 0 || request.Items.Any(x => x.Quantity <= 0 || x.UnitPrice < 0 || x.VatPercent < 0 || x.VatPercent > 100)) return null;
+            // Sửa phiếu cũng tra lại giá biểu cước nâng hạ theo loại container của hồ sơ (depot-fullstack-lolo-tariff-pricing).
+            var jobIsoSize = order.DepotJob?.IsoSize ?? order.Size;
+            await RejectStorageItemsAsync(request.Items);
+            await ServiceTariffPricing.ApplyAsync(_db, jobIsoSize, request.Items);
+            await CleaningTariffPricing.ApplyToServiceOrderAsync(_db, jobIsoSize, request.Items);
+            order.Size = jobIsoSize;
 
             if (request.CustomerName is not null) order.CustomerName = request.CustomerName;
             if (request.CustomerTaxCode is not null) order.CustomerTaxCode = request.CustomerTaxCode;
@@ -2035,6 +2048,26 @@ namespace Depot.Application.Services
             return new GateOutBookingMatch(booking, bookingLine, category);
         }
 
+        /// <summary>Phí lưu bãi do hệ thống tính khi Gate-Out — phiếu dịch vụ không nhận hạng mục nhóm STORAGE hay mã bậc lưu bãi
+        /// mẫu cũ "&lt;mã quy tắc&gt;_T&lt;n&gt;" (depot-fullstack-storage-tariff-pricing).</summary>
+        private async Task RejectStorageItemsAsync(IEnumerable<ServiceOrderItemRequest> items)
+        {
+            var ruleCodes = await _db.StorageTariffRules.AsNoTracking().Select(r => r.Code).ToListAsync();
+            var bad = items.FirstOrDefault(i =>
+                string.Equals(i.Category?.Trim(), "STORAGE", StringComparison.OrdinalIgnoreCase)
+                || ruleCodes.Any(code => (i.ServiceCode ?? string.Empty).Trim().ToUpperInvariant() == code
+                    || (i.ServiceCode ?? string.Empty).Trim().ToUpperInvariant().StartsWith(code + "_T")));
+            if (bad != null)
+                throw new ArgumentException($"Hạng mục '{bad.ServiceName}' là phí lưu bãi — phí lưu bãi do hệ thống tính khi Gate-Out, không lập trên phiếu dịch vụ.");
+        }
+
+        public async Task<StorageFeeResult?> GetStorageFeeAsync(long jobId)
+        {
+            var job = await _db.DepotJobs.AsNoTracking().FirstOrDefaultAsync(j => j.Id == jobId);
+            if (job == null) return null;
+            return await StorageTariffPricing.CalculateAsync(_db, job, job.GateOutDate ?? DateTime.UtcNow);
+        }
+
         /// <summary>Kiểm tra trước 1 booking cho 1 hồ sơ — chỉ đọc, không đổi booking hay hồ sơ.</summary>
         public async Task<GateOutBookingCheckResult> CheckGateOutBookingAsync(long jobId, string? bookingNo)
         {
@@ -2115,6 +2148,8 @@ namespace Depot.Application.Services
             var sealNo = request.SealNo;
             var eirNo = $"EIR-OUT-{nowUtc:yyyyMMdd}-{Random.Shared.Next(100000, 999999)}";
             var bookingNo = match?.Booking.BookingNo;
+            // Phí lưu bãi tính tới lúc ra cổng — ghi nhật ký, chưa chặn ra cổng (depot-fullstack-storage-tariff-pricing).
+            var storageFee = await StorageTariffPricing.CalculateAsync(_db, job, nowUtc);
 
             await using var tx = await _db.Database.BeginTransactionAsync();
 
@@ -2167,6 +2202,8 @@ namespace Depot.Application.Services
                 details = $"Cấp vỏ KHÔNG theo booking — lý do: {reasonLabel}{(string.IsNullOrEmpty(note) ? string.Empty : $" ({note})")}. " +
                           $"Xe {truckPlate}, tài xế {driverName}, EIR {eirNo}.";
             }
+
+            details += " " + StorageTariffPricing.AuditText(storageFee);
 
             var position = await _db.YardPositions.FirstOrDefaultAsync(p => p.IsOccupied && p.OccupiedContainerNo == job.ContainerNo);
             if (position != null)

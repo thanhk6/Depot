@@ -20,6 +20,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { GateOutContainerRecord } from '../types/gateOut';
+import { GateOutStorageFee } from './GateOutStorageFee';
 
 interface GateOutDispatchModalProps {
   container: GateOutContainerRecord;
@@ -243,6 +244,9 @@ export const GateOutDispatchModal: React.FC<GateOutDispatchModalProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Phí lưu bãi do server tính (chưa thu) */}
+          <GateOutStorageFee containerNo={container.containerNo} />
 
           {/* Section 2: Truck Arrival & Booking Information */}
           <div className="space-y-4">

@@ -94,7 +94,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     // xem docs/backend-progress/23-master-data.md để đối chiếu lại nếu thêm/đổi loại danh mục mới.
     const catalogTypesByMenuId: Record<string, string> = {
       departments: 'DEPARTMENT',
-      cleaning_tariffs: 'CLEANING_TARIFF',
       container_types: 'CONTAINER_TYPE',
       damage_locations: 'DAMAGE_LOCATION',
       damage_codes: 'DAMAGE_CODE',
@@ -120,6 +119,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           // riêng mục đó (sẽ tự ẩn badge, không hiện số sai) thay vì reject cả Promise.all.
           .catch(() => [menuId, 0] as const)
       ),
+      // Biểu Phí Vệ Sinh: bảng riêng CleaningTariffs (không còn catalog CLEANING_TARIFF).
+      masterDataApi
+        .getCleaningTariffs()
+        .then((response: any) => ['cleaning_tariffs', Array.isArray(response?.data) ? response.data.length : 0] as const)
+        .catch(() => ['cleaning_tariffs', 0] as const),
       masterDataApi
         .getServiceTariffs()
         .then((response: any) => {
@@ -364,7 +368,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {
           // Trước đây 1 mục "Cước Nâng Hạ & Lưu Bãi" gộp chung — đã tách thành 3 mục riêng theo yêu
           // cầu người dùng (xem docs/frontend-tariff-catalog-split.md), mỗi mục vào đúng 1 màn quản lý
-          // riêng biệt (`LoloTariffMaster`/`StorageTariffMaster`/`TariffCalculatorPage`).
+          // riêng biệt (`LoloTariffMaster`/`StorageTariffMaster`; Máy tính cước đã bỏ theo yêu cầu 20/10/2026).
           id: 'tariff_lolo',
           label: 'Cước Nâng Hạ (LoLo)',
           icon: <Truck className="w-4 h-4 text-cyan-400" />,
@@ -375,12 +379,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           label: 'Cước Lưu Bãi (Storage)',
           icon: <Layers className="w-4 h-4 text-indigo-400" />,
           badge: masterDataCatalogCounts.tariff_storage ? `${masterDataCatalogCounts.tariff_storage} Quy Tắc` : undefined
-        },
-        {
-          id: 'tariff_calculator',
-          label: 'Máy Tính Cước Nâng Hạ & Lưu Bãi',
-          icon: <Receipt className="w-4 h-4 text-emerald-400" />,
-          badge: 'Công Cụ'
         },
         {
           id: 'cleaning_tariffs',

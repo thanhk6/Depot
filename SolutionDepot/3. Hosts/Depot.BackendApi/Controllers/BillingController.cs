@@ -16,6 +16,9 @@ namespace Depot.BackendApi.Controllers
         private readonly IBillingService service;
         public BillingController(IBillingService service) => this.service = service;
 
+        // Người thao tác = tài khoản đăng nhập; tên người do trình duyệt gửi bị bỏ qua (depot-fullstack-shipping-line-ar-fix).
+        private string Actor => User.GetFullName() ?? User.GetUsername() ?? string.Empty;
+
         [HttpGet("debts")]
         public async Task<IActionResult> GetDebts([FromQuery] string? shippingLineCode, [FromQuery] string? status)
         {
@@ -47,7 +50,7 @@ namespace Depot.BackendApi.Controllers
         [HttpPost("sync")]
         public async Task<IActionResult> SyncDebts([FromBody] SyncDebtsRequest request)
         {
-            try { return Ok(new ResponseSingleContentModel<object> { StatusCode = 200, Message = "Đồng bộ công nợ thành công", Data = await service.SyncDebtsAsync(request) }); }
+            try { return Ok(new ResponseSingleContentModel<object> { StatusCode = 200, Message = "Đồng bộ công nợ thành công", Data = await service.SyncDebtsAsync(request, Actor) }); }
             catch (Exception ex) { return BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = ex.Message, Data = "Không thể đồng bộ công nợ" }); }
         }
 
@@ -56,7 +59,7 @@ namespace Depot.BackendApi.Controllers
         {
             try
             {
-                var debt = await service.IssueInvoiceAsync(debtCode, request);
+                var debt = await service.IssueInvoiceAsync(debtCode, request, Actor);
                 return debt == null
                     ? NotFound(new ResponseSingleContentModel<string> { StatusCode = 404, Message = "Không tìm thấy khoản công nợ", Data = debtCode })
                     : Ok(new ResponseSingleContentModel<object> { StatusCode = 200, Message = "Xuất hóa đơn thành công", Data = debt });
@@ -72,7 +75,7 @@ namespace Depot.BackendApi.Controllers
         {
             try
             {
-                var result = await service.RecordPaymentAsync(request);
+                var result = await service.RecordPaymentAsync(request, Actor);
                 return result.IsSuccessed
                     ? Ok(new ResponseSingleContentModel<object> { StatusCode = 200, Message = result.Message ?? "Ghi nhận thanh toán thành công", Data = result.ResultObj })
                     : BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = result.Message ?? "Không thể ghi nhận thanh toán", Data = request.ShippingLineCode });
@@ -88,7 +91,7 @@ namespace Depot.BackendApi.Controllers
         {
             try
             {
-                var result = await service.ClosePeriodAsync(periodCode, request);
+                var result = await service.ClosePeriodAsync(periodCode, request, Actor);
                 return result.IsSuccessed
                     ? Ok(new ResponseSingleContentModel<object> { StatusCode = 200, Message = result.Message ?? "Khoá sổ kỳ công nợ thành công", Data = result.ResultObj })
                     : BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = result.Message ?? "Không thể khoá sổ kỳ công nợ", Data = periodCode });
@@ -104,7 +107,7 @@ namespace Depot.BackendApi.Controllers
         {
             try
             {
-                var result = await service.ReversePaymentAsync(paymentCode, request);
+                var result = await service.ReversePaymentAsync(paymentCode, request, Actor);
                 return result.IsSuccessed
                     ? Ok(new ResponseSingleContentModel<object> { StatusCode = 200, Message = result.Message ?? "Huỷ khoản thanh toán thành công", Data = result.ResultObj })
                     : BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = result.Message ?? "Không thể huỷ khoản thanh toán", Data = paymentCode });

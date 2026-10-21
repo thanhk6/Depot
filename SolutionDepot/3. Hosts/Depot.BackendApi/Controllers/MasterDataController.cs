@@ -280,12 +280,62 @@ namespace Depot.BackendApi.Controllers
             }
         }
 
+        // Biểu phí vệ sinh — bảng riêng CleaningTariffs + CleaningTariffPrices (thay catalog "CLEANING_TARIFF").
+        [HttpGet("cleaning-tariffs")]
+        public async Task<IActionResult> GetCleaningTariffs([FromQuery] bool includeInactive = false)
+        {
+            var items = await _masterService.GetCleaningTariffsAsync(includeInactive);
+            return Ok(new ResponseSingleContentModel<object> { StatusCode = 200, Message = "Lấy biểu phí vệ sinh thành công", Data = items });
+        }
+
+        [RequirePermission(RolePermissions.MasterData)]
+        [HttpPost("cleaning-tariffs")]
+        public async Task<IActionResult> CreateCleaningTariff([FromBody] CleaningTariffRequest request)
+        {
+            try
+            {
+                var item = await _masterService.CreateCleaningTariffAsync(request);
+                return Ok(new ResponseSingleContentModel<dynamic> { StatusCode = 200, Message = "Tạo biểu phí vệ sinh thành công", Data = item });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = ex.Message, Data = "Biểu phí vệ sinh không hợp lệ" });
+            }
+        }
+
+        [RequirePermission(RolePermissions.MasterData)]
+        [HttpPut("cleaning-tariffs/{id:long}")]
+        public async Task<IActionResult> UpdateCleaningTariff(long id, [FromBody] CleaningTariffRequest request)
+        {
+            try
+            {
+                var item = await _masterService.UpdateCleaningTariffAsync(id, request);
+                return item == null
+                    ? NotFound(new ResponseSingleContentModel<string> { StatusCode = 404, Message = "Không tìm thấy biểu phí vệ sinh", Data = id.ToString() })
+                    : Ok(new ResponseSingleContentModel<dynamic> { StatusCode = 200, Message = "Cập nhật biểu phí vệ sinh thành công", Data = item });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new ResponseSingleContentModel<string> { StatusCode = 400, Message = ex.Message, Data = "Biểu phí vệ sinh không hợp lệ" });
+            }
+        }
+
+        [RequirePermission(RolePermissions.MasterData)]
+        [HttpDelete("cleaning-tariffs/{id:long}")]
+        public async Task<IActionResult> DeleteCleaningTariff(long id)
+        {
+            var deleted = await _masterService.DeactivateCleaningTariffAsync(id);
+            return deleted
+                ? Ok(new ResponseSingleContentModel<string> { StatusCode = 200, Message = "Đã xóa biểu phí vệ sinh", Data = "DELETED" })
+                : NotFound(new ResponseSingleContentModel<string> { StatusCode = 404, Message = "Không tìm thấy biểu phí vệ sinh", Data = id.ToString() });
+        }
+
         // Cước Lưu Bãi (Storage) — bảng riêng StorageTariffRule + StorageTariffTier, tách khỏi catalog
         // "STORAGE_TARIFF" dùng chung cũ (xem docs/frontend-tariff-catalog-split.md).
         [HttpGet("storage-tariffs")]
-        public async Task<IActionResult> GetStorageTariffs()
+        public async Task<IActionResult> GetStorageTariffs([FromQuery] bool includeInactive = false)
         {
-            var items = await _masterService.GetStorageTariffsAsync();
+            var items = await _masterService.GetStorageTariffsAsync(includeInactive);
             return Ok(new ResponseSingleContentModel<object> { StatusCode = 200, Message = "Lấy quy tắc lưu bãi thành công", Data = items });
         }
 
@@ -329,12 +379,12 @@ namespace Depot.BackendApi.Controllers
             {
                 var deleted = await _masterService.DeactivateStorageTariffAsync(id);
                 return deleted
-                    ? Ok(new ResponseSingleContentModel<string> { StatusCode = 200, Message = "Đã vô hiệu hóa quy tắc lưu bãi", Data = "INACTIVE" })
+                    ? Ok(new ResponseSingleContentModel<string> { StatusCode = 200, Message = "Đã xoá quy tắc lưu bãi", Data = "DELETED" })
                     : NotFound(new ResponseSingleContentModel<string> { StatusCode = 404, Message = "Không tìm thấy quy tắc lưu bãi", Data = id.ToString() });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new ResponseSingleContentModel<string> { StatusCode = 500, Message = "Lỗi khi vô hiệu hóa quy tắc lưu bãi", Data = ex.Message });
+                return StatusCode(500, new ResponseSingleContentModel<string> { StatusCode = 500, Message = "Lỗi khi xoá quy tắc lưu bãi", Data = ex.Message });
             }
         }
 

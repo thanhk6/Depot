@@ -118,7 +118,6 @@ chỉ phần mô tả/ghi chú là viết tay (file `docs/menu/_tools/notes.json
 | `departments` | DM Phòng Ban Depot | `DepartmentMaster` | [08-danh-muc-master-data.md](08-danh-muc-master-data.md#dm-phòng-ban-depot) |
 | `tariff_lolo` | Cước Nâng Hạ (LoLo) | `LoloTariffMaster` | [08-danh-muc-master-data.md](08-danh-muc-master-data.md#cước-nâng-hạ-lolo) |
 | `tariff_storage` | Cước Lưu Bãi (Storage) | `StorageTariffMaster` | [08-danh-muc-master-data.md](08-danh-muc-master-data.md#cước-lưu-bãi-storage) |
-| `tariff_calculator` | Máy Tính Cước Nâng Hạ & Lưu Bãi | `TariffCalculatorPage` | [08-danh-muc-master-data.md](08-danh-muc-master-data.md#máy-tính-cước-nâng-hạ--lưu-bãi) |
 | `cleaning_tariffs` | Biểu Phí Vệ Sinh Container | `CleaningMaster` | [08-danh-muc-master-data.md](08-danh-muc-master-data.md#biểu-phí-vệ-sinh-container) |
 | `container_types` | DM Loại Container (ISO) | `ContainerTypeMaster` | [08-danh-muc-master-data.md](08-danh-muc-master-data.md#dm-loại-container-iso) |
 | `damage_locations` | DM Vị Trí Cấu Kiện | `DamageLocationMaster` | [08-danh-muc-master-data.md](08-danh-muc-master-data.md#dm-vị-trí-cấu-kiện) |

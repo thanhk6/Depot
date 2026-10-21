@@ -37,7 +37,6 @@ export const MENU_PERMISSION: Record<string, string | string[]> = {
   departments: 'masterdata',
   tariff_lolo: 'masterdata',
   tariff_storage: 'masterdata',
-  tariff_calculator: 'masterdata',
   cleaning_tariffs: 'masterdata',
   container_types: 'masterdata',
   damage_locations: 'masterdata',

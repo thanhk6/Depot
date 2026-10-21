@@ -689,6 +689,17 @@ namespace Depot.BackendApi.Controllers
             }
         }
 
+        /// <summary>Phí lưu bãi do server tính (tới hôm nay, hoặc tới ngày Gate-Out nếu đã ra) — chỉ đọc.</summary>
+        [RequirePermission(RolePermissions.Operation, RolePermissions.GateOutNoBooking)]
+        [HttpGet("{id:long}/storage-fee")]
+        public async Task<IActionResult> GetStorageFee(long id)
+        {
+            var result = await _depotService.GetStorageFeeAsync(id);
+            return result == null
+                ? NotFound(new ResponseSingleContentModel<string> { StatusCode = 404, Message = "Không tìm thấy hồ sơ container.", Data = id.ToString() })
+                : Ok(new ResponseSingleContentModel<StorageFeeResult> { StatusCode = 200, Message = result.Message, Data = result });
+        }
+
         /// <summary>Kiểm tra 1 booking với hồ sơ trước khi cấp vỏ — chỉ đọc, không đổi booking hay hồ sơ.</summary>
         [RequirePermission(RolePermissions.Operation)]
         [HttpGet("{id:long}/gate-out/booking-check")]

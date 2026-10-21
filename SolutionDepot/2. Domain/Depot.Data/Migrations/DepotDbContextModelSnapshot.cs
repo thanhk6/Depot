@@ -2793,6 +2793,150 @@ namespace Depot.Data.Migrations
                     b.ToTable("Suppliers");
                 });
 
+            modelBuilder.Entity("Depot.Data.Entities.Master.CleaningTariff", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("CedexCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("ChemicalRequired")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeletedBy")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
+                    b.Property<string>("EquipmentUsed")
+                        .HasColumnType("text");
+
+                    b.Property<int>("EstimatedDurationMin")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text");
+
+                    b.Property<string>("NameEn")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("NameVi")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ResponsiblePartyDefault")
+                        .IsRequired()
+                        .HasMaxLength(5)
+                        .HasColumnType("character varying(5)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("VatPercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<int>("WaterUsageLiters")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("CleaningTariffs", (string)null);
+                });
+
+            modelBuilder.Entity("Depot.Data.Entities.Master.CleaningTariffPrice", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CleaningTariffId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("ContainerTypeCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeletedBy")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("Price")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CleaningTariffId", "ContainerTypeCode")
+                        .IsUnique();
+
+                    b.ToTable("CleaningTariffPrices", (string)null);
+                });
+
             modelBuilder.Entity("Depot.Data.Entities.Master.Container", b =>
                 {
                     b.Property<long>("Id")
@@ -3392,30 +3536,6 @@ namespace Depot.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
-                    b.Property<decimal>("Price20GP")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<decimal>("Price20RF")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<decimal>("Price40HC")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<decimal>("Price40RH")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<decimal>("Price45HC")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<decimal>("PriceSpecial")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
                     b.Property<string>("ServiceCategory")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -3441,6 +3561,55 @@ namespace Depot.Data.Migrations
                     b.HasIndex("ServiceCategory");
 
                     b.ToTable("ServiceTariffs");
+                });
+
+            modelBuilder.Entity("Depot.Data.Entities.Master.ServiceTariffPrice", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("ContainerTypeCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeletedBy")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("Price")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<long>("ServiceTariffId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ServiceTariffId", "ContainerTypeCode")
+                        .IsUnique();
+
+                    b.ToTable("ServiceTariffPrices", (string)null);
                 });
 
             modelBuilder.Entity("Depot.Data.Entities.Master.ShippingLine", b =>
@@ -3512,11 +3681,6 @@ namespace Depot.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
-
-                    b.Property<string>("ContainerTypeCategory")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -3607,30 +3771,6 @@ namespace Depot.Data.Migrations
                     b.Property<string>("LastModifiedBy")
                         .HasColumnType("text");
 
-                    b.Property<decimal>("Price20Dry")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<decimal>("Price20Reefer")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<decimal>("Price40Dry")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<decimal>("Price40Reefer")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<decimal>("Price45Dry")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<decimal>("PriceSpecial")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer");
 
@@ -3650,6 +3790,55 @@ namespace Depot.Data.Migrations
                     b.HasIndex("StorageTariffRuleId");
 
                     b.ToTable("StorageTariffTier");
+                });
+
+            modelBuilder.Entity("Depot.Data.Entities.Master.StorageTariffTierPrice", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("ContainerTypeCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeletedBy")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("Price")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<long>("StorageTariffTierId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StorageTariffTierId", "ContainerTypeCode")
+                        .IsUnique();
+
+                    b.ToTable("StorageTariffTierPrices", (string)null);
                 });
 
             modelBuilder.Entity("Depot.Data.Entities.Storage.DepotFile", b =>
@@ -4725,6 +4914,15 @@ namespace Depot.Data.Migrations
                     b.Navigation("ServiceOrder");
                 });
 
+            modelBuilder.Entity("Depot.Data.Entities.Master.CleaningTariffPrice", b =>
+                {
+                    b.HasOne("Depot.Data.Entities.Master.CleaningTariff", null)
+                        .WithMany("Prices")
+                        .HasForeignKey("CleaningTariffId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Depot.Data.Entities.Master.Container", b =>
                 {
                     b.HasOne("Depot.Data.Entities.Master.ShippingLine", null)
@@ -4745,6 +4943,15 @@ namespace Depot.Data.Migrations
                     b.Navigation("ShippingLine");
                 });
 
+            modelBuilder.Entity("Depot.Data.Entities.Master.ServiceTariffPrice", b =>
+                {
+                    b.HasOne("Depot.Data.Entities.Master.ServiceTariff", null)
+                        .WithMany("Prices")
+                        .HasForeignKey("ServiceTariffId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Depot.Data.Entities.Master.StorageTariffTier", b =>
                 {
                     b.HasOne("Depot.Data.Entities.Master.StorageTariffRule", "StorageTariffRule")
@@ -4754,6 +4961,15 @@ namespace Depot.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("StorageTariffRule");
+                });
+
+            modelBuilder.Entity("Depot.Data.Entities.Master.StorageTariffTierPrice", b =>
+                {
+                    b.HasOne("Depot.Data.Entities.Master.StorageTariffTier", null)
+                        .WithMany("Prices")
+                        .HasForeignKey("StorageTariffTierId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Depot.Data.Entities.System.SystemUser", b =>
@@ -4794,9 +5010,24 @@ namespace Depot.Data.Migrations
                     b.Navigation("Items");
                 });
 
+            modelBuilder.Entity("Depot.Data.Entities.Master.CleaningTariff", b =>
+                {
+                    b.Navigation("Prices");
+                });
+
+            modelBuilder.Entity("Depot.Data.Entities.Master.ServiceTariff", b =>
+                {
+                    b.Navigation("Prices");
+                });
+
             modelBuilder.Entity("Depot.Data.Entities.Master.StorageTariffRule", b =>
                 {
                     b.Navigation("Tiers");
+                });
+
+            modelBuilder.Entity("Depot.Data.Entities.Master.StorageTariffTier", b =>
+                {
+                    b.Navigation("Prices");
                 });
 
             modelBuilder.Entity("Depot.Data.Entities.System.Role", b =>

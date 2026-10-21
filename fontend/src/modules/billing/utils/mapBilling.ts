@@ -91,10 +91,12 @@ export function mapAgingDto(dto: any): DebtAgingBucket {
     shippingLineId: dto.shippingLineCode,
     shippingLineName: dto.shippingLineName,
     currency: 'VND',
+    bucketNotDue: Number(dto.bucketNotDue) || 0,
     bucket0_30: dto.bucket0_30,
     bucket31_60: dto.bucket31_60,
     bucket61_90: dto.bucket61_90,
     bucketOver90: dto.bucketOver90,
+    overdueTotal: Number(dto.overdueTotal) || 0,
     totalReceivable: dto.totalReceivable
   };
 }

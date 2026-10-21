@@ -8,7 +8,6 @@
 | [DM Phòng Ban Depot](#dm-phòng-ban-depot) | `departments` | `DepartmentMaster` |
 | [Cước Nâng Hạ (LoLo)](#cước-nâng-hạ-lolo) | `tariff_lolo` | `LoloTariffMaster` |
 | [Cước Lưu Bãi (Storage)](#cước-lưu-bãi-storage) | `tariff_storage` | `StorageTariffMaster` |
-| [Máy Tính Cước Nâng Hạ & Lưu Bãi](#máy-tính-cước-nâng-hạ--lưu-bãi) | `tariff_calculator` | `TariffCalculatorPage` |
 | [Biểu Phí Vệ Sinh Container](#biểu-phí-vệ-sinh-container) | `cleaning_tariffs` | `CleaningMaster` |
 | [DM Loại Container (ISO)](#dm-loại-container-iso) | `container_types` | `ContainerTypeMaster` |
 | [DM Vị Trí Cấu Kiện](#dm-vị-trí-cấu-kiện) | `damage_locations` | `DamageLocationMaster` |
@@ -71,7 +70,7 @@ Lịch sử rà soát & sửa lỗi: [23-master-data.md](../backend-progress/23-
 
 ## Cước Nâng Hạ (LoLo)
 
-Biểu cước nâng hạ (bảng `ServiceTariffs`): giá theo kích cỡ, VAT, phân loại dịch vụ (nâng hạ vỏ rỗng/có hàng, đảo chuyển, phụ phí đêm, PTI, hải quan, cân).
+Biểu cước nâng hạ (bảng `ServiceTariffs`): VAT, phân loại dịch vụ (nâng hạ vỏ rỗng/có hàng, đảo chuyển, phụ phí đêm, PTI, hải quan, cân); **đơn giá riêng cho từng loại container của DM Loại Container** (bảng `ServiceTariffPrices`, mã loại = `CONTAINER_TYPE.Name`). Cột / ô giá trên màn dựng theo các loại đang dùng của DM; chưa nhập = chưa có giá (lập phiếu cho loại đó bị chặn). Không đổi mã biểu cước sau khi tạo.
 
 ### Frontend
 
@@ -98,13 +97,20 @@ Biểu cước nâng hạ (bảng `ServiceTariffs`): giá theo kích cỡ, VAT, 
 ### Ghi chú
 
 - `Tạm ngưng` = `IsActive=false` (vẫn thấy ở màn quản trị), `Xóa` = `IsDeleted=true`.
-- Phụ phí ca đêm của Máy tính cước tìm theo `ApplicableShift = NIGHT_SURCHARGE` (tự suy từ phân loại).
+- Phụ phí ca đêm: biểu cước có `ApplicableShift = NIGHT_SURCHARGE` (tự suy từ phân loại *Phụ phí đêm*); chọn thêm trên phiếu dịch vụ, không tự áp theo giờ. Máy tính cước đã bỏ (20/10/2026).
 
 Lịch sử rà soát & sửa lỗi: [23-master-data.md](../backend-progress/23-master-data.md), [frontend-tariff-catalog-split.md](../backend-progress/../frontend-tariff-catalog-split.md)
 
 ## Cước Lưu Bãi (Storage)
 
-Biểu cước lưu bãi lũy tiến theo ngày (bảng `StorageTariffRules` + `StorageTariffTiers`).
+Biểu cước lưu bãi lũy tiến theo ngày — bảng `StorageTariffRules` (quy tắc) + `StorageTariffTier` (bậc) + `StorageTariffTierPrices` (bậc × mã loại container → đơn giá/ngày), API `/MasterData/storage-tariffs` (`?includeInactive=true` để lấy cả quy tắc tạm ngưng). Từ 20/10/2026 (`depot-fullstack-storage-tariff-pricing`):
+
+- **Hãng tàu** lấy từ DM Hãng Tàu (hoặc **Mọi hãng tàu** = `ALL`); mỗi hãng tối đa **1 quy tắc đang dùng**. Bỏ phân loại nhóm container và USD (luôn VND/Cont/Ngày).
+- **Ngày miễn phí** chỉ khai ở *Số ngày miễn phí*; bậc đầu bắt đầu ngày *miễn phí + 1*, các bậc **liền nhau** (từ ngày tự tính), bậc cuối để trống *đến ngày*.
+- **Đơn giá mỗi bậc theo từng loại** đang dùng của DM Loại Container; ô trống = chưa có giá cho loại đó.
+- *Tạm Ngưng* vẫn hiện để bật lại; nút xoá = xoá mềm; không đổi mã sau khi tạo; điều chỉnh % chỉ áp quy tắc đang dùng trong bộ lọc, có xác nhận.
+- Hệ thống dùng biểu cước này để tính phí lưu bãi khi Gate-Out (`GET /DepotJobs/{id}/storage-fee`), xem `docs/quy-trinh-van-hanh-depot.md` mục 11. Phiếu dịch vụ không còn dòng lưu bãi.
+- Dữ liệu cũ: giá 6 cột (20 / 40 / 45 khô, 20 / 40 lạnh, đặc biệt) đã chép sang từng loại; quy tắc test đã xoá; chỉ `STOR_DRY_STANDARD` (Mọi hãng, miễn phí 5 ngày, từ ngày 6: 20' khô 35.000, 40GP / 40HC 60.000) đang dùng, các quy tắc khác tạm ngưng.
 
 ### Frontend
 
@@ -130,34 +136,9 @@ Biểu cước lưu bãi lũy tiến theo ngày (bảng `StorageTariffRules` + `
 
 Lịch sử rà soát & sửa lỗi: [23-master-data.md](../backend-progress/23-master-data.md), [frontend-tariff-catalog-split.md](../backend-progress/../frontend-tariff-catalog-split.md)
 
-## Máy Tính Cước Nâng Hạ & Lưu Bãi
-
-Máy tính cước nâng hạ + lưu bãi dựa trên 2 biểu cước trên.
-
-### Frontend
-
-- Tab id: `tariff_calculator` — khai báo ở `components/layout/Sidebar.tsx`, render ở `App.tsx` (`case 'tariff_calculator'`).
-- Trang: `MasterDataPage` — [`fontend/src/modules/masterdata/pages/MasterDataPage.tsx`](../../fontend/src/modules/masterdata/pages/MasterDataPage.tsx)
-- Nội dung tab `tariff_calculator`: `TariffCalculatorPage` — [`fontend/src/modules/masterdata/components/TariffCalculatorPage.tsx`](../../fontend/src/modules/masterdata/components/TariffCalculatorPage.tsx)
-- Props nhận từ `App.tsx`: `initialTab`
-
-### API & Backend
-
-| Hàm frontend | HTTP | Endpoint | Controller.Action | Service | Bảng DB |
-|---|---|---|---|---|---|
-| `masterDataApi.createCatalog` | POST | `/api/MasterData/catalog` | `MasterData.CreateCatalog` | `MasterDataService.CreateCatalogItemAsync` | `MasterCatalogItems` |
-| `masterDataApi.deactivateCatalog` | DELETE | `/api/MasterData/catalog/{id}` | `MasterData.DeleteCatalog` | `MasterDataService.DeactivateCatalogItemAsync` | `MasterCatalogItems` |
-| `masterDataApi.getAll` | GET | `/api/MasterData/all` | `MasterData.GetAll` | `MasterDataService.GetAllShippingLinesAsync`<br>`MasterDataService.GetAllMaterialsAsync`<br>`MasterDataService.GetCatalogAsync` | `ShippingLines`, `Materials`, `MasterCatalogItems` |
-| `masterDataApi.getCatalog` | GET | `/api/MasterData/catalog/{catalogType}` | `MasterData.GetCatalog` | `MasterDataService.GetCatalogAsync` | `MasterCatalogItems` |
-| `masterDataApi.getServiceTariffs` | GET | `/api/MasterData/service-tariffs` | `MasterData.GetServiceTariffs` | `MasterDataService.GetServiceTariffsAsync` | `ServiceTariffs` |
-| `masterDataApi.getStorageTariffs` | GET | `/api/MasterData/storage-tariffs` | `MasterData.GetStorageTariffs` | `MasterDataService.GetStorageTariffsAsync` | `StorageTariffRules` |
-| `masterDataApi.updateCatalog` | PUT | `/api/MasterData/catalog/{id}` | `MasterData.UpdateCatalog` | `MasterDataService.UpdateCatalogItemAsync` | `MasterCatalogItems` |
-
-Lịch sử rà soát & sửa lỗi: [23-master-data.md](../backend-progress/23-master-data.md)
-
 ## Biểu Phí Vệ Sinh Container
 
-Biểu phí vệ sinh container (catalog `CLEANING_TARIFF`): đơn giá theo loại container, hóa chất, thời gian.
+Biểu phí vệ sinh container — bảng riêng `CleaningTariffs` + `CleaningTariffPrices` (API `/MasterData/cleaning-tariffs`, thay catalog `CLEANING_TARIFF` cũ từ 20/10/2026): **đơn giá riêng cho từng loại container của DM Loại Container**, VAT, nhóm dịch vụ, bên chịu phí mặc định, hoá chất, thời gian. Cột / ô giá trên màn dựng theo các loại đang dùng của DM; mỗi lần lưu chỉ ghi đúng 1 dòng; không đổi mã sau khi tạo; điều chỉnh % chỉ áp dịch vụ đang dùng trong bộ lọc. Đã bỏ mục "đơn giá thoả thuận theo hãng tàu".
 
 ### Frontend
 

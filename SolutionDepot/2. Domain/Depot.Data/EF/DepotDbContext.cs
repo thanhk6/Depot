@@ -38,6 +38,7 @@ namespace Depot.Data.EF
         public DbSet<CustomerBooking> CustomerBookings => Set<CustomerBooking>();
         public DbSet<MasterCatalogItem> MasterCatalogItems => Set<MasterCatalogItem>();
         public DbSet<ServiceTariff> ServiceTariffs => Set<ServiceTariff>();
+        public DbSet<CleaningTariff> CleaningTariffs => Set<CleaningTariff>();
         public DbSet<StorageTariffRule> StorageTariffRules => Set<StorageTariffRule>();
         public DbSet<Container> Containers => Set<Container>();
         #endregion

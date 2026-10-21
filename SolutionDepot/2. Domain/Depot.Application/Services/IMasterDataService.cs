@@ -25,9 +25,14 @@ namespace Depot.Application.Services
         Task<ServiceTariff> CreateServiceTariffAsync(ServiceTariffRequest request);
         Task<ServiceTariff?> UpdateServiceTariffAsync(long id, ServiceTariffRequest request);
         Task<bool> DeactivateServiceTariffAsync(long id);
+        // Biểu phí vệ sinh — bảng riêng CleaningTariffs + CleaningTariffPrices (thay catalog CLEANING_TARIFF).
+        Task<List<CleaningTariff>> GetCleaningTariffsAsync(bool includeInactive = false);
+        Task<CleaningTariff> CreateCleaningTariffAsync(CleaningTariffRequest request);
+        Task<CleaningTariff?> UpdateCleaningTariffAsync(long id, CleaningTariffRequest request);
+        Task<bool> DeactivateCleaningTariffAsync(long id);
         // Cước Lưu Bãi (Storage) — bảng riêng StorageTariffRule + StorageTariffTier, tách khỏi catalog
         // "STORAGE_TARIFF" dùng chung cũ (xem docs/frontend-tariff-catalog-split.md).
-        Task<List<StorageTariffRule>> GetStorageTariffsAsync();
+        Task<List<StorageTariffRule>> GetStorageTariffsAsync(bool includeInactive = false);
         Task<StorageTariffRule> CreateStorageTariffAsync(StorageTariffRuleRequest request);
         Task<StorageTariffRule?> UpdateStorageTariffAsync(long id, StorageTariffRuleRequest request);
         Task<bool> DeactivateStorageTariffAsync(long id);

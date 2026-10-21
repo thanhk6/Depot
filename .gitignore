@@ -21,3 +21,7 @@ coverage/
 [Oo]bj/
 node_modules/
 *.user
+
+# Báo cáo / kết quả bộ test (tests/)
+tests/playwright-report/
+tests/test-results/

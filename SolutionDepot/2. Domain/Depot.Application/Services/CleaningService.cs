@@ -64,10 +64,13 @@ public sealed class CleaningService : ICleaningService
         }
 
         // BUG-021: trước đây tạo được lệnh vệ sinh cho số container không có trong bãi (không có hồ sơ nào).
-        if (!await db.DepotJobs.AnyAsync(j => j.ContainerNo == containerNoNormalized && j.Status != "GATE_OUT"))
+        var activeJob = await db.DepotJobs.AsNoTracking().FirstOrDefaultAsync(j => j.ContainerNo == containerNoNormalized && j.Status != "GATE_OUT");
+        if (activeJob == null)
             throw new ArgumentException($"Container {containerNoNormalized} không có hồ sơ nào đang trong bãi.");
         if (request.Items.Any(i => i.UnitPrice < 0 || i.EstimatedDurationMin < 0))
             throw new ArgumentException("Đơn giá và thời gian dự kiến của hạng mục vệ sinh không được âm.");
+        // Đơn giá do server tra theo Biểu Phí Vệ Sinh + loại container của hồ sơ, bỏ qua giá gửi lên (depot-fullstack-cleaning-tariff-pricing).
+        await CleaningTariffPricing.ApplyToCleaningRecordAsync(db, activeJob.IsoSize, request.Items);
 
         var now = DateTime.UtcNow;
         var code = "CL-" + now.ToString("yyyyMMddHHmmss") + "-" + Random.Shared.Next(100, 999);

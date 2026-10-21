@@ -53,9 +53,9 @@ namespace Depot.Data.EF
             // để chắc chắn đọc được cả những dòng catalog vừa Add ở SeedCatalogsAsync trong lần chạy đầu
             // tiên trên DB rỗng (chưa flush thì query LINQ không thấy).
             await SeedServiceTariffsFromLegacyCatalogAsync(context);
-            await SeedStorageTariffsFromLegacyCatalogAsync(context);
             await SeedEstimateCatalogsAsync(context);
             await SeedDamageLocationChecklistZonesAsync(context);
+            await SeedCleaningTariffsAsync(context);
             // Không seed hồ sơ container mẫu (JOB-SEED-0001) nữa — mọi container phải đi từ Gate-In thật
             // (yêu cầu 2026-10-07: xoá sạch dữ liệu mẫu để làm lại từ đầu).
         }
@@ -438,14 +438,7 @@ namespace Depot.Data.EF
                 new MasterCatalogItem { CatalogType = "INSPECTION_STANDARD", Code = "AS_IS", Name = "As Is", NameVi = "Bàn giao nguyên trạng", Description = "Bàn giao nguyên trạng không cam kết tiêu chuẩn kỹ thuật, thường dùng khi bán thanh lý.", JsonData = "{\"shippingLine\":\"ALL\",\"containerType\":\"ALL\",\"containerSize\":\"ALL\",\"version\":\"2024\",\"effectiveDate\":\"2024-01-01\"}", SortOrder = 4 }
             });
 
-            // ===== CLEANING_TARIFF — biểu phí vệ sinh (CLN_GENERAL giữ nguyên seed cũ) =====
-            catalogs.AddRange(new[]
-            {
-                new MasterCatalogItem { CatalogType = "CLEANING_TARIFF", Code = "CLN_CHEMICAL", Name = "Chemical wash", NameVi = "Vệ sinh hóa chất", JsonData = "{\"cedexCode\":\"CW\",\"category\":\"CHEMICAL_WASH\",\"applicableSizes\":[\"20\",\"40\",\"45\"],\"price20DC\":280000,\"price40DC\":420000,\"price40HC\":450000,\"price45HC\":480000,\"price20RF\":350000,\"price40HR\":520000,\"currency\":\"VND\",\"estimatedDurationMin\":45,\"waterUsageLiters\":300,\"chemicalRequired\":\"Xut/tay rua chuyen dung\",\"equipmentUsed\":\"May xit ap luc + hoa chat\",\"responsiblePartyDefault\":\"U\",\"vatPercent\":8}", SortOrder = 2 },
-                new MasterCatalogItem { CatalogType = "CLEANING_TARIFF", Code = "CLN_FOOD_GRADE", Name = "Food grade wash", NameVi = "Vệ sinh chuẩn thực phẩm", JsonData = "{\"cedexCode\":\"FG\",\"category\":\"FOOD_GRADE\",\"applicableSizes\":[\"20\",\"40\",\"45\"],\"price20DC\":450000,\"price40DC\":650000,\"price40HC\":700000,\"price45HC\":750000,\"price20RF\":550000,\"price40HR\":800000,\"currency\":\"VND\",\"estimatedDurationMin\":90,\"waterUsageLiters\":500,\"chemicalRequired\":\"Hoa chat khu khuan an toan thuc pham\",\"equipmentUsed\":\"May xit hoi nuoc + kiem tra CEDEX\",\"responsiblePartyDefault\":\"C\",\"vatPercent\":8}", SortOrder = 3 },
-                new MasterCatalogItem { CatalogType = "CLEANING_TARIFF", Code = "CLN_ODOR_REMOVAL", Name = "Odor removal deep clean", NameVi = "Khử mùi chuyên sâu", JsonData = "{\"cedexCode\":\"OD\",\"category\":\"ODOR_REMOVAL\",\"applicableSizes\":[\"20\",\"40\",\"45\"],\"price20DC\":350000,\"price40DC\":500000,\"price40HC\":530000,\"price45HC\":560000,\"price20RF\":400000,\"price40HR\":600000,\"currency\":\"VND\",\"estimatedDurationMin\":60,\"waterUsageLiters\":200,\"chemicalRequired\":\"Dung dich khu mui Ozone/than hoat tinh\",\"equipmentUsed\":\"May sinh Ozone + quat hut mui\",\"responsiblePartyDefault\":\"U\",\"vatPercent\":8}", SortOrder = 4 },
-                new MasterCatalogItem { CatalogType = "CLEANING_TARIFF", Code = "CLN_FUMIGATION", Name = "Fumigation", NameVi = "Hun trùng kiểm dịch", JsonData = "{\"cedexCode\":\"FM\",\"category\":\"FUMIGATION\",\"applicableSizes\":[\"20\",\"40\",\"45\"],\"price20DC\":600000,\"price40DC\":900000,\"price40HC\":950000,\"price45HC\":1000000,\"price20RF\":700000,\"price40HR\":1050000,\"currency\":\"VND\",\"estimatedDurationMin\":180,\"waterUsageLiters\":0,\"chemicalRequired\":\"Methyl Bromide / Phosphine theo quy dinh kiem dich\",\"equipmentUsed\":\"Bat phu kin khi + may bom khi\",\"responsiblePartyDefault\":\"C\",\"vatPercent\":8}", SortOrder = 5 }
-            });
+            // CLEANING_TARIFF: đã chuyển sang bảng riêng CleaningTariffs (SeedCleaningTariffsAsync) — không gieo vào catalog nữa.
 
             // ===== SERVICE_TARIFF — cước nâng hạ (LOLO_EMPTY giữ nguyên seed cũ, không đổi).
             // LOLO_MT_NORMAL/LOLO_YARD_SHIFT/LOLO_NIGHT_EXTRA lấy đúng theo dữ liệu tham chiếu đã có sẵn
@@ -551,6 +544,23 @@ namespace Depot.Data.EF
                 changed = true;
             }
             if (changed) await context.SaveChangesAsync();
+        }
+
+        // Biểu phí vệ sinh mặc định cho DB mới (bảng CleaningTariffs) — KHÔNG kèm giá: đơn giá theo từng loại container do người
+        // dùng nhập (không preset). DB đã có dữ liệu thì migration CleaningTariffTables đã chép từ catalog cũ, ở đây bỏ qua mã đã có.
+        private static async Task SeedCleaningTariffsAsync(DepotDbContext context)
+        {
+            var seeds = new[]
+            {
+                new CleaningTariff { Code = "CLN_GENERAL", NameVi = "Vệ sinh tổng quát", NameEn = "General cleaning", Category = "GENERAL_SWEEP", SortOrder = 1 },
+                new CleaningTariff { Code = "CLN_CHEMICAL", NameVi = "Vệ sinh hóa chất", NameEn = "Chemical wash", Category = "CHEMICAL_WASH", CedexCode = "CW", EstimatedDurationMin = 45, WaterUsageLiters = 300, SortOrder = 2 },
+                new CleaningTariff { Code = "CLN_FOOD_GRADE", NameVi = "Vệ sinh chuẩn thực phẩm", NameEn = "Food grade wash", Category = "FOOD_GRADE", CedexCode = "FG", ResponsiblePartyDefault = "C", EstimatedDurationMin = 90, WaterUsageLiters = 500, SortOrder = 3 }
+            };
+            var existing = await context.CleaningTariffs.IgnoreQueryFilters().Select(x => x.Code).ToListAsync();
+            var toAdd = seeds.Where(x => !existing.Contains(x.Code)).ToList();
+            if (toAdd.Count == 0) return;
+            context.CleaningTariffs.AddRange(toAdd);
+            await context.SaveChangesAsync();
         }
 
         private static async Task SeedYardAsync(DepotDbContext context)
@@ -699,12 +709,7 @@ namespace Depot.Data.EF
                     NameVi = legacy.NameVi ?? legacy.Name,
                     NameEn = legacy.Name,
                     Unit = ReadString("unit", "Lần / Cont"),
-                    Price20GP = ReadDecimal("price20GP"),
-                    Price40HC = ReadDecimal("price40HC"),
-                    Price45HC = ReadDecimal("price45HC"),
-                    Price20RF = ReadDecimal("price20RF"),
-                    Price40RH = ReadDecimal("price40RH"),
-                    PriceSpecial = ReadDecimal("priceSpecial"),
+                    // Không gieo giá: đơn giá theo từng loại container do người dùng nhập (không preset).
                     VatPercent = ReadDecimal("vatPercent") == 0 ? 8 : ReadDecimal("vatPercent"),
                     Currency = ReadString("currency", "VND"),
                     ApplicableShift = ReadString("applicableShift", "ALL"),
@@ -717,98 +722,5 @@ namespace Depot.Data.EF
             await context.SaveChangesAsync();
         }
 
-        /// <summary>
-        /// Backfill 1 lần: copy dữ liệu Cước Lưu Bãi đã có sẵn trong catalog dùng chung "STORAGE_TARIFF"
-        /// (bảng <c>MasterCatalogItems</c>) sang bảng riêng <c>StorageTariffRule</c> +
-        /// <c>StorageTariffTier</c> mới (xem docs/frontend-tariff-catalog-split.md). Idempotent theo
-        /// <c>Code</c> — chỉ thêm dòng nào bên bảng mới còn thiếu, không đụng/xoá dữ liệu cũ ở
-        /// MasterCatalogItems.
-        /// </summary>
-        private static async Task SeedStorageTariffsFromLegacyCatalogAsync(DepotDbContext context)
-        {
-            var legacyItems = await context.MasterCatalogItems
-                .Where(x => x.CatalogType == "STORAGE_TARIFF" && x.IsActive)
-                .ToListAsync();
-            if (legacyItems.Count == 0) return;
-
-            var existingCodes = await context.StorageTariffRules.Select(x => x.Code).ToListAsync();
-
-            foreach (var legacy in legacyItems)
-            {
-                if (existingCodes.Contains(legacy.Code)) continue;
-
-                System.Text.Json.JsonElement root;
-                try
-                {
-                    root = System.Text.Json.JsonDocument.Parse(legacy.JsonData).RootElement;
-                }
-                catch
-                {
-                    root = default;
-                }
-                var hasRoot = root.ValueKind == System.Text.Json.JsonValueKind.Object;
-
-                decimal ReadDecimal(System.Text.Json.JsonElement obj, string key) =>
-                    obj.ValueKind == System.Text.Json.JsonValueKind.Object && obj.TryGetProperty(key, out var v) && v.TryGetDecimal(out var d) ? d : 0m;
-                string ReadString(System.Text.Json.JsonElement obj, string key, string fallback) =>
-                    obj.ValueKind == System.Text.Json.JsonValueKind.Object && obj.TryGetProperty(key, out var v) && v.ValueKind == System.Text.Json.JsonValueKind.String ? (v.GetString() ?? fallback) : fallback;
-                int ReadInt(System.Text.Json.JsonElement obj, string key, int fallback) =>
-                    obj.ValueKind == System.Text.Json.JsonValueKind.Object && obj.TryGetProperty(key, out var v) && v.TryGetInt32(out var i) ? i : fallback;
-
-                var rule = new StorageTariffRule
-                {
-                    Code = legacy.Code,
-                    ShippingLineCode = hasRoot ? ReadString(root, "shippingLineCode", "ALL") : "ALL",
-                    ShippingLineName = hasRoot ? ReadString(root, "shippingLineName", legacy.Name) : legacy.Name,
-                    ContainerTypeCategory = hasRoot ? ReadString(root, "containerTypeCategory", "DRY_STANDARD") : "DRY_STANDARD",
-                    DefaultFreeDays = hasRoot ? ReadInt(root, "freeDays", 0) : 0,
-                    CalculationUnit = hasRoot ? ReadString(root, "calculationUnit", "VND/Cont/Day") : "VND/Cont/Day",
-                    VatPercent = hasRoot && ReadDecimal(root, "vatPercent") != 0 ? ReadDecimal(root, "vatPercent") : 8,
-                    Notes = legacy.Description,
-                    IsActive = true,
-                    SortOrder = legacy.SortOrder
-                };
-
-                if (hasRoot && root.TryGetProperty("tiers", out var tiersElement) && tiersElement.ValueKind == System.Text.Json.JsonValueKind.Array)
-                {
-                    var sortOrder = 0;
-                    foreach (var tierEl in tiersElement.EnumerateArray())
-                    {
-                        sortOrder++;
-                        int? toDay = tierEl.TryGetProperty("toDay", out var toDayEl) && toDayEl.ValueKind == System.Text.Json.JsonValueKind.Number ? toDayEl.GetInt32() : null;
-                        rule.Tiers.Add(new StorageTariffTier
-                        {
-                            TierName = ReadString(tierEl, "tierName", $"Bậc {sortOrder}"),
-                            FromDay = ReadInt(tierEl, "fromDay", 1),
-                            ToDay = toDay,
-                            Price20Dry = ReadDecimal(tierEl, "price20Dry"),
-                            Price40Dry = ReadDecimal(tierEl, "price40Dry"),
-                            Price45Dry = ReadDecimal(tierEl, "price45Dry"),
-                            Price20Reefer = ReadDecimal(tierEl, "price20Reefer"),
-                            Price40Reefer = ReadDecimal(tierEl, "price40Reefer"),
-                            PriceSpecial = ReadDecimal(tierEl, "priceSpecial"),
-                            SortOrder = sortOrder
-                        });
-                    }
-                }
-                // Không có mảng `tiers` trong JsonData (vd 3 quy tắc seed cũ chỉ có giá phẳng, không có
-                // cấu trúc bậc — xem docs/backend-progress/23-master-data.md) → tạo đúng 1 bậc duy nhất
-                // từ các field giá phẳng, khớp fallback mà `StorageTariffMaster.tsx` cũ đã dùng.
-                else if (hasRoot)
-                {
-                    rule.Tiers.Add(new StorageTariffTier
-                    {
-                        TierName = "Biểu giá", FromDay = 1, ToDay = null,
-                        Price20Dry = ReadDecimal(root, "price20Dry"), Price40Dry = ReadDecimal(root, "price40Dry"), Price45Dry = ReadDecimal(root, "price45Dry"),
-                        Price20Reefer = ReadDecimal(root, "price20Reefer"), Price40Reefer = ReadDecimal(root, "price40Reefer"), PriceSpecial = ReadDecimal(root, "priceSpecial"),
-                        SortOrder = 1
-                    });
-                }
-
-                context.StorageTariffRules.Add(rule);
-            }
-
-            await context.SaveChangesAsync();
-        }
     }
 }

@@ -70,16 +70,10 @@ export interface CleaningTariffMasterItem {
   applicableSizes: ('20' | '40' | '45')[];
   applicableContainerTypes?: string[]; // Danh sách mã loại container áp dụng (20DC, 40HC, 20RF, 40HR, 20OT, 20FR, 20TK...)
   
-  // Base Prices by Size & Type (VND)
-  price20DC: number; // Đơn giá cont 20GP/DC khô
-  price40DC: number; // Đơn giá cont 40GP/DC khô
-  price40HC: number; // Đơn giá cont 40HC cao
-  price45HC: number; // Đơn giá cont 45HC
-  price20RF: number; // Đơn giá cont 20RF lạnh
-  price40HR: number; // Đơn giá cont 40HR lạnh
-  priceByContainerType?: Record<string, number>; // Đơn giá chi tiết theo từng mã loại cont trong danh mục (20OT, 40OT, 20FR, 40FR, 20TK...)
-  
-  currency: 'VND' | 'USD';
+  /** Đơn giá theo từng loại container của DM Loại Container: { "40HC": 450000, "40GP": 420000, ... }; thiếu = chưa có giá. */
+  prices: Record<string, number>;
+
+  currency: 'VND';
   estimatedDurationMin: number; // Thời gian thực hiện (phút)
   waterUsageLiters: number;     // Lượng nước tiêu thụ (lít)
   chemicalRequired: string;     // Hóa chất sử dụng
@@ -87,13 +81,6 @@ export interface CleaningTariffMasterItem {
   responsiblePartyDefault: 'O' | 'U' | 'T'; // Bên chịu chi phí mặc định
   vatPercent: number;           // Thuế VAT % (mặc định 8)
   
-  // Custom tariff overrides by shipping line
-  shippingLinePricing?: {
-    shippingLine: string;
-    price20: number;
-    price40: number;
-    price45: number;
-  }[];
   
   status: 'ACTIVE' | 'INACTIVE';
   sortOrder: number;

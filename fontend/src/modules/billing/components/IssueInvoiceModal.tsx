@@ -25,9 +25,8 @@ export const IssueInvoiceModal: React.FC<IssueInvoiceModalProps> = ({
   onSubmitIssueInvoice,
   currency
 }) => {
-  const [invoiceNo, setInvoiceNo] = useState<string>(
-    `HDDT-2026-08-${Math.floor(1000 + Math.random() * 9000)}`
-  );
+  // Số hoá đơn do kế toán nhập theo hoá đơn thật — không tự sinh số.
+  const [invoiceNo, setInvoiceNo] = useState<string>('');
   const [invoiceDate, setInvoiceDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
@@ -115,6 +114,7 @@ export const IssueInvoiceModal: React.FC<IssueInvoiceModalProps> = ({
               </label>
               <input
                 type="text"
+                data-testid="invoice-no-input"
                 value={invoiceNo}
                 onChange={(e) => setInvoiceNo(e.target.value)}
                 placeholder="VD: HDDT-2026-08-0192"

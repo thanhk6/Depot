@@ -48,6 +48,8 @@ namespace Depot.Application.Services
         Task<bool> DispatchForkliftMoveAsync(ForkliftMoveOrderRequest moveReq);
         Task GateOutAsync(long jobId, GateOutRequest request, string actor);
         Task<GateOutBookingCheckResult> CheckGateOutBookingAsync(long jobId, string? bookingNo);
+        /// <summary>Phí lưu bãi tới hôm nay (hoặc tới ngày Gate-Out nếu đã ra); null nếu không có hồ sơ.</summary>
+        Task<StorageFeeResult?> GetStorageFeeAsync(long jobId);
         Task<int> GetBookingValidityHoursAsync();
         Task<DepotStatisticsSummaryDto> GetDashboardStatsAsync();
         Task<KpiSummaryDto> GetKpiSummaryAsync();

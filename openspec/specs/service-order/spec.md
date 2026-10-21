@@ -52,3 +52,60 @@ Hệ thống SHALL cho sửa phiếu (thông tin khách hàng, tài xế, ghi ch
 #### Scenario: Huỷ phiếu chưa thu
 - **WHEN** huỷ phiếu chưa thanh toán
 - **THEN** phiếu chuyển đã huỷ và nhật ký ghi SERVICE_ORDER_CANCELLED
+
+### Requirement: Đơn giá biểu cước nâng hạ do server tra
+Với mỗi hạng mục có mã thuộc biểu cước nâng hạ, khi lập và khi sửa phiếu, hệ thống SHALL tự tra đơn giá theo loại container của hồ sơ Gate-In và lấy VAT của biểu cước, bỏ qua đơn giá / VAT / loại container trình duyệt gửi. Hệ thống MUST từ chối (400, nêu mã biểu cước và loại container) khi biểu cước tạm ngưng, hoặc loại container đó chưa có giá. Trên form phiếu dịch vụ, ô đơn giá và VAT của các hạng mục này MUST bị khoá; chỉ sửa được số lượng.
+
+#### Scenario: Trình duyệt gửi giá khác biểu cước
+- **WHEN** lập phiếu cho container 40GP có hạng mục LOLO_EMPTY (biểu cước có giá 40GP 420.000 đ, VAT 8%) với đơn giá gửi lên 1 đ và VAT 0%
+- **THEN** phiếu lưu đơn giá 420.000 đ và VAT 8% theo biểu cước, tổng tiền tính theo giá đó
+
+#### Scenario: Loại chưa có giá
+- **WHEN** lập phiếu cho container 45HC có hạng mục LOLO_EMPTY trong khi biểu cước chưa có giá cho loại 45HC
+- **THEN** hệ thống từ chối 400 báo "Biểu cước LOLO_EMPTY chưa có giá cho loại 45HC" và không tạo phiếu
+
+#### Scenario: Biểu cước tạm ngưng
+- **WHEN** lập phiếu có hạng mục mang mã biểu cước đang tạm ngưng
+- **THEN** hệ thống từ chối 400 nêu mã biểu cước
+
+#### Scenario: Loại container theo hồ sơ
+- **WHEN** hồ sơ Gate-In là 40GP nhưng trình duyệt gửi loại 20HC
+- **THEN** đơn giá vẫn tra theo 40GP
+
+#### Scenario: Form khoá giá
+- **WHEN** Khai thác mở form phiếu dịch vụ có dòng nâng hạ
+- **THEN** ô đơn giá và VAT của dòng đó không sửa được; ô số lượng vẫn sửa được
+
+#### Scenario: Dòng nâng hạ tự thêm
+- **WHEN** mở form phiếu cho container mà biểu cước nâng hạ vỏ rỗng đang dùng có giá cho loại đó
+- **THEN** form tự thêm đúng một dòng của biểu cước nhóm Nâng hạ vỏ rỗng, không lấy biểu cước nhóm khác; nếu chưa có giá thì không thêm dòng và báo chưa có giá
+
+### Requirement: Dòng vệ sinh trên phiếu dịch vụ theo từng dịch vụ
+Phiếu dịch vụ SHALL có một dòng riêng cho mỗi dịch vụ vệ sinh của lệnh vệ sinh đã bàn giao (đúng mã, tên, số lượng), không gộp nhiều dịch vụ vào một dòng. Với mỗi dòng có mã thuộc biểu phí vệ sinh, khi lập và khi sửa phiếu, hệ thống SHALL tự tra đơn giá theo loại container của hồ sơ và lấy VAT của biểu phí, bỏ qua giá / VAT trình duyệt gửi; dịch vụ tạm ngưng hoặc chưa có giá MUST bị từ chối 400. Trên form, ô đơn giá và VAT của dòng vệ sinh MUST bị khoá.
+
+#### Scenario: Ba dịch vụ vệ sinh thành ba dòng
+- **WHEN** lập phiếu cho container có lệnh vệ sinh đã bàn giao gồm CLN_GENERAL, CLN_CHEMICAL, CLN_FOOD_GRADE
+- **THEN** form có đúng 3 dòng vệ sinh mang 3 mã đó, mỗi dòng giá theo biểu phí, không có dòng gộp tổng
+
+#### Scenario: Trình duyệt gửi giá vệ sinh khác
+- **WHEN** lập phiếu có dòng CLN_CHEMICAL đơn giá gửi lên 1 đ cho container 40HC, biểu phí 450.000 đ VAT 8%
+- **THEN** phiếu lưu 450.000 đ, VAT 8%
+
+#### Scenario: Form khoá giá vệ sinh
+- **WHEN** Khai thác mở form phiếu có dòng vệ sinh
+- **THEN** ô đơn giá và VAT của dòng vệ sinh không sửa được; số lượng vẫn sửa được
+
+#### Scenario: Tách phiếu chưa thu đã gộp
+- **WHEN** sửa lại phiếu chưa thu SO-20261018-761 (WHLU4254283, 45HC) sau nâng cấp
+- **THEN** dòng "Vệ sinh tổng quát" gộp được thay bằng 3 dòng CLN_GENERAL, CLN_CHEMICAL, CLN_FOOD_GRADE theo giá biểu phí; dòng nâng hạ giữ nguyên; có nhật ký sửa phiếu
+
+### Requirement: Không lập phí lưu bãi trên phiếu dịch vụ
+Phiếu dịch vụ MUST NOT có hạng mục lưu bãi chọn tay: form MUST NOT liệt kê các bậc lưu bãi, và server MUST từ chối 400 hạng mục nhóm `STORAGE` hoặc mã thuộc biểu cước lưu bãi khi lập / sửa phiếu, vì phí lưu bãi do hệ thống tính khi Gate-Out.
+
+#### Scenario: Gửi hạng mục lưu bãi
+- **WHEN** lập phiếu dịch vụ có hạng mục nhóm `STORAGE`
+- **THEN** hệ thống từ chối 400, báo phí lưu bãi tính khi Gate-Out
+
+#### Scenario: Form không còn dòng lưu bãi
+- **WHEN** mở danh sách chọn hạng mục trên form phiếu dịch vụ
+- **THEN** không có dòng "Lưu bãi …"

@@ -43,6 +43,7 @@ import {
   Droplets
 } from 'lucide-react';
 import { getApiErrorMessage } from '../../../utils/apiError';
+import { mapCleaningTariff } from '../../masterdata/utils/cleaningTariffCatalog';
 
 interface SurveyModulePageProps {
   initialSubTab?: string;
@@ -92,7 +93,7 @@ export const SurveyModulePage: React.FC<SurveyModulePageProps> = ({
       const [locationResponse, damageResponse, repairResponse, gradeResponse, standardResponse, cleaningResponse] = await Promise.all([
         masterDataApi.getCatalog('DAMAGE_LOCATION'), masterDataApi.getCatalog('DAMAGE_CODE'),
         masterDataApi.getCatalog('REPAIR_CODE'), masterDataApi.getCatalog('GRADE'),
-        masterDataApi.getCatalog('INSPECTION_STANDARD'), masterDataApi.getCatalog('CLEANING_TARIFF')
+        masterDataApi.getCatalog('INSPECTION_STANDARD'), masterDataApi.getCleaningTariffs()
       ]);
       const mapItems = (response: any) => response?.data || [];
       setLocations(mapItems(locationResponse).map((item: any) => ({ id: item.id, code: item.code, name: item.name, vietnameseName: item.nameVi || item.name, description: item.description || '', category: readJson(item.jsonData).category || 'STRUCTURE', checklistZone: readJson(item.jsonData).checklistZone ?? '', status: item.isActive ? 'ACTIVE' : 'INACTIVE', sortOrder: item.sortOrder })));
@@ -100,18 +101,8 @@ export const SurveyModulePage: React.FC<SurveyModulePageProps> = ({
       setRepairCodes(mapItems(repairResponse).map((item: any) => ({ id: item.id, repairCode: item.code, stsCode: readJson(item.jsonData).stsCode || item.code, name: item.name, vietnameseName: item.nameVi || item.name, description: item.description || '', repairType: readJson(item.jsonData).repairType || 'STRAIGHTEN', labourRate: readJson(item.jsonData).labourRate || 0, labourHours: readJson(item.jsonData).labourHours || 0, materialEstimatedCost: readJson(item.jsonData).materialEstimatedCost || 0, status: item.isActive ? 'ACTIVE' : 'INACTIVE' })));
       setGrades(mapItems(gradeResponse).map((item: any) => ({ id: item.id, gradeCode: item.code, gradeName: item.nameVi || item.name, description: item.description || '', shippingLine: readJson(item.jsonData).shippingLine || 'ALL', customer: readJson(item.jsonData).customer || 'ALL', status: item.isActive ? 'ACTIVE' : 'INACTIVE', sortOrder: item.sortOrder })));
       setStandards(mapItems(standardResponse).map((item: any) => ({ id: item.id, standardCode: item.code, standardName: item.name, shippingLine: readJson(item.jsonData).shippingLine || 'ALL', containerType: readJson(item.jsonData).containerType || 'ALL', containerSize: readJson(item.jsonData).containerSize || 'ALL', version: readJson(item.jsonData).version || '', effectiveDate: readJson(item.jsonData).effectiveDate || '', description: item.description || '', status: item.isActive ? 'ACTIVE' : 'INACTIVE' })));
-      setCleaningTariffs(mapItems(cleaningResponse).map((item: any) => {
-        const data = readJson(item.jsonData);
-        return {
-          id: item.id, cleaningCode: item.code, cedexCode: data.cedexCode || '', name: item.name,
-          vietnameseName: item.nameVi || item.name, category: data.category || 'GENERAL_SWEEP', description: item.description || '',
-          applicableSizes: data.applicableSizes || ['20', '40', '45'], price20DC: data.price20DC || 0, price40DC: data.price40DC || 0,
-          price40HC: data.price40HC || 0, price45HC: data.price45HC || 0, price20RF: data.price20RF || 0, price40HR: data.price40HR || 0,
-          currency: data.currency || 'VND', estimatedDurationMin: data.estimatedDurationMin || 0, waterUsageLiters: data.waterUsageLiters || 0,
-          chemicalRequired: data.chemicalRequired || '', equipmentUsed: data.equipmentUsed || '', responsiblePartyDefault: data.responsiblePartyDefault || 'U',
-          vatPercent: data.vatPercent || 8, status: item.isActive ? 'ACTIVE' : 'INACTIVE', sortOrder: item.sortOrder
-        } as CleaningTariffMasterItem;
-      }));
+      // Biểu Phí Vệ Sinh: bảng riêng CleaningTariffs, giá theo từng loại container (depot-fullstack-cleaning-tariff-pricing).
+      setCleaningTariffs(mapItems(cleaningResponse).map(mapCleaningTariff));
     };
     load().catch((error) => setMasterCatalogError(error instanceof Error ? error.message : 'Không thể tải danh mục kỹ thuật từ backend.'));
   }, []);
@@ -851,7 +842,7 @@ export const SurveyModulePage: React.FC<SurveyModulePageProps> = ({
             <CleaningMaster
               cleaningTariffs={cleaningTariffs}
               containerTypes={containerTypes}
-              onUpdateCleaningTariffs={(tariffs) => { setCleaningTariffs(tariffs); void persistCatalog('CLEANING_TARIFF', cleaningTariffs, tariffs, 'cleaningCode'); }}
+              onUpdateCleaningTariffs={setCleaningTariffs}
             />
           )}
 

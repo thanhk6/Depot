@@ -232,7 +232,6 @@ function AppContent({ onLogout }: AppContentProps) {
     departments: 'Danh Mục Phòng Ban & Cơ Cấu Tổ Chức',
     tariff_lolo: 'Cước Nâng Hạ (LoLo)',
     tariff_storage: 'Cước Lưu Bãi (Storage)',
-    tariff_calculator: 'Máy Tính Cước Nâng Hạ & Lưu Bãi',
     cleaning_tariffs: 'Biểu Phí Vệ Sinh Container',
     container_types: 'DM Loại Container (ISO 6346)',
     damage_locations: 'DM Vị Trí Cấu Kiện (Locations)',
@@ -533,7 +532,6 @@ function AppContent({ onLogout }: AppContentProps) {
       case 'master_data':
       case 'tariff_lolo':
       case 'tariff_storage':
-      case 'tariff_calculator':
       case 'cleaning_tariffs':
       case 'container_types':
       case 'damage_locations':

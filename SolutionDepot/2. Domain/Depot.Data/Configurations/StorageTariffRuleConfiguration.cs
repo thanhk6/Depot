@@ -13,7 +13,6 @@ namespace Depot.Data.Configurations
             builder.Property(x => x.ShippingLineCode).IsRequired().HasMaxLength(20);
             builder.HasIndex(x => x.ShippingLineCode);
             builder.Property(x => x.ShippingLineName).IsRequired().HasMaxLength(150);
-            builder.Property(x => x.ContainerTypeCategory).IsRequired().HasMaxLength(30);
             builder.Property(x => x.CalculationUnit).IsRequired().HasMaxLength(30);
             builder.Property(x => x.VatPercent).HasPrecision(5, 2);
 

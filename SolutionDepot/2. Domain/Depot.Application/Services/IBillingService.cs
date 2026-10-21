@@ -16,11 +16,11 @@ namespace Depot.Application.Services
         Task<List<DebtPeriod>> GetPeriodsAsync(string? shippingLineCode = null);
         Task<List<ArPayment>> GetPaymentsAsync(string? shippingLineCode = null);
         Task<List<DebtSyncCandidateDto>> GetSyncCandidatesAsync();
-        Task<List<ShippingLineDebt>> SyncDebtsAsync(SyncDebtsRequest request);
-        Task<ShippingLineDebt?> IssueInvoiceAsync(string debtCode, IssueInvoiceRequest request);
-        Task<ApiResult<ArPayment>> RecordPaymentAsync(RecordArPaymentRequest request);
-        Task<ApiResult<DebtPeriod>> ClosePeriodAsync(string periodCode, ClosePeriodRequest request);
-        Task<ApiResult<ArPayment>> ReversePaymentAsync(string paymentCode, ReverseArPaymentRequest request);
+        Task<List<ShippingLineDebt>> SyncDebtsAsync(SyncDebtsRequest request, string actor);
+        Task<ShippingLineDebt?> IssueInvoiceAsync(string debtCode, IssueInvoiceRequest request, string actor);
+        Task<ApiResult<ArPayment>> RecordPaymentAsync(RecordArPaymentRequest request, string actor);
+        Task<ApiResult<DebtPeriod>> ClosePeriodAsync(string periodCode, ClosePeriodRequest request, string actor);
+        Task<ApiResult<ArPayment>> ReversePaymentAsync(string paymentCode, ReverseArPaymentRequest request, string actor);
         Task<List<DebtAgingBucketDto>> GetAgingReportAsync();
     }
 }

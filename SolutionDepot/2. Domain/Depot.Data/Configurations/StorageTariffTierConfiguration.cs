@@ -11,12 +11,22 @@ namespace Depot.Data.Configurations
             builder.Property(x => x.TierName).IsRequired().HasMaxLength(100);
             builder.HasIndex(x => x.StorageTariffRuleId);
 
-            builder.Property(x => x.Price20Dry).HasPrecision(18, 2);
-            builder.Property(x => x.Price40Dry).HasPrecision(18, 2);
-            builder.Property(x => x.Price45Dry).HasPrecision(18, 2);
-            builder.Property(x => x.Price20Reefer).HasPrecision(18, 2);
-            builder.Property(x => x.Price40Reefer).HasPrecision(18, 2);
-            builder.Property(x => x.PriceSpecial).HasPrecision(18, 2);
+            // Giá theo loại container là dòng con thuần tuý của bậc — xoá bậc thì xoá luôn giá.
+            builder.HasMany(x => x.Prices)
+                .WithOne()
+                .HasForeignKey(x => x.StorageTariffTierId)
+                .OnDelete(DeleteBehavior.Cascade);
+        }
+    }
+
+    public sealed class StorageTariffTierPriceConfiguration : IEntityTypeConfiguration<StorageTariffTierPrice>
+    {
+        public void Configure(EntityTypeBuilder<StorageTariffTierPrice> builder)
+        {
+            builder.ToTable("StorageTariffTierPrices");
+            builder.Property(x => x.ContainerTypeCode).IsRequired().HasMaxLength(20);
+            builder.Property(x => x.Price).HasPrecision(18, 2);
+            builder.HasIndex(x => new { x.StorageTariffTierId, x.ContainerTypeCode }).IsUnique();
         }
     }
 }

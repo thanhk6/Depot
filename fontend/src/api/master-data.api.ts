@@ -86,10 +86,30 @@ export const masterDataApi = {
     const response = await apiClient.delete<ApiResponse<string>>(`${API_ENDPOINTS.MASTER_DATA.SERVICE_TARIFFS}/${id}`);
     return response.data;
   },
+  // Biểu Phí Vệ Sinh — bảng riêng CleaningTariffs + CleaningTariffPrices (thay catalog "CLEANING_TARIFF").
+  getCleaningTariffs: async (options?: { includeInactive?: boolean }) => {
+    const response = await apiClient.get<ApiResponse<unknown[]>>(API_ENDPOINTS.MASTER_DATA.CLEANING_TARIFFS, {
+      params: options?.includeInactive ? { includeInactive: true } : undefined
+    });
+    return response.data;
+  },
+  createCleaningTariff: async (request: unknown) => {
+    const response = await apiClient.post<ApiResponse<unknown>>(API_ENDPOINTS.MASTER_DATA.CLEANING_TARIFFS, request);
+    return response.data;
+  },
+  updateCleaningTariff: async (id: string | number, request: unknown) => {
+    const response = await apiClient.put<ApiResponse<unknown>>(`${API_ENDPOINTS.MASTER_DATA.CLEANING_TARIFFS}/${id}`, request);
+    return response.data;
+  },
+  deleteCleaningTariff: async (id: string | number) => {
+    const response = await apiClient.delete<ApiResponse<string>>(`${API_ENDPOINTS.MASTER_DATA.CLEANING_TARIFFS}/${id}`);
+    return response.data;
+  },
   // Cước Lưu Bãi (Storage) — bảng riêng StorageTariffRule + StorageTariffTier. Xem
   // docs/frontend-tariff-catalog-split.md.
-  getStorageTariffs: async () => {
-    const response = await apiClient.get<ApiResponse<unknown[]>>(API_ENDPOINTS.MASTER_DATA.STORAGE_TARIFFS);
+  // includeInactive: màn quản lý cần cả quy tắc tạm ngưng để bật lại; cổng / phiếu chỉ dùng quy tắc đang dùng.
+  getStorageTariffs: async (includeInactive = false) => {
+    const response = await apiClient.get<ApiResponse<unknown[]>>(API_ENDPOINTS.MASTER_DATA.STORAGE_TARIFFS, { params: includeInactive ? { includeInactive: true } : undefined });
     return response.data;
   },
   createStorageTariff: async (request: unknown) => {

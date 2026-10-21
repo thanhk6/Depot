@@ -10,11 +10,9 @@ import { ServiceOrderFormModal } from '../components/ServiceOrderFormModal';
 import { ServiceOrderDetailModal } from '../components/ServiceOrderDetailModal';
 // "Cước Nâng Hạ & Lưu Bãi" đã tách thành 3 danh mục riêng theo yêu cầu người dùng (thay cho component
 // gộp chung `LiftOnLiftOffAndStorageMaster.tsx` cũ, đã xoá) — xem docs/frontend-tariff-catalog-split.md.
-// Tab "Biểu Phí Tariff Niêm Yết & Máy Tính Cước" ở đây trước đây hiển thị cả 3 phần cùng lúc, nên giữ
-// nguyên bằng cách xếp chồng cả 3 component mới thay vì chỉ chọn 1.
+// Tab "Biểu Phí Tariff Niêm Yết" xếp chồng 2 danh mục cước; Máy tính cước đã bỏ theo yêu cầu (20/10/2026).
 import { LoloTariffMaster } from '../../masterdata/components/LoloTariffMaster';
 import { StorageTariffMaster } from '../../masterdata/components/StorageTariffMaster';
-import { TariffCalculatorPage } from '../../masterdata/components/TariffCalculatorPage';
 import { formatVND } from '../../../utils/format';
 import {
   Receipt,
@@ -344,7 +342,7 @@ export const OperationPage: React.FC<OperationPageProps> = ({
           }`}
         >
           <DollarSign className="w-4 h-4" />
-          <span>Biểu Phí Tariff Niêm Yết & Máy Tính Cước</span>
+          <span>Biểu Phí Tariff Niêm Yết</span>
         </button>
       </div>
 
@@ -372,7 +370,6 @@ export const OperationPage: React.FC<OperationPageProps> = ({
         <div className="space-y-6">
           <LoloTariffMaster />
           <StorageTariffMaster />
-          <TariffCalculatorPage />
         </div>
       )}
 

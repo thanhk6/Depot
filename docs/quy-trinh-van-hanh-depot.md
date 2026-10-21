@@ -62,7 +62,7 @@ Container **không hư hỏng** (giám định không ghi lỗi nào) đi tắt:
    - Tab *Checklist khu vực*: khu vực có hư hỏng **tự chuyển Không Đạt** kèm số lỗi (theo khu vực mà admin gắn cho từng vị trí ở *DM Vị Trí Cấu Kiện*); xoá hết lỗi thì về Đạt. Các khu vực khác giám định viên tự đánh Đạt / Không Đạt / N/A. "Không Đạt" ở khu vực Vệ sinh chỉ đổi AV → CL, không hạ DM.
    - Hệ thống chặn lưu nếu checklist thiếu / thừa khu vực so với danh mục, hoặc khu vực đang có hư hỏng mà không phải Không Đạt.
    - Danh sách khu vực do admin quản lý ở *DANH MỤC MASTER DATA → DM Khu Vực Checklist Giám Định* (thêm, đổi tên / thứ tự / mặc định Đạt hoặc N/A, tạm ngưng). Không đổi mã sau khi tạo; không tạm ngưng / xoá khu vực còn vị trí gắn; khu vực đã có trong phiếu chỉ được tạm ngưng. Phiếu nháp mở lại tự theo danh mục mới; phiếu đã nộp giữ nguyên.
-4. Tab *Vệ sinh*: **bắt buộc chọn ít nhất 1 dịch vụ vệ sinh** (theo *Biểu Phí Vệ Sinh*), chọn lý do nếu là CL.
+4. Tab *Vệ sinh*: **bắt buộc chọn ít nhất 1 dịch vụ vệ sinh** (theo *Biểu Phí Vệ Sinh*), chọn lý do nếu là CL. Đơn giá **do hệ thống tra theo loại container của hồ sơ** (mỗi dịch vụ có giá riêng cho từng loại trong *DM Loại Container*), không sửa tay; dịch vụ chưa có giá cho loại đó thì không chọn được (nhập giá ở *DANH MỤC MASTER DATA → Biểu Phí Vệ Sinh Container*).
 5. Tab *Hình ảnh*: **bắt buộc ít nhất 1 ảnh toàn cảnh**.
 6. Bấm **Hoàn Tất Giám Định - Chuyển Qua Vệ Sinh** (hoặc *Lưu tạm* để làm tiếp sau).
 
@@ -81,7 +81,7 @@ Container **không hư hỏng** (giám định không ghi lỗi nào) đi tắt:
 - **Màn hình:** *3. Tổ Vệ Sinh (Cleaning Bay)*.
 
 **Các bước**
-1. Tiếp nhận lệnh vệ sinh của container.
+1. Tiếp nhận lệnh vệ sinh của container (lệnh tạo từ phiếu giám định, hoặc *Tiếp nhận vệ sinh* thủ công — giá từng hạng mục do hệ thống tra theo Biểu Phí Vệ Sinh, chưa có giá thì bị chặn).
 2. Làm từng hạng mục, **tick hoàn thành từng hạng mục** (hoặc *Xong tất cả*).
 3. Bấm **Hoàn tất vệ sinh & bàn giao Khai thác** — chỉ được khi **tất cả** hạng mục đã tick.
 
@@ -120,10 +120,15 @@ Lệnh xe nâng khác: *Bãi → Xưởng sửa chữa* khi bắt đầu sửa, 
 **Các bước**
 1. Chọn container chờ lập phiếu → **Lập phiếu dịch vụ**.
 2. Thông tin lấy **tự động từ hồ sơ Gate-In** (khách hàng, xe, tài xế, container) — không nhập tay.
-3. Phí tính theo biểu phí: **cước nâng hạ (LOLO)** + **phí vệ sinh** (theo các dịch vụ vệ sinh đã làm).
+3. Phí tính theo biểu phí: **cước nâng hạ (LOLO)** + **phí vệ sinh**: **mỗi dịch vụ vệ sinh của lệnh vệ sinh đã bàn giao là một dòng riêng** (đúng mã, tên), giá và VAT theo *Biểu Phí Vệ Sinh* cho loại container của hồ sơ, khoá không sửa tay. Giá vệ sinh lấy theo biểu phí lúc lập phiếu.
+   - Dòng **biểu cước nâng hạ** (nâng hạ vỏ rỗng / có hàng, đảo chuyển, phụ phí đêm, PTI, hải quan, cân): **đơn giá và VAT do hệ thống tra theo biểu cước**, không sửa tay (chỉ sửa số lượng). Giá theo đúng **loại container của hồ sơ Gate-In**: mỗi biểu cước có **giá riêng cho từng loại** trong *DM Loại Container* (20HC, 40HC, 40GP, 45HC, 20RF, 40RH, 20OT…), nhập ở *DANH MỤC MASTER DATA → Cước Nâng Hạ (LoLo)*; loại mới thêm ở DM tự có ô giá trống.
+   - Cỡ nào **chưa có giá** (giá = 0) thì hệ thống **chặn** và báo "Biểu cước … chưa có giá cho cỡ …" — nhập giá ở *DANH MỤC MASTER DATA → Cước Nâng Hạ (LoLo)* rồi lập lại. Máy tính cước và biểu phí ở cổng dùng cùng cách tra giá.
+   - **Không có dòng lưu bãi** trên phiếu dịch vụ (hệ thống từ chối): phí lưu bãi do hệ thống tính khi Gate-Out (mục 11).
 4. **Lưu & In**: phiếu dịch vụ, phiếu thu, e-EIR.
 
 **Hệ thống tự làm:** ghi nhật ký *Khai thác lập phiếu dịch vụ*; phiếu chuyển sang màn **Thanh toán**. Màn chi tiết phiếu chỉ để **xem và in**.
+
+> **Ghi chú dữ liệu cũ:** trước 20/10/2026 phiếu dịch vụ tính sai giá nâng hạ cho cỡ chưa có giá (lấy giá 40HC). Hai phiếu **đã thu tiền** `SO-20261016-645` (SUDU3070783, 45HC) và `SO-20261016-756` (BMOU1675248, 40RH) giữ nguyên số đã thu (dòng nâng hạ 420.000 đ). Phiếu chưa thu `SO-20261018-761` (WHLU4254283, 45HC) được tính lại theo biểu cước sau khi nhập giá 45HC. Ngày 20/10/2026 phiếu này được tách dòng vệ sinh gộp (1.230.001 đ) thành 3 dòng theo lệnh vệ sinh CL-20261018065734-785 (tổng quát 500.000, hoá chất 480.001, chuẩn thực phẩm 750.000 đ) — tổng mới 1.998.001,08 đ gồm VAT.
 
 ---
 
@@ -234,6 +239,11 @@ Hãng tàu trả lời qua email / cổng AEMS / điện thoại / văn bản �
 
 **Hệ thống tự làm:** QC đạt → container *Sẵn sàng xuất* (hoặc quay lại vệ sinh nếu còn lệnh vệ sinh chưa xong); tạo lệnh xe nâng *Xưởng sửa chữa → Bãi*.
 
+**Công nợ hãng tàu:** sau khi QC đạt, hồ sơ xuất hiện ở *Công Nợ Hãng Tàu (AR) → Đồng bộ công nợ*. Kế toán bấm đồng bộ để ghi nợ cho hãng:
+- số tiền = **số tiền hãng duyệt đã nhập tay** ở bước 8 (không phải tổng báo giá, không gửi API hãng); mã duyệt = mã duyệt / số Work Order của hãng;
+- ngày nợ = ngày QC đạt, hạn thanh toán sau 30 ngày; mỗi hồ sơ một khoản nợ;
+- chưa QC đạt (đang chờ QC, QC không đạt) thì chưa ghi nợ được.
+
 ---
 
 ## 11. Xuất cổng (Gate-Out)
@@ -252,7 +262,14 @@ Hãng tàu trả lời qua email / cổng AEMS / điện thoại / văn bản �
 
 **Không có booking** (trả vỏ về hãng, chuyển depot, sửa ngoài depot…): nhân viên cổng **gọi Giám sát / Quản lý**. Người này mở hộp cấp vỏ, tích *Không cần booking*, chọn lý do (*Khác* thì bắt buộc ghi chú) rồi xác nhận.
 
-**Hệ thống tự làm:** hồ sơ *Đã ra cổng* kèm số booking, booking **tăng số vỏ đã cấp 1** (không bao giờ cấp vượt số lượng, kể cả nhiều xe cùng lấy), giải phóng vị trí bãi, ghi nhật ký *Xuất cổng* (booking và số vỏ còn lại, hoặc lý do không theo booking và người duyệt).
+**Phí lưu bãi:** hộp cấp vỏ hiện phí lưu bãi do hệ thống tính theo *Cước Lưu Bãi* (DANH MỤC MASTER DATA):
+- dùng quy tắc đang dùng của **đúng hãng tàu** của container, không có thì quy tắc **Mọi hãng tàu**;
+- **số ngày lưu bãi = số ngày lịch (giờ Việt Nam) từ ngày Gate-In đến ngày ra, tính cả ngày vào và ngày ra**; trừ **số ngày miễn phí**, các ngày còn lại nhân đơn giá của bậc chứa ngày đó theo **loại container** (DM Loại Container), cộng VAT;
+- ví dụ: 40HC vào 01/10, ra 12/10 = 12 ngày; miễn phí 5 ngày → tính 7 ngày;
+- chưa có quy tắc / bậc chưa có giá cho loại đó thì hộp báo rõ lý do, không lấy giá loại khác.
+Từ 20/10/2026 phí lưu bãi **mới hiện để tham khảo và ghi vào nhật ký Xuất cổng, chưa thu và chưa chặn ra cổng** (lập phiếu thu sẽ làm sau).
+
+**Hệ thống tự làm:** hồ sơ *Đã ra cổng* kèm số booking, booking **tăng số vỏ đã cấp 1** (không bao giờ cấp vượt số lượng, kể cả nhiều xe cùng lấy), giải phóng vị trí bãi, ghi nhật ký *Xuất cổng* (booking và số vỏ còn lại, hoặc lý do không theo booking và người duyệt; số ngày lưu bãi và tổng phí lưu bãi, hoặc lý do chưa tính được).
 
 ---
 

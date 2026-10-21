@@ -17,6 +17,7 @@ export const DebtAgingReportTab: React.FC<DebtAgingReportTabProps> = ({
     return (amount || 0).toLocaleString('vi-VN') + (currency === 'VND' ? ' đ' : ' $');
   };
 
+  const totalNotDue = agingData.reduce((acc, b) => acc + (b.bucketNotDue || 0), 0);
   const total0_30 = agingData.reduce((acc, b) => acc + b.bucket0_30, 0);
   const total31_60 = agingData.reduce((acc, b) => acc + b.bucket31_60, 0);
   const total61_90 = agingData.reduce((acc, b) => acc + b.bucket61_90, 0);
@@ -59,10 +60,21 @@ export const DebtAgingReportTab: React.FC<DebtAgingReportTabProps> = ({
 
       {/* 4 Aging Buckets Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {/* Bucket 1: 0 - 30 Ngày */}
+        {/* Chưa đến hạn (server tính theo ngày Việt Nam) */}
+        <div className="bg-white border border-slate-200 p-4 rounded-2xl space-y-2 sm:col-span-2 lg:col-span-4">
+          <div className="flex items-center justify-between text-sky-600">
+            <span className="text-xs font-bold uppercase tracking-wider">Chưa Đến Hạn</span>
+            <ShieldCheck className="w-4 h-4" />
+          </div>
+          <div data-testid="aging-not-due-total" className="text-xl sm:text-2xl font-black font-mono text-sky-600">
+            {formatMoney(totalNotDue)}
+          </div>
+        </div>
+
+        {/* Bucket 1: quá hạn 1 - 30 Ngày */}
         <div className="bg-white border border-slate-200 p-4 rounded-2xl space-y-2">
           <div className="flex items-center justify-between text-emerald-600">
-            <span className="text-xs font-bold uppercase tracking-wider">0 - 30 Ngày (Trong hạn)</span>
+            <span className="text-xs font-bold uppercase tracking-wider">Quá hạn 1 - 30 Ngày</span>
             <ShieldCheck className="w-4 h-4" />
           </div>
           <div className="text-xl sm:text-2xl font-black font-mono text-emerald-600">
@@ -139,7 +151,8 @@ export const DebtAgingReportTab: React.FC<DebtAgingReportTabProps> = ({
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 <th className="py-3 px-4">HÃNG TÀU</th>
-                <th className="py-3 px-4 text-right">0 - 30 NGÀY</th>
+                <th className="py-3 px-4 text-right">CHƯA ĐẾN HẠN</th>
+                <th className="py-3 px-4 text-right">QUÁ HẠN 1 - 30</th>
                 <th className="py-3 px-4 text-right">31 - 60 NGÀY</th>
                 <th className="py-3 px-4 text-right">61 - 90 NGÀY</th>
                 <th className="py-3 px-4 text-right">&gt; 90 NGÀY</th>
@@ -156,6 +169,9 @@ export const DebtAgingReportTab: React.FC<DebtAgingReportTabProps> = ({
                       </span>
                       <span className="text-slate-700 font-normal">{item.shippingLineName}</span>
                     </div>
+                  </td>
+                  <td className="py-3.5 px-4 text-right font-mono text-sky-600">
+                    {formatMoney(item.bucketNotDue || 0)}
                   </td>
                   <td className="py-3.5 px-4 text-right font-mono text-emerald-600 font-medium">
                     {formatMoney(item.bucket0_30)}
@@ -178,6 +194,7 @@ export const DebtAgingReportTab: React.FC<DebtAgingReportTabProps> = ({
             <tfoot>
               <tr className="bg-slate-50 border-t-2 border-slate-200 font-bold text-xs">
                 <td className="py-3.5 px-4 text-slate-900 uppercase">TỔNG CỘNG</td>
+                <td className="py-3.5 px-4 text-right font-mono text-sky-600 font-black">{formatMoney(totalNotDue)}</td>
                 <td className="py-3.5 px-4 text-right font-mono text-emerald-600 font-black">{formatMoney(total0_30)}</td>
                 <td className="py-3.5 px-4 text-right font-mono text-amber-700 font-black">{formatMoney(total31_60)}</td>
                 <td className="py-3.5 px-4 text-right font-mono text-orange-700 font-black">{formatMoney(total61_90)}</td>

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Depot.Data.Entities.Base;
 
 namespace Depot.Data.Entities.Master;
@@ -20,18 +21,8 @@ public class ServiceTariff : FullAuditedEntity<long>
     public string? NameEn { get; set; }
     /// <summary>Đơn vị tính (vd "Lần / Cont").</summary>
     public string Unit { get; set; } = "Lần / Cont";
-    /// <summary>Đơn giá container 20' GP/DC.</summary>
-    public decimal Price20GP { get; set; }
-    /// <summary>Đơn giá container 40' GP/HC.</summary>
-    public decimal Price40HC { get; set; }
-    /// <summary>Đơn giá container 45' HC.</summary>
-    public decimal Price45HC { get; set; }
-    /// <summary>Đơn giá container 20' Reefer (lạnh).</summary>
-    public decimal Price20RF { get; set; }
-    /// <summary>Đơn giá container 40' Reefer (lạnh).</summary>
-    public decimal Price40RH { get; set; }
-    /// <summary>Đơn giá thiết bị đặc chủng (OOG/Tank/Flat Rack).</summary>
-    public decimal PriceSpecial { get; set; }
+    /// <summary>Đơn giá theo từng loại container trong DM Loại Container (thay 6 cột giá cố định cũ).</summary>
+    public virtual ICollection<ServiceTariffPrice> Prices { get; set; } = new List<ServiceTariffPrice>();
     /// <summary>Thuế VAT áp dụng (%).</summary>
     public decimal VatPercent { get; set; } = 8;
     /// <summary>Đơn vị tiền tệ.</summary>

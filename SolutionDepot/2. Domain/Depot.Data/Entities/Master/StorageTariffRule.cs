@@ -4,7 +4,7 @@ using Depot.Data.Entities.Base;
 namespace Depot.Data.Entities.Master;
 
 /// <summary>
-/// Quy tắc cước lưu bãi lũy tiến theo hãng tàu / loại container — tách riêng khỏi bảng danh mục dùng
+/// Quy tắc cước lưu bãi lũy tiến theo hãng tàu (mỗi hãng / "ALL" tối đa 1 quy tắc đang dùng; giá theo loại container nằm ở bậc) — tách riêng khỏi bảng danh mục dùng
 /// chung <see cref="MasterCatalogItem"/> (CatalogType = "STORAGE_TARIFF") vì có cấu trúc lồng (nhiều
 /// bậc giá theo khoảng ngày, xem <see cref="StorageTariffTier"/>), không phù hợp nhét vào 1 cột JsonData
 /// tự do. Xem docs/frontend-tariff-catalog-split.md.
@@ -18,8 +18,6 @@ public class StorageTariffRule : FullAuditedEntity<long>
     public string ShippingLineCode { get; set; } = "ALL";
     /// <summary>Tên hiển thị hãng tàu / nhóm áp dụng.</summary>
     public string ShippingLineName { get; set; } = string.Empty;
-    /// <summary>Nhóm loại container áp dụng: DRY_STANDARD, REEFER, IMO_HAZARDOUS, ISO_TANK...</summary>
-    public string ContainerTypeCategory { get; set; } = "DRY_STANDARD";
     /// <summary>Số ngày miễn phí lưu bãi mặc định (Free Time).</summary>
     public int DefaultFreeDays { get; set; }
     /// <summary>Đơn vị tính cước (vd "VND/Cont/Day").</summary>
